@@ -25,7 +25,9 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 # or 
 # $ python temoa.py path/to/dat/file
 
-from src.temoa_model import *
+# from temoa_model import *
 
-runModel()
+print('running from the package by default is no longer supported.  Use the main.py file at project top-level')
+
+# runModel()
 

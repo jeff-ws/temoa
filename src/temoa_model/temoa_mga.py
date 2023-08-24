@@ -19,8 +19,7 @@ in LICENSE.txt.  Users uncompressing this from an archive may not have
 received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from pyomo.environ import *
-from temoa_rules import TotalCost_rule
+from src.temoa_model.temoa_rules import TotalCost_rule
 
 def ActivityObj_rule ( M, prev_act_t ):
 	new_act = 0
@@ -36,7 +35,9 @@ def SlackedObjective_rule ( M, prev_cost, mga_slack ):
 	# 'PreviousSlackedObjective', for which Pyomo searches the namespace for
 	# 'PreviousSlackedObjective_rule'.  We decidedly do not want Pyomo
 	# trying to call this function because it is not aware of the second arg.
-	slackcost = (1 + mga_slack) * prev_cost 
+	slackcost = (1 + mga_slack) * prev_cost
+	# TODO:  This is way sketchy.  reference is to the rule rather than the expression generated.
+	#        might consider a reference to the instance.obj or such ??
 	oldobjective = TotalCost_rule( M )
 	expr = ( slackcost >= oldobjective )
 	return expr

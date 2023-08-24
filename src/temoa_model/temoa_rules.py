@@ -21,16 +21,31 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 
 # Import below required in Python 2.7 to avoid integer division
 # (e.g., 1/2 = 0 instead of 0.5)
-from __future__ import division
+# from __future__ import division
 
-from temoa_initialize import *
+# from src.temoa_model.temoa_initialize import *
+
+from sys import stderr as SE
+# this setup allows the IDE to use TemoaModel for typing purposes, but never import
+# it, avoiding any possible circular references between temoa_model <-> temoa_rules
+from typing import TYPE_CHECKING
+
+from pyomo.core.kernel.numvalue import value
+from pyomo.environ import Constraint
+
+from src.temoa_model.temoa_initialize import DemandConstraintErrorCheck, CommodityBalanceConstraintErrorCheck, \
+    CommodityBalanceConstraintErrorCheckAnnual
+
+if TYPE_CHECKING:
+    from src.temoa_model.temoa_model import TemoaModel
+
 
 # ---------------------------------------------------------------
 # Define the derived variables used in the objective function
 # and constraints below.
 # ---------------------------------------------------------------
 
-def Capacity_Constraint(M, r, p, s, d, t, v):
+def Capacity_Constraint(M: 'TemoaModel', r, p, s, d, t, v):
     r"""
 This constraint ensures that the capacity of a given process is sufficient
 to support its activity across all time periods and time slices. The calculation
@@ -70,30 +85,29 @@ possibility.
     # expression cloning taking place with Pyomo.
 
     useful_activity = sum(
-    M.V_FlowOut[r, p, s, d, S_i, t, v, S_o]
-    for S_i in M.processInputs[r, p, t, v]
-    for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
+        M.V_FlowOut[r, p, s, d, S_i, t, v, S_o]
+        for S_i in M.processInputs[r, p, t, v]
+        for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
     )
-
     if t in M.tech_curtailment:
         # If technologies are present in the curtailment set, then enough
         # capacity must be available to cover both activity and curtailment.
         return value(M.CapacityFactorProcess[r, s, d, t, v]) \
             * value(M.CapacityToActivity[r, t]) * value(M.SegFrac[s, d]) \
             * value(M.ProcessLifeFrac[r, p, t, v]) \
-            * M.V_Capacity[r, t, v] == useful_activity + sum( \
-            M.V_Curtailment[r, p, s, d, S_i, t, v, S_o] \
-            for S_i in M.processInputs[r, p, t, v] \
-            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i])
+            * M.V_Capacity[r, t, v] == useful_activity + sum(
+                M.V_Curtailment[r, p, s, d, S_i, t, v, S_o]
+                for S_i in M.processInputs[r, p, t, v]
+                for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i])
     else:
         return value(M.CapacityFactorProcess[r, s, d, t, v]) \
-        * value(M.CapacityToActivity[r, t]) \
-        * value(M.SegFrac[s, d]) \
-        * value(M.ProcessLifeFrac[r, p, t, v]) \
-        * M.V_Capacity[r, t, v] >= useful_activity
+            * value(M.CapacityToActivity[r, t]) \
+            * value(M.SegFrac[s, d]) \
+            * value(M.ProcessLifeFrac[r, p, t, v]) \
+            * M.V_Capacity[r, t, v] >= useful_activity
 
 
-def CapacityAnnual_Constraint(M, r, p, t, v):
+def CapacityAnnual_Constraint(M: 'TemoaModel', r, p, t, v):
     r"""
 Similar to Capacity_Constraint, but for technologies belonging to the
 :code:`tech_annual`  set. Technologies in the tech_annual set have constant output
@@ -119,7 +133,7 @@ capacity.
 
 
 """
-    CF = 1 #placeholder CF
+    CF = 1  # placeholder CF
 
     activity_rptv = sum(
         M.V_FlowOutAnnual[r, p, S_i, t, v, S_o]
@@ -128,12 +142,13 @@ capacity.
     )
 
     return CF \
-    * value(M.CapacityToActivity[r, t]) \
-    * value(M.ProcessLifeFrac[r, p, t, v]) \
-    * M.V_Capacity[r, t, v] >= activity_rptv
+        * value(M.CapacityToActivity[r, t]) \
+        * value(M.ProcessLifeFrac[r, p, t, v]) \
+        * M.V_Capacity[r, t, v] >= activity_rptv
 
 
-def ActivityByTech_Constraint(M, t):
+
+def ActivityByTech_Constraint(M: 'TemoaModel', t):
     r"""
 This constraint is utilized by the MGA objective function and defines
 the total activity of a technology over the planning horizon. The first version
@@ -158,17 +173,17 @@ in the :code:`tech_annual` set.
         for s_index in M.FlowVar_rpsditvo:
             if t in s_index:
                 indices.append(s_index)
-        activity = sum( M.V_FlowOut[s_index]
-              for s_index in indices
-          )
+        activity = sum(M.V_FlowOut[s_index]
+                       for s_index in indices
+                       )
     else:
         indices = []
         for s_index in M.FlowVarAnnual_rpitvo:
             if t in s_index:
                 indices.append(s_index)
-        activity = sum( M.V_FlowOutAnnual[s_index]
-              for s_index in indices
-          )
+        activity = sum(M.V_FlowOutAnnual[s_index]
+                       for s_index in indices
+                       )
 
     if int is type(activity):
         return Constraint.Skip
@@ -177,7 +192,7 @@ in the :code:`tech_annual` set.
     return expr
 
 
-def CapacityAvailableByPeriodAndTech_Constraint(M, r, p, t):
+def CapacityAvailableByPeriodAndTech_Constraint(M: 'TemoaModel', r, p, t):
     r"""
 
 The :math:`\textbf{CAPAVL}` variable is nominally for reporting solution values,
@@ -207,7 +222,8 @@ throughout the period.
     expr = M.V_CapacityAvailableByPeriodAndTech[r, p, t] == cap_avail
     return expr
 
-def ExistingCapacity_Constraint(M, r, t, v):
+
+def ExistingCapacity_Constraint(M: 'TemoaModel', r, t, v):
     r"""
 
 Temoa treats existing capacity installed prior to the beginning of the model's
@@ -225,6 +241,7 @@ that exist prior to the optimization horizon to user-specified values.
 """
     expr = M.V_Capacity[r, t, v] == M.ExistingCapacity[r, t, v]
     return expr
+
 
 # ---------------------------------------------------------------
 # Define the Objective Function
@@ -306,37 +323,34 @@ loan rates and periods.
     return sum(PeriodCost_rule(M, p) for p in M.time_optimize)
 
 
-def PeriodCost_rule(M, p):
+def PeriodCost_rule(M: 'TemoaModel', p):
     P_0 = min(M.time_optimize)
     P_e = M.time_future.last()  # End point of modeled horizon
     GDR = value(M.GlobalDiscountRate)
     MPL = M.ModelProcessLife
     x = 1 + GDR  # convenience variable, nothing more.
 
-
-    if  value(M.MyopicBaseyear) != 0:
-      P_0 = value(M.MyopicBaseyear)
-
-
+    if value(M.MyopicBaseyear) != 0:
+        P_0 = value(M.MyopicBaseyear)
 
     loan_costs = sum(
         M.V_Capacity[r, S_t, S_v]
         * (
-            value(M.CostInvest[r, S_t, S_v])
-            * value(M.LoanAnnualize[r, S_t, S_v])
-            * (
-                value(M.LifetimeLoanProcess[r, S_t, S_v])
-                if not GDR
-                else (
-                    x ** (P_0 - S_v + 1)
-                    * (1 - x ** (-value(M.LifetimeLoanProcess[r, S_t, S_v])))
-                    / GDR
+                value(M.CostInvest[r, S_t, S_v])
+                * value(M.LoanAnnualize[r, S_t, S_v])
+                * (
+                    value(M.LifetimeLoanProcess[r, S_t, S_v])
+                    if not GDR
+                    else (
+                            x ** (P_0 - S_v + 1)
+                            * (1 - x ** (-value(M.LifetimeLoanProcess[r, S_t, S_v])))
+                            / GDR
+                    )
                 )
-            )
         )
         * (
-            (1 - x ** (-min(value(M.LifetimeProcess[r, S_t, S_v]), P_e - S_v)))
-            / (1 - x ** (-value(M.LifetimeProcess[r, S_t, S_v])))
+                (1 - x ** (-min(value(M.LifetimeProcess[r, S_t, S_v]), P_e - S_v)))
+                / (1 - x ** (-value(M.LifetimeProcess[r, S_t, S_v])))
         )
         for r, S_t, S_v in M.CostInvest.sparse_iterkeys()
         if S_v == p
@@ -345,12 +359,12 @@ def PeriodCost_rule(M, p):
     fixed_costs = sum(
         M.V_Capacity[r, S_t, S_v]
         * (
-            value(M.CostFixed[r, p, S_t, S_v])
-            * (
-                value(MPL[r, p, S_t, S_v])
-                if not GDR
-                else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
-            )
+                value(M.CostFixed[r, p, S_t, S_v])
+                * (
+                    value(MPL[r, p, S_t, S_v])
+                    if not GDR
+                    else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
+                )
         )
         for r, S_p, S_t, S_v in M.CostFixed.sparse_iterkeys()
         if S_p == p
@@ -359,12 +373,12 @@ def PeriodCost_rule(M, p):
     variable_costs = sum(
         M.V_FlowOut[r, p, s, d, S_i, S_t, S_v, S_o]
         * (
-            value(M.CostVariable[r, p, S_t, S_v])
-            * (
-                value(MPL[r, p, S_t, S_v])
-                if not GDR
-                else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
-            )
+                value(M.CostVariable[r, p, S_t, S_v])
+                * (
+                    value(MPL[r, p, S_t, S_v])
+                    if not GDR
+                    else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
+                )
         )
         for r, S_p, S_t, S_v in M.CostVariable.sparse_iterkeys()
         if S_p == p and S_t not in M.tech_annual
@@ -377,12 +391,12 @@ def PeriodCost_rule(M, p):
     variable_costs_annual = sum(
         M.V_FlowOutAnnual[r, p, S_i, S_t, S_v, S_o]
         * (
-            value(M.CostVariable[r, p, S_t, S_v])
-            * (
-                value(MPL[r, p, S_t, S_v])
-                if not GDR
-                else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
-            )
+                value(M.CostVariable[r, p, S_t, S_v])
+                * (
+                    value(MPL[r, p, S_t, S_v])
+                    if not GDR
+                    else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
+                )
         )
         for r, S_p, S_t, S_v in M.CostVariable.sparse_iterkeys()
         if S_p == p and S_t in M.tech_annual
@@ -401,7 +415,7 @@ def PeriodCost_rule(M, p):
 # ---------------------------------------------------------------
 
 
-def Demand_Constraint(M, r, p, s, d, dem):
+def Demand_Constraint(M: 'TemoaModel', r, p, s, d, dem):
     r"""
 
 The Demand constraint drives the model.  This constraint ensures that supply at
@@ -425,7 +439,7 @@ words, an end-use demand must only be an end-use demand.  Note that if an output
 could satisfy both an end-use and internal system demand, then the output from
 :math:`\textbf{FO}` and :math:`\textbf{FOA}` would be double counted.
 """
-    if (r,s,d,dem) not in M.DemandSpecificDistribution.sparse_keys():
+    if (r, s, d, dem) not in M.DemandSpecificDistribution.sparse_keys():
         return Constraint.Skip
 
     supply = sum(
@@ -438,14 +452,15 @@ could satisfy both an end-use and internal system demand, then the output from
         M.V_FlowOutAnnual[r, p, S_i, S_t, S_v, dem]
         for S_t, S_v in M.commodityUStreamProcess[r, p, dem] if S_t in M.tech_annual
         for S_i in M.ProcessInputsByOutput[r, p, S_t, S_v, dem]
-    ) * value( M.SegFrac[ s, d])
+    ) * value(M.SegFrac[s, d])
 
     DemandConstraintErrorCheck(supply + supply_annual, r, p, s, d, dem)
 
     expr = supply + supply_annual == M.Demand[r, p, dem] * M.DemandSpecificDistribution[r, s, d, dem]
     return expr
 
-def DemandActivity_Constraint(M, r, p, s, d, t, v, dem, s_0, d_0):
+
+def DemandActivity_Constraint(M: 'TemoaModel', r, p, s, d, t, v, dem, s_0, d_0):
     r"""
 
 For end-use demands, it is unreasonable to let the model arbitrarily shift the
@@ -474,7 +489,7 @@ Note that this constraint is only applied to the demand commodities with diurnal
 variations, and therefore the equation above only includes :math:`\textbf{FO}`
 and not  :math:`\textbf{FOA}`
 """
-    if (r,s,d,dem) not in M.DemandSpecificDistribution.sparse_keys():
+    if (r, s, d, dem) not in M.DemandSpecificDistribution.sparse_keys():
         return Constraint.Skip
     DSD = M.DemandSpecificDistribution  # lazy programmer
 
@@ -491,7 +506,7 @@ and not  :math:`\textbf{FOA}`
     return expr
 
 
-def CommodityBalance_Constraint(M, r, p, s, d, c):
+def CommodityBalance_Constraint(M: 'TemoaModel', r, p, s, d, c):
     r"""
 Where the Demand constraint :eq:`Demand` ensures that end-use demands are met,
 the CommodityBalance constraint ensures that the endogenous system demands are
@@ -593,51 +608,53 @@ reduces computational burden.
     )
 
     try:
-      vflow_out = sum(
-          M.V_FlowOut[r, p, s, d, S_i, S_t, S_v, c]
-          for S_t, S_v in M.commodityUStreamProcess[r, p, c]
-          for S_i in M.ProcessInputsByOutput[r, p, S_t, S_v, c]
-      )
-
-      #export of commodity c from region r to other regions
-      interregional_exports = 0
-      if (r, p, c) in M.exportRegions:
-        interregional_exports = sum(
-          M.V_FlowOut[r+"-"+reg, p, s, d, c, S_t, S_v, S_o]
-          for reg, S_t, S_v, S_o in M.exportRegions[r, p, c]
-          )
-
-      #import of commodity c from other regions into region r
-      interregional_imports = 0
-      if (r, p, c) in M.importRegions:
-        interregional_imports = sum(
-          M.V_FlowOut[reg+"-"+r, p, s, d, S_i, S_t, S_v, c]
-          for reg, S_t, S_v, S_i in M.importRegions[r, p, c]
-          )
-
-      v_out_excess = 0
-      if c in M.flex_commodities:
-        v_out_excess = sum(
-            M.V_Flex[r, p, s, d, S_i, S_t, S_v, c]
-            for S_t, S_v in M.commodityUStreamProcess[r, p, c] if S_t not in M.tech_storage and S_t not in M.tech_annual and S_t in M.tech_flex
+        vflow_out = sum(
+            M.V_FlowOut[r, p, s, d, S_i, S_t, S_v, c]
+            for S_t, S_v in M.commodityUStreamProcess[r, p, c]
             for S_i in M.ProcessInputsByOutput[r, p, S_t, S_v, c]
         )
 
+        # export of commodity c from region r to other regions
+        interregional_exports = 0
+        if (r, p, c) in M.exportRegions:
+            interregional_exports = sum(
+                M.V_FlowOut[r + "-" + reg, p, s, d, c, S_t, S_v, S_o]
+                for reg, S_t, S_v, S_o in M.exportRegions[r, p, c]
+            )
+
+        # import of commodity c from other regions into region r
+        interregional_imports = 0
+        if (r, p, c) in M.importRegions:
+            interregional_imports = sum(
+                M.V_FlowOut[reg + "-" + r, p, s, d, S_i, S_t, S_v, c]
+                for reg, S_t, S_v, S_i in M.importRegions[r, p, c]
+            )
+
+        v_out_excess = 0
+        if c in M.flex_commodities:
+            v_out_excess = sum(
+                M.V_Flex[r, p, s, d, S_i, S_t, S_v, c]
+                for S_t, S_v in M.commodityUStreamProcess[r, p, c] if
+                S_t not in M.tech_storage and S_t not in M.tech_annual and S_t in M.tech_flex
+                for S_i in M.ProcessInputsByOutput[r, p, S_t, S_v, c]
+            )
+
     except:
-      raise Exception('The commodity "'+str(c)+'" can be produced \
+        raise Exception('The commodity "' + str(c) + '" can be produced \
       by at least one technology in the tech_annual set and one technology \
       not in the tech_annual set. All the producers of the commodity must \
       either be in tech_annual or not in tech_annual')
 
+    CommodityBalanceConstraintErrorCheck(vflow_out + interregional_imports,
+                                         vflow_in_ToStorage + vflow_in_ToNonStorage + vflow_in_ToNonStorageAnnual + interregional_exports + v_out_excess,
+                                         r, p, s, d, c)
 
-
-    CommodityBalanceConstraintErrorCheck(vflow_out + interregional_imports,  vflow_in_ToStorage +  vflow_in_ToNonStorage + vflow_in_ToNonStorageAnnual + interregional_exports + v_out_excess, r, p, s, d, c)
-
-    expr = vflow_out + interregional_imports == vflow_in_ToStorage +  vflow_in_ToNonStorage + vflow_in_ToNonStorageAnnual + interregional_exports + v_out_excess
+    expr = vflow_out + interregional_imports == vflow_in_ToStorage + vflow_in_ToNonStorage + vflow_in_ToNonStorageAnnual + interregional_exports + v_out_excess
 
     return expr
 
-def CommodityBalanceAnnual_Constraint(M, r, p, c):
+
+def CommodityBalanceAnnual_Constraint(M: 'TemoaModel', r, p, c):
     r"""
 Similar to the CommodityBalance_Constraint, but this version applies only
 to commodities produced at a constant annual rate. This version of the
@@ -692,38 +709,40 @@ While the commodity :math:`c` can only be produced by technologies in the
         for S_i in M.ProcessInputsByOutput[r, p, S_t, S_v, c]
     )
 
-    #export of commodity c from region r to other regions
+    # export of commodity c from region r to other regions
     interregional_exports = 0
     if (r, p, c) in M.exportRegions:
-      interregional_exports = sum(
-        M.V_FlowOutAnnual[str(r)+"-"+str(reg), p, c, S_t, S_v, S_o]
-        for reg, S_t, S_v, S_o in M.exportRegions[r, p, c]
+        interregional_exports = sum(
+            M.V_FlowOutAnnual[str(r) + "-" + str(reg), p, c, S_t, S_v, S_o]
+            for reg, S_t, S_v, S_o in M.exportRegions[r, p, c]
         )
 
-    #import of commodity c from other regions into region r
+    # import of commodity c from other regions into region r
     interregional_imports = 0
     if (r, p, c) in M.importRegions:
-      interregional_imports = sum(
-        M.V_FlowOutAnnual[str(reg)+"-"+str(r), p, S_i, S_t, S_v, c]
-        for reg, S_t, S_v, S_i in M.importRegions[r, p, c]
+        interregional_imports = sum(
+            M.V_FlowOutAnnual[str(reg) + "-" + str(r), p, S_i, S_t, S_v, c]
+            for reg, S_t, S_v, S_i in M.importRegions[r, p, c]
         )
 
     v_out_excess = 0
     if c in M.flex_commodities:
-      v_out_excess = sum(
-        M.V_FlexAnnual[r, p, S_i, S_t, S_v, c]
-        for S_t, S_v in M.commodityUStreamProcess[r, p, c] if S_t in M.tech_flex and S_t in M.tech_annual
-        for S_i in M.ProcessInputsByOutput[r, p, S_t, S_v, c]
-    )
+        v_out_excess = sum(
+            M.V_FlexAnnual[r, p, S_i, S_t, S_v, c]
+            for S_t, S_v in M.commodityUStreamProcess[r, p, c] if S_t in M.tech_flex and S_t in M.tech_annual
+            for S_i in M.ProcessInputsByOutput[r, p, S_t, S_v, c]
+        )
 
-    CommodityBalanceConstraintErrorCheckAnnual(vflow_out + interregional_imports,  vflow_in_annual + vflow_in + interregional_exports + v_out_excess, r, p, c)
+    CommodityBalanceConstraintErrorCheckAnnual(vflow_out + interregional_imports,
+                                               vflow_in_annual + vflow_in + interregional_exports + v_out_excess, r, p,
+                                               c)
 
-    expr = vflow_out + interregional_imports ==  vflow_in_annual + vflow_in + interregional_exports + v_out_excess
-
+    expr = vflow_out + interregional_imports == vflow_in_annual + vflow_in + interregional_exports + v_out_excess
 
     return expr
 
-def ResourceExtraction_Constraint(M, reg, p, r):
+
+def ResourceExtraction_Constraint(M: 'TemoaModel', reg, p, r):
     r"""
 The ResourceExtraction constraint allows a modeler to specify an annual limit on
 the amount of a particular resource Temoa may use in a period. The first version
@@ -743,22 +762,23 @@ belonging to the :code:`tech_annual` set.
    \forall \{r, p, c\} \in \Theta_{\text{ResourceExtraction}}
 """
     try:
-      collected = sum(
-          M.V_FlowOut[reg, p, S_s, S_d, S_i, S_t, S_v, r]
-          for S_i, S_t, S_v in M.ProcessByPeriodAndOutput.keys()
-          for S_s in M.time_season
-          for S_d in M.time_of_day
-      )
+        collected = sum(
+            M.V_FlowOut[reg, p, S_s, S_d, S_i, S_t, S_v, r]
+            for S_i, S_t, S_v in M.ProcessByPeriodAndOutput.keys()
+            for S_s in M.time_season
+            for S_d in M.time_of_day
+        )
     except:
-      collected = sum(
-          M.V_FlowOutAnnual[reg, p, S_i, S_t, S_v, r]
-          for S_i, S_t, S_v in M.ProcessByPeriodAndOutput.keys()
-      )
+        collected = sum(
+            M.V_FlowOutAnnual[reg, p, S_i, S_t, S_v, r]
+            for S_i, S_t, S_v in M.ProcessByPeriodAndOutput.keys()
+        )
 
     expr = collected <= M.ResourceBound[reg, p, r]
     return expr
 
-def BaseloadDiurnal_Constraint(M, r, p, s, d, t, v):
+
+def BaseloadDiurnal_Constraint(M: 'TemoaModel', r, p, s, d, t, v):
     r"""
 
 Some electric generators cannot ramp output over a short period of time (e.g.,
@@ -810,26 +830,27 @@ functionality is currently on the Temoa TODO list.
     # So:   (ActA / SegA) == (ActB / SegB)
     #   computationally, however, multiplication is cheaper than division, so:
     #       (ActA * SegB) == (ActB * SegA)
-    activity_sd = sum( \
-        M.V_FlowOut[r, p, s, d, S_i, t, v, S_o] \
-        for S_i in M.processInputs[r, p, t, v] \
-        for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i] \
+    activity_sd = sum(
+        M.V_FlowOut[r, p, s, d, S_i, t, v, S_o]
+        for S_i in M.processInputs[r, p, t, v]
+        for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
     )
 
-    activity_sd_0 = sum( \
-        M.V_FlowOut[r, p, s, d_0, S_i, t, v, S_o] \
-        for S_i in M.processInputs[r, p, t, v] \
-        for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i] \
+    activity_sd_0 = sum(
+        M.V_FlowOut[r, p, s, d_0, S_i, t, v, S_o]
+        for S_i in M.processInputs[r, p, t, v]
+        for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
     )
 
     expr = (
-        activity_sd * M.SegFrac[s, d_0]
-        == activity_sd_0 * M.SegFrac[s, d]
+            activity_sd * M.SegFrac[s, d_0]
+            == activity_sd_0 * M.SegFrac[s, d]
     )
 
     return expr
 
-def RegionalExchangeCapacity_Constraint(M, r_e, r_i, t, v):
+
+def RegionalExchangeCapacity_Constraint(M: 'TemoaModel', r_e, r_i, t, v):
     r"""
 
 This constraint ensures that the process (t,v) connecting regions
@@ -846,12 +867,12 @@ r_e and r_i is handled by one capacity variables.
       \forall \{r_e, r_i, t, v\} \in \Theta_{\text{RegionalExchangeCapacity}}
 """
 
-    expr = M.V_Capacity[r_e+"-"+r_i, t, v] == M.V_Capacity[r_i+"-"+r_e, t, v]
+    expr = M.V_Capacity[r_e + "-" + r_i, t, v] == M.V_Capacity[r_i + "-" + r_e, t, v]
 
     return expr
 
 
-def StorageEnergy_Constraint(M, r, p, s, d, t, v):
+def StorageEnergy_Constraint(M: 'TemoaModel', r, p, s, d, t, v):
     r"""
 
 This constraint tracks the storage charge level (:math:`\textbf{SL}_{r, p, s, d, t, v}`)
@@ -930,19 +951,19 @@ All equations below are sparsely indexed such that:
     # the last time slice of the last season must zero out
     if d == M.time_of_day.last() and s == M.time_season.last():
         d_prev = M.time_of_day.prev(d)
-        expr = M.V_StorageLevel[r, p, s, d_prev, t, v] + stored_energy == M.V_StorageInit[r, t,v]
+        expr = M.V_StorageLevel[r, p, s, d_prev, t, v] + stored_energy == M.V_StorageInit[r, t, v]
 
     # First time slice of the first season (i.e., start of period), starts at StorageInit level
     elif d == M.time_of_day.first() and s == M.time_season.first():
-        expr = M.V_StorageLevel[r, p, s, d, t, v] == M.V_StorageInit[r,t,v] + stored_energy
+        expr = M.V_StorageLevel[r, p, s, d, t, v] == M.V_StorageInit[r, t, v] + stored_energy
 
     # First time slice of any season that is NOT the first season
     elif d == M.time_of_day.first():
         d_last = M.time_of_day.last()
         s_prev = M.time_season.prev(s)
         expr = (
-            M.V_StorageLevel[r, p, s, d, t, v]
-            == M.V_StorageLevel[r, p, s_prev, d_last, t, v] + stored_energy
+                M.V_StorageLevel[r, p, s, d, t, v]
+                == M.V_StorageLevel[r, p, s_prev, d_last, t, v] + stored_energy
         )
 
     # Any time slice that is NOT covered above (i.e., not the time slice ending
@@ -950,13 +971,14 @@ All equations below are sparsely indexed such that:
     else:
         d_prev = M.time_of_day.prev(d)
         expr = (
-            M.V_StorageLevel[r, p, s, d, t, v]
-            == M.V_StorageLevel[r, p, s, d_prev, t, v] + stored_energy
+                M.V_StorageLevel[r, p, s, d, t, v]
+                == M.V_StorageLevel[r, p, s, d_prev, t, v] + stored_energy
         )
 
     return expr
 
-def StorageEnergyUpperBound_Constraint(M, r, p, s, d, t, v):
+
+def StorageEnergyUpperBound_Constraint(M: 'TemoaModel', r, p, s, d, t, v):
     r"""
 
 This constraint ensures that the amount of energy stored does not exceed
@@ -986,18 +1008,18 @@ scale the storage duration to account for the number of days in each season.
 """
 
     energy_capacity = (
-        M.V_Capacity[r, t, v]
-        * M.CapacityToActivity[r, t]
-        * (M.StorageDuration[r, t] / 8760)
-        * sum(M.SegFrac[s,S_d] for S_d in M.time_of_day) * 365
-        * value(M.ProcessLifeFrac[r, p, t, v])
+            M.V_Capacity[r, t, v]
+            * M.CapacityToActivity[r, t]
+            * (M.StorageDuration[r, t] / 8760)
+            * sum(M.SegFrac[s, S_d] for S_d in M.time_of_day) * 365
+            * value(M.ProcessLifeFrac[r, p, t, v])
     )
     expr = M.V_StorageLevel[r, p, s, d, t, v] <= energy_capacity
 
     return expr
 
 
-def StorageChargeRate_Constraint(M, r, p, s, d, t, v):
+def StorageChargeRate_Constraint(M: 'TemoaModel', r, p, s, d, t, v):
     r"""
 
 This constraint ensures that the charge rate of the storage unit is
@@ -1023,10 +1045,10 @@ limited by the power capacity (typically GW) of the storage unit.
 
     # Maximum energy charge in each time slice
     max_charge = (
-        M.V_Capacity[r, t, v]
-        * M.CapacityToActivity[r, t]
-        * M.SegFrac[s, d]
-        * value(M.ProcessLifeFrac[r, p, t, v])
+            M.V_Capacity[r, t, v]
+            * M.CapacityToActivity[r, t]
+            * M.SegFrac[s, d]
+            * value(M.ProcessLifeFrac[r, p, t, v])
     )
 
     # Energy charge cannot exceed the power capacity of the storage unit
@@ -1035,7 +1057,7 @@ limited by the power capacity (typically GW) of the storage unit.
     return expr
 
 
-def StorageDischargeRate_Constraint(M, r, p, s, d, t, v):
+def StorageDischargeRate_Constraint(M: 'TemoaModel', r, p, s, d, t, v):
     r"""
 
 This constraint ensures that the discharge rate of the storage unit
@@ -1060,10 +1082,10 @@ is limited by the power capacity (typically GW) of the storage unit.
 
     # Maximum energy discharge in each time slice
     max_discharge = (
-        M.V_Capacity[r, t, v]
-        * M.CapacityToActivity[r, t]
-        * M.SegFrac[s, d]
-        * value(M.ProcessLifeFrac[r, p, t, v])
+            M.V_Capacity[r, t, v]
+            * M.CapacityToActivity[r, t]
+            * M.SegFrac[s, d]
+            * value(M.ProcessLifeFrac[r, p, t, v])
     )
 
     # Energy discharge cannot exceed the capacity of the storage unit
@@ -1072,7 +1094,7 @@ is limited by the power capacity (typically GW) of the storage unit.
     return expr
 
 
-def StorageThroughput_Constraint(M, r, p, s, d, t, v):
+def StorageThroughput_Constraint(M: 'TemoaModel', r, p, s, d, t, v):
     r"""
 
 It is not enough to only limit the charge and discharge rate separately. We also
@@ -1105,16 +1127,16 @@ the capacity (typically GW) of the storage unit.
 
     throughput = charge + discharge
     max_throughput = (
-        M.V_Capacity[r, t, v]
-        * M.CapacityToActivity[r, t]
-        * M.SegFrac[s, d]
-        * value(M.ProcessLifeFrac[r, p, t, v])
+            M.V_Capacity[r, t, v]
+            * M.CapacityToActivity[r, t]
+            * M.SegFrac[s, d]
+            * value(M.ProcessLifeFrac[r, p, t, v])
     )
     expr = throughput <= max_throughput
     return expr
 
 
-def StorageInit_Constraint( M, r, t, v ):
+def StorageInit_Constraint(M: 'TemoaModel', r, t, v):
     r"""
 
 This constraint is used if the users wishes to force a specific initial storage charge level
@@ -1142,19 +1164,19 @@ capacity could lead to more expensive solutions.
 
     s = M.time_season.first()
     energy_capacity = (
-        M.V_Capacity[r, t, v]
-        * M.CapacityToActivity[r, t]
-        * (M.StorageDuration[r, t] / 8760)
-        * sum(M.SegFrac[s,S_d] for S_d in M.time_of_day) * 365
-        * value(M.ProcessLifeFrac[r, v, t, v])
+            M.V_Capacity[r, t, v]
+            * M.CapacityToActivity[r, t]
+            * (M.StorageDuration[r, t] / 8760)
+            * sum(M.SegFrac[s, S_d] for S_d in M.time_of_day) * 365
+            * value(M.ProcessLifeFrac[r, v, t, v])
     )
 
-    expr = M.V_StorageInit[r, t, v] ==  energy_capacity * M.StorageInitFrac[r, t, v]
+    expr = M.V_StorageInit[r, t, v] == energy_capacity * M.StorageInitFrac[r, t, v]
 
     return expr
 
 
-def RampUpDay_Constraint(M, r, p, s, d, t, v):
+def RampUpDay_Constraint(M: 'TemoaModel', r, p, s, d, t, v):
     # M.time_of_day is a sorted set, and M.time_of_day.first() returns the first
     # element in the set, similarly, M.time_of_day.last() returns the last element.
     # M.time_of_day.prev(d) function will return the previous element before s, and
@@ -1203,22 +1225,22 @@ In the :code:`RampUpDay` and :code:`RampUpSeason` constraints, we assume
 """
     if d != M.time_of_day.first():
         d_prev = M.time_of_day.prev(d)
-        activity_sd_prev = sum( \
-            M.V_FlowOut[r, p, s, d_prev, S_i, t, v, S_o] \
-            for S_i in M.processInputs[r, p, t, v] \
-            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i] \
+        activity_sd_prev = sum(
+            M.V_FlowOut[r, p, s, d_prev, S_i, t, v, S_o]
+            for S_i in M.processInputs[r, p, t, v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
         )
 
-        activity_sd = sum( \
-            M.V_FlowOut[r, p, s, d, S_i, t, v, S_o] \
-            for S_i in M.processInputs[r, p, t, v] \
-            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i] \
+        activity_sd = sum(
+            M.V_FlowOut[r, p, s, d, S_i, t, v, S_o]
+            for S_i in M.processInputs[r, p, t, v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
         )
 
         expr_left = (
-            activity_sd / value(M.SegFrac[s, d])
-            - activity_sd_prev / value(M.SegFrac[s, d_prev])
-        ) / value(M.CapacityToActivity[r,t])
+                            activity_sd / value(M.SegFrac[s, d])
+                            - activity_sd_prev / value(M.SegFrac[s, d_prev])
+                    ) / value(M.CapacityToActivity[r, t])
         expr_right = M.V_Capacity[r, t, v] * value(M.RampUp[r, t])
         expr = expr_left <= expr_right
     else:
@@ -1227,7 +1249,7 @@ In the :code:`RampUpDay` and :code:`RampUpSeason` constraints, we assume
     return expr
 
 
-def RampDownDay_Constraint(M, r, p, s, d, t, v):
+def RampDownDay_Constraint(M: 'TemoaModel', r, p, s, d, t, v):
     r"""
 
 Similar to the :code`RampUpDay` constraint, we use the :code:`RampDownDay`
@@ -1254,22 +1276,22 @@ constraint to limit ramp down rates between any two adjacent time slices.
 """
     if d != M.time_of_day.first():
         d_prev = M.time_of_day.prev(d)
-        activity_sd_prev = sum( \
-            M.V_FlowOut[r, p, s, d_prev, S_i, t, v, S_o] \
-            for S_i in M.processInputs[r, p, t, v] \
-            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i] \
+        activity_sd_prev = sum(
+            M.V_FlowOut[r, p, s, d_prev, S_i, t, v, S_o]
+            for S_i in M.processInputs[r, p, t, v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
         )
 
-        activity_sd = sum( \
-            M.V_FlowOut[r, p, s, d, S_i, t, v, S_o] \
-            for S_i in M.processInputs[r, p, t, v] \
-            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i] \
+        activity_sd = sum(
+            M.V_FlowOut[r, p, s, d, S_i, t, v, S_o]
+            for S_i in M.processInputs[r, p, t, v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
         )
 
         expr_left = (
-            activity_sd / value(M.SegFrac[s, d])
-            - activity_sd_prev / value(M.SegFrac[s, d_prev])
-        ) / value(M.CapacityToActivity[r,t])
+                            activity_sd / value(M.SegFrac[s, d])
+                            - activity_sd_prev / value(M.SegFrac[s, d_prev])
+                    ) / value(M.CapacityToActivity[r, t])
         expr_right = -(M.V_Capacity[r, t, v] * value(M.RampDown[r, t]))
         expr = expr_left >= expr_right
     else:
@@ -1278,7 +1300,7 @@ constraint to limit ramp down rates between any two adjacent time slices.
     return expr
 
 
-def RampUpSeason_Constraint(M, r, p, s, t, v):
+def RampUpSeason_Constraint(M: 'TemoaModel', r, p, s, t, v):
     r"""
 
 Note that :math:`d_1` and :math:`d_{nd}` represent the first and last time-of-day,
@@ -1308,22 +1330,22 @@ respectively.
         d_first = M.time_of_day.first()
         d_last = M.time_of_day.last()
 
-        activity_sd_first = sum( \
-            M.V_FlowOut[r, p, s, d_first, S_i, t, v, S_o] \
-            for S_i in M.processInputs[r, p, t, v] \
-            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i] \
+        activity_sd_first = sum(
+            M.V_FlowOut[r, p, s, d_first, S_i, t, v, S_o]
+            for S_i in M.processInputs[r, p, t, v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
         )
 
-        activity_s_prev_d_last = sum( \
-            M.V_FlowOut[r, p, s_prev, d_last, S_i, t, v, S_o] \
-            for S_i in M.processInputs[r, p, t, v] \
-            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i] \
+        activity_s_prev_d_last = sum(
+            M.V_FlowOut[r, p, s_prev, d_last, S_i, t, v, S_o]
+            for S_i in M.processInputs[r, p, t, v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
         )
 
         expr_left = (
-            activity_sd_first / M.SegFrac[s, d_first]
-            - activity_s_prev_d_last / M.SegFrac[s_prev, d_last]
-        ) / value(M.CapacityToActivity[r,t])
+                            activity_sd_first / M.SegFrac[s, d_first]
+                            - activity_s_prev_d_last / M.SegFrac[s_prev, d_last]
+                    ) / value(M.CapacityToActivity[r, t])
         expr_right = M.V_Capacity[r, t, v] * value(M.RampUp[r, t])
         expr = expr_left <= expr_right
     else:
@@ -1332,7 +1354,7 @@ respectively.
     return expr
 
 
-def RampDownSeason_Constraint(M, r, p, s, t, v):
+def RampDownSeason_Constraint(M: 'TemoaModel', r, p, s, t, v):
     r"""
 
 Similar to the :code:`RampUpSeason` constraint, we use the
@@ -1363,22 +1385,22 @@ between any two adjacent seasons.
         d_first = M.time_of_day.first()
         d_last = M.time_of_day.last()
 
-        activity_sd_first = sum( \
-            M.V_FlowOut[r, p, s, d_first, S_i, t, v, S_o] \
-            for S_i in M.processInputs[r, p, t, v] \
-            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i] \
+        activity_sd_first = sum(
+            M.V_FlowOut[r, p, s, d_first, S_i, t, v, S_o]
+            for S_i in M.processInputs[r, p, t, v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
         )
 
-        activity_s_prev_d_last = sum( \
-            M.V_FlowOut[r, p, s_prev, d_last, S_i, t, v, S_o] \
-            for S_i in M.processInputs[r, p, t, v] \
-            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i] \
+        activity_s_prev_d_last = sum(
+            M.V_FlowOut[r, p, s_prev, d_last, S_i, t, v, S_o]
+            for S_i in M.processInputs[r, p, t, v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
         )
 
         expr_left = (
-            activity_sd_first / value(M.SegFrac[s, d_first])
-            - activity_s_prev_d_last / value(M.SegFrac[s_prev, d_last])
-        ) / value(M.CapacityToActivity[r,t])
+                            activity_sd_first / value(M.SegFrac[s, d_first])
+                            - activity_s_prev_d_last / value(M.SegFrac[s_prev, d_last])
+                    ) / value(M.CapacityToActivity[r, t])
         expr_right = -(M.V_Capacity[r, t, v] * value(M.RampDown[r, t]))
         expr = expr_left >= expr_right
     else:
@@ -1387,8 +1409,7 @@ between any two adjacent seasons.
     return expr
 
 
-def RampUpPeriod_Constraint(M, r, p, t, v):
-
+def RampUpPeriod_Constraint(M: 'TemoaModel', r, p, t, v):
     # if p != M.time_future.first():
     # 	p_prev  = M.time_future.prev(p)
     # 	s_first = M.time_season.first()
@@ -1414,8 +1435,7 @@ def RampUpPeriod_Constraint(M, r, p, t, v):
     return Constraint.Skip  # We don't need inter-period ramp up/down constraint.
 
 
-def RampDownPeriod_Constraint(M, r, p, t, v):
-
+def RampDownPeriod_Constraint(M: 'TemoaModel', r, p, t, v):
     # if p != M.time_future.first():
     # 	p_prev  = M.time_future.prev(p)
     # 	s_first = M.time_season.first()
@@ -1442,7 +1462,7 @@ def RampDownPeriod_Constraint(M, r, p, t, v):
     return Constraint.Skip  # We don't need inter-period ramp up/down constraint.
 
 
-def ReserveMargin_Constraint(M, r, p, s, d):
+def ReserveMargin_Constraint(M: 'TemoaModel', r, p, s, d):
     r"""
 
 During each period :math:`p`, the sum of the available capacity of all reserve
@@ -1469,7 +1489,8 @@ we write this equation for all the time-slices defined in the database in each r
        \forall \{r, p, s, d\} \in \Theta_{\text{ReserveMargin}}
 
 """
-    if (not M.tech_reserve) or ((r,p) not in M.processReservePeriods.keys()):  # If reserve set empty or if r,p not in M.processReservePeriod.keys(), skip the constraint
+    if (not M.tech_reserve) or ((r,
+                                 p) not in M.processReservePeriods.keys()):  # If reserve set empty or if r,p not in M.processReservePeriod.keys(), skip the constraint
         return Constraint.Skip
 
     cap_avail = sum(
@@ -1482,8 +1503,7 @@ we write this equation for all the time-slices defined in the database in each r
         if (r, p, t) in M.processVintages.keys()
         for v in M.processVintages[r, p, t]
         # Make sure (r,p,t,v) combinations are defined
-        if (r,p,t,v) in M.activeCapacityAvailable_rptv
-
+        if (r, p, t, v) in M.activeCapacityAvailable_rptv
 
     )
 
@@ -1491,7 +1511,7 @@ we write this equation for all the time-slices defined in the database in each r
     # generation instead.
     total_generation = sum(
         M.V_FlowOut[r, p, s, d, S_i, t, S_v, S_o]
-        for (t,S_v) in M.processReservePeriods[r, p]
+        for (t, S_v) in M.processReservePeriods[r, p]
         for S_i in M.processInputs[r, p, t, S_v]
         for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
     )
@@ -1501,7 +1521,7 @@ we write this equation for all the time-slices defined in the database in each r
     return cap_avail >= cap_target
 
 
-def EmissionLimit_Constraint(M, r, p, e):
+def EmissionLimit_Constraint(M: 'TemoaModel', r, p, e):
     r"""
 
 A modeler can track emissions through use of the :code:`commodity_emissions`
@@ -1531,19 +1551,17 @@ output in separate terms.
 """
     emission_limit = M.EmissionLimit[r, p, e]
 
-     # r can be an individual region (r='US'), or a combination of regions separated by a + (r='Mexico+US+Canada'), or 'global'.
-     # Note that regions!=M.regions. We iterate over regions to find actual_emissions and actual_emissions_annual.
-    
+    # r can be an individual region (r='US'), or a combination of regions separated by a + (r='Mexico+US+Canada'), or 'global'.
+    # Note that regions!=M.regions. We iterate over regions to find actual_emissions and actual_emissions_annual.
 
     # if r == 'global', the constraint is system-wide
 
     if r == 'global':
-      regions = M.regions
+        regions = M.regions
     elif '+' in r:
-      regions = r.split('+')
+        regions = r.split('+')
     else:
-      regions = [r]
-
+        regions = [r]
 
     actual_emissions = sum(
         M.V_FlowOut[reg, p, S_s, S_d, S_i, S_t, S_v, S_o]
@@ -1601,7 +1619,8 @@ output in separate terms.
         if (reg, p, S_t, S_v) in M.processInputs.keys()
     )
 
-    if int is type(actual_emissions + actual_emissions_annual + actual_emissions_flex + actual_emissions_curtail + actual_emissions_flex_annual):
+    if int is type(
+            actual_emissions + actual_emissions_annual + actual_emissions_flex + actual_emissions_curtail + actual_emissions_flex_annual):
         msg = (
             "Warning: No technology produces emission '%s', though limit was "
             "specified as %s.\n"
@@ -1613,7 +1632,7 @@ output in separate terms.
     return expr
 
 
-def GrowthRateConstraint_rule(M, p, r, t):
+def GrowthRateConstraint_rule(M: 'TemoaModel', p, r, t):
     r"""
 
 This constraint sets an upper bound growth rate on technology-specific capacity.
@@ -1655,7 +1674,7 @@ horizon.
     return expr
 
 
-def MaxActivity_Constraint(M, r, p, t):
+def MaxActivity_Constraint(M: 'TemoaModel', r, p, t):
     r"""
 
 The MaxActivity sets an upper bound on the activity from a specific technology.
@@ -1677,40 +1696,40 @@ set.
    \forall \{r, p, t \in T^{a}\} \in \Theta_{\text{MaxActivity}}
 
 """
-	# r can be an individual region (r='US'), or a combination of regions separated by a + (r='Mexico+US+Canada'), or 'global'.
+    # r can be an individual region (r='US'), or a combination of regions separated by a + (r='Mexico+US+Canada'), or 'global'.
     # if r == 'global', the constraint is system-wide
     if r == 'global':
-      reg = M.regions
+        reg = M.regions
     elif '+' in r:
-      reg = r.split('+')
+        reg = r.split('+')
     else:
-      reg = [r]
+        reg = [r]
 
     try:
-      activity_rpt = sum(
-          M.V_FlowOut[r, p, s, d, S_i, t, S_v, S_o]
-          for r in reg
-          for S_v in M.processVintages[r, p, t]
-          for S_i in M.processInputs[r, p, t, S_v]
-          for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
-          for s in M.time_season
-          for d in M.time_of_day
-      )
+        activity_rpt = sum(
+            M.V_FlowOut[r, p, s, d, S_i, t, S_v, S_o]
+            for r in reg
+            for S_v in M.processVintages[r, p, t]
+            for S_i in M.processInputs[r, p, t, S_v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
+            for s in M.time_season
+            for d in M.time_of_day
+        )
     except:
-      activity_rpt = sum(
-          M.V_FlowOutAnnual[r, p, S_i, t, S_v, S_o]
-          for r in reg
-          for S_v in M.processVintages[r, p, t]
-          for S_i in M.processInputs[r, p, t, S_v]
-          for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
-      )
+        activity_rpt = sum(
+            M.V_FlowOutAnnual[r, p, S_i, t, S_v, S_o]
+            for r in reg
+            for S_v in M.processVintages[r, p, t]
+            for S_i in M.processInputs[r, p, t, S_v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
+        )
 
     max_act = value(M.MaxActivity[r, p, t])
     expr = activity_rpt <= max_act
     return expr
 
 
-def MinActivity_Constraint(M, r, p, t):
+def MinActivity_Constraint(M: 'TemoaModel', r, p, t):
     r"""
 
 The MinActivity sets a lower bound on the activity from a specific technology.
@@ -1732,40 +1751,40 @@ set.
    \forall \{r, p, t \in T^{a}\} \in \Theta_{\text{MinActivity}}
 
 """
-	# r can be an individual region (r='US'), or a combination of regions separated by a + (r='Mexico+US+Canada'), or 'global'.
+    # r can be an individual region (r='US'), or a combination of regions separated by a + (r='Mexico+US+Canada'), or 'global'.
     # if r == 'global', the constraint is system-wide
     if r == 'global':
-      reg = M.regions
+        reg = M.regions
     elif '+' in r:
-      reg = r.split('+')
+        reg = r.split('+')
     else:
-      reg = [r]
+        reg = [r]
 
     try:
-      activity_rpt = sum(
-          M.V_FlowOut[r, p, s, d, S_i, t, S_v, S_o]
-          for r in reg
-          for S_v in M.processVintages[r, p, t]
-          for S_i in M.processInputs[r, p, t, S_v]
-          for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
-          for s in M.time_season
-          for d in M.time_of_day
-      )
+        activity_rpt = sum(
+            M.V_FlowOut[r, p, s, d, S_i, t, S_v, S_o]
+            for r in reg
+            for S_v in M.processVintages[r, p, t]
+            for S_i in M.processInputs[r, p, t, S_v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
+            for s in M.time_season
+            for d in M.time_of_day
+        )
     except:
-      activity_rpt = sum(
-          M.V_FlowOutAnnual[r, p, S_i, t, S_v, S_o]
-          for r in reg
-          for S_v in M.processVintages[r, p, t]
-          for S_i in M.processInputs[r, p, t, S_v]
-          for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
-      )
+        activity_rpt = sum(
+            M.V_FlowOutAnnual[r, p, S_i, t, S_v, S_o]
+            for r in reg
+            for S_v in M.processVintages[r, p, t]
+            for S_i in M.processInputs[r, p, t, S_v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
+        )
 
     min_act = value(M.MinActivity[r, p, t])
     expr = activity_rpt >= min_act
     return expr
 
 
-def MinActivityGroup_Constraint(M, p, g):
+def MinActivityGroup_Constraint(M: 'TemoaModel', p, g):
     r"""
 
 The MinActivityGroup constraint sets a minimum activity limit for a user-defined
@@ -1806,13 +1825,12 @@ refers to the :code:`MinGenGroupTarget` parameter.
         for S_o in M.ProcessOutputsByInput[r, p, S_t, S_v, S_i]
     )
 
-
     min_act = value(M.MinGenGroupTarget[p, g])
     expr = activity_p + activity_p_annual >= min_act
     return expr
 
 
-def MaxCapacity_Constraint(M, r, p, t):
+def MaxCapacity_Constraint(M: 'TemoaModel', r, p, t):
     r"""
 
 The MaxCapacity constraint sets a limit on the maximum available capacity of a
@@ -1831,7 +1849,7 @@ tech, not tech and vintage.
     return expr
 
 
-def MaxResource_Constraint(M, r, t):
+def MaxResource_Constraint(M: 'TemoaModel', r, t):
     r"""
 
 The MaxResource constraint sets a limit on the maximum available resource of a
@@ -1847,31 +1865,31 @@ constraints are region and tech.
 """
     max_resource = value(M.MaxResource[r, t])
     try:
-      activity_rt = sum(
-          M.V_FlowOut[r, p, s, d, S_i, t, S_v, S_o]
-          for p in M.time_optimize
-          if (r, p, t) in M.processVintages.keys()
-          for S_v in M.processVintages[r, p, t]
-          for S_i in M.processInputs[r, p, t, S_v]
-          for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
-          for s in M.time_season
-          for d in M.time_of_day
-      )
+        activity_rt = sum(
+            M.V_FlowOut[r, p, s, d, S_i, t, S_v, S_o]
+            for p in M.time_optimize
+            if (r, p, t) in M.processVintages.keys()
+            for S_v in M.processVintages[r, p, t]
+            for S_i in M.processInputs[r, p, t, S_v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
+            for s in M.time_season
+            for d in M.time_of_day
+        )
     except:
-      activity_rt = sum(
-          M.V_FlowOutAnnual[r, p, S_i, t, S_v, S_o]
-          for p in M.time_optimize
-          if (r, p, t) in M.processVintages.keys()
-          for S_v in M.processVintages[r, p, t]
-          for S_i in M.processInputs[r, p, t, S_v]
-          for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
-      )
+        activity_rt = sum(
+            M.V_FlowOutAnnual[r, p, S_i, t, S_v, S_o]
+            for p in M.time_optimize
+            if (r, p, t) in M.processVintages.keys()
+            for S_v in M.processVintages[r, p, t]
+            for S_i in M.processInputs[r, p, t, S_v]
+            for S_o in M.ProcessOutputsByInput[r, p, t, S_v, S_i]
+        )
 
     expr = activity_rt <= max_resource
     return expr
 
 
-def MaxCapacitySet_Constraint(M, p):
+def MaxCapacitySet_Constraint(M: 'TemoaModel', p):
     r"""
 Similar to the :code:`MaxCapacity` constraint, but works on a group of technologies
 specified in the :code:`tech_capacity_max` subset.
@@ -1885,7 +1903,7 @@ specified in the :code:`tech_capacity_max` subset.
     return expr
 
 
-def MinCapacity_Constraint(M, r, p, t):
+def MinCapacity_Constraint(M: 'TemoaModel', r, p, t):
     r"""
 
 The MinCapacity constraint sets a limit on the minimum available capacity of a
@@ -1904,7 +1922,7 @@ tech, not tech and vintage.
     return expr
 
 
-def MinCapacitySet_Constraint(M, p):
+def MinCapacitySet_Constraint(M: 'TemoaModel', p):
     r"""
 Similar to the :code:`MinCapacity` constraint, but works on a group of technologies
 specified in the :code:`tech_capacity_min` subset.
@@ -1918,7 +1936,7 @@ specified in the :code:`tech_capacity_min` subset.
     return expr
 
 
-def TechInputSplit_Constraint(M, r, p, s, d, i, t, v):
+def TechInputSplit_Constraint(M: 'TemoaModel', r, p, s, d, i, t, v):
     r"""
 Allows users to specify fixed or minimum shares of commodity inputs to a process
 producing a single output. These shares can vary by model time period. See
@@ -1940,7 +1958,8 @@ NOT in the :code:`tech_annual` set) are considered.
     expr = inp >= M.TechInputSplit[r, p, i, t] * total_inp
     return expr
 
-def TechInputSplitAnnual_Constraint(M, r, p, i, t, v):
+
+def TechInputSplitAnnual_Constraint(M: 'TemoaModel', r, p, i, t, v):
     r"""
 Allows users to specify fixed or minimum shares of commodity inputs to a process
 producing a single output. These shares can vary by model time period. See
@@ -1962,7 +1981,8 @@ of the :math:`tech_annual` set) are considered.
     expr = inp >= M.TechInputSplit[r, p, i, t] * total_inp
     return expr
 
-def TechInputSplitAverage_Constraint(M, r, p, i, t, v):
+
+def TechInputSplitAverage_Constraint(M: 'TemoaModel', r, p, i, t, v):
     r"""
 Allows users to specify fixed or minimum shares of commodity inputs to a process
 producing a single output. Under this constraint, only the technologies with variable
@@ -1987,11 +2007,11 @@ the constraint only fixes the input shares over the course of a year.
         for S_o in M.ProcessOutputsByInput[r, p, t, v, i]
     )
 
-
     expr = inp >= M.TechInputSplitAverage[r, p, i, t] * total_inp
-    return expr 
+    return expr
 
-def TechOutputSplit_Constraint(M, r, p, s, d, t, v, o):
+
+def TechOutputSplit_Constraint(M: 'TemoaModel', r, p, s, d, t, v, o):
     r"""
 
 Some processes take a single input and make multiple outputs, and the user would like to
@@ -2033,15 +2053,16 @@ The constraint is formulated as follows:
     )
 
     total_out = sum(
-      M.V_FlowOut[r, p, s, d, S_i, t, v, S_o]
-      for S_i in M.processInputs[r, p, t, v]
-      for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
+        M.V_FlowOut[r, p, s, d, S_i, t, v, S_o]
+        for S_i in M.processInputs[r, p, t, v]
+        for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
     )
 
     expr = out >= M.TechOutputSplit[r, p, t, o] * total_out
     return expr
 
-def TechOutputSplitAnnual_Constraint ( M, r, p, t, v, o):
+
+def TechOutputSplitAnnual_Constraint(M: 'TemoaModel', r, p, t, v, o):
     r"""
 This constraint operates similarly to TechOutputSplit_Constraint.
 However, under this function, only the technologies with constant annual
@@ -2067,22 +2088,23 @@ output (i.e., members of the :math:`tech_annual` set) are considered.
         M.V_FlowOutAnnual[r, p, S_i, t, v, S_o]
         for S_i in M.processInputs[r, p, t, v]
         for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
-      )
+    )
 
     expr = out >= M.TechOutputSplit[r, p, t, o] * total_out
     return expr
 
+
 # ---------------------------------------------------------------
 # Define rule-based parameters
 # ---------------------------------------------------------------
-def ParamModelProcessLife_rule(M, r, p, t, v):
+def ParamModelProcessLife_rule(M: 'TemoaModel', r, p, t, v):
     life_length = value(M.LifetimeProcess[r, t, v])
     tpl = min(v + life_length - p, value(M.PeriodLength[p]))
 
     return tpl
 
 
-def ParamPeriodLength(M, p):
+def ParamPeriodLength(M: 'TemoaModel', p):
     # This specifically does not use time_optimize because this function is
     # called /over/ time_optimize.
     periods = sorted(M.time_future)
@@ -2096,7 +2118,7 @@ def ParamPeriodLength(M, p):
     return length
 
 
-def ParamProcessLifeFraction_rule(M, r, p, t, v):
+def ParamProcessLifeFraction_rule(M: 'TemoaModel', r, p, t, v):
     """\
 
 Calculate the fraction of period p that process :math:`<t, v>` operates.
@@ -2119,7 +2141,7 @@ create useful output.
     return frac
 
 
-def ParamLoanAnnualize_rule(M, r, t, v):
+def ParamLoanAnnualize_rule(M: 'TemoaModel', r, t, v):
     dr = value(M.DiscountRate[r, t, v])
     lln = value(M.LifetimeLoanProcess[r, t, v])
     if not dr:
@@ -2129,8 +2151,7 @@ def ParamLoanAnnualize_rule(M, r, t, v):
     return annualized_rate
 
 
-
-def LinkedEmissionsTech_Constraint(M, r, p, s, d, t, v, e):
+def LinkedEmissionsTech_Constraint(M: 'TemoaModel', r, p, s, d, t, v, e):
     r"""
 This constraint is necessary for carbon capture technologies that produce
 CO2 as an emissions commodity, but the CO2 also serves as a physical
@@ -2154,27 +2175,26 @@ the primary region corresponds to the linked technology as well. The lifetimes
 of the primary and linked technologies should be specified and identical. 
 """
     linked_t = M.LinkedTechs[r, t, e]
-    if (r,t,v) in M.LifetimeProcess.keys() and M.LifetimeProcess[r, linked_t,v] != M.LifetimeProcess[r, t,v]:
+    if (r, t, v) in M.LifetimeProcess.keys() and M.LifetimeProcess[r, linked_t, v] != M.LifetimeProcess[r, t, v]:
         msg = ('the LifetimeProcess values of the primary and linked technologies '
-          'in the LinkedTechs table have to be specified and identical')
-        raise Exception( msg )
-    if (r,t) in M.LifetimeTech.keys() and M.LifetimeTech[r, linked_t] != M.LifetimeTech[r, t]:
+               'in the LinkedTechs table have to be specified and identical')
+        raise Exception(msg)
+    if (r, t) in M.LifetimeTech.keys() and M.LifetimeTech[r, linked_t] != M.LifetimeTech[r, t]:
         msg = ('the LifetimeTech values of the primary and linked technologies '
-          'in the LinkedTechs table have to be specified and identical')
-        raise Exception( msg )
+               'in the LinkedTechs table have to be specified and identical')
+        raise Exception(msg)
 
     primary_flow = sum(
-    M.V_FlowOut[r, p, s, d, S_i, t, v, S_o]*M.EmissionActivity[r, e, S_i, t, v, S_o]
-    for S_i in M.processInputs[r, p, t, v]
-    for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
+        M.V_FlowOut[r, p, s, d, S_i, t, v, S_o] * M.EmissionActivity[r, e, S_i, t, v, S_o]
+        for S_i in M.processInputs[r, p, t, v]
+        for S_o in M.ProcessOutputsByInput[r, p, t, v, S_i]
     )
 
     linked_flow = sum(
-    M.V_FlowOut[r, p, s, d, S_i, linked_t, v, S_o]
-    for S_i in M.processInputs[r, p, linked_t, v]
-    for S_o in M.ProcessOutputsByInput[r, p, linked_t, v, S_i]
+        M.V_FlowOut[r, p, s, d, S_i, linked_t, v, S_o]
+        for S_i in M.processInputs[r, p, linked_t, v]
+        for S_o in M.ProcessOutputsByInput[r, p, linked_t, v, S_i]
     )
 
     expr = -primary_flow == linked_flow
     return expr
-

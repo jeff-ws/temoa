@@ -1,9 +1,10 @@
-import sqlite3
-import os
-import sys
 import getopt
+import os
 import re
+import sqlite3
+import sys
 from collections import OrderedDict
+
 
 def get_tperiods(inp_f):
 	file_ty = re.search(r"(\w+)\.(\w+)\b", inp_f) # Extract the input filename and extension

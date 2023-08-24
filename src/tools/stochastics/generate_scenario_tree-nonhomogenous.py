@@ -24,10 +24,8 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 import os
 import sys
 
-from itertools import product
 from pprint import pformat
 from shutil import copy as copyfile, rmtree
-from textwrap import TextWrapper
 
 # Ensure compatibility with Python 2.7 and 3
 try:
@@ -632,7 +630,7 @@ def main ( ):
 if '__main__' == __name__:
 	try:
 		main()
-	except Exception, e:
+	except Exception as e:
 		if '--debug' in sys.argv:
 			raise
 

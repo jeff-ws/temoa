@@ -7,31 +7,28 @@
 #  This software is distributed under the BSD License.
 #  _________________________________________________________________________
 
-import gc
 import os
+import random
 import sys
 import time
-import random
 from optparse import OptionParser, OptionGroup
 
-from pyutilib.pyro import shutdown_pyro_components
 import pyutilib.misc
-
 from pyomo.core.base import maximize, minimize
-from pyomo.core.base.symbol_map import symbol_map_from_instance
-from pyomo.util import pyomo_command
-from pyomo.util.plugin import ExtensionPoint
 from pyomo.opt.base import (SolverFactory,
                             PersistentSolver,
                             ProblemFormat)
 from pyomo.opt.base.solvers import UnknownSolver
 from pyomo.opt.parallel import SolverManagerFactory
-
+from pyomo.pysp.ef import write_ef, create_ef_instance
 from pyomo.pysp.scenariotree.instance_factory import \
     ScenarioTreeInstanceFactory
-from pyomo.pysp.ef import write_ef, create_ef_instance
 from pyomo.pysp.solutionwriter import ISolutionWriterExtension
 from pyomo.pysp.util.misc import launch_command
+from pyomo.util import pyomo_command
+from pyomo.util.plugin import ExtensionPoint
+from pyutilib.pyro import shutdown_pyro_components
+
 
 #
 # utility method to construct an option parser for ef writer arguments
@@ -654,7 +651,6 @@ def main(args=None):
     #
     # Import plugins
     #
-    import pyomo.environ
 
     #
     # Parse command-line options.

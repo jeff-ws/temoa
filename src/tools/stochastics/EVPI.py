@@ -1,15 +1,12 @@
 # This version is compatible with Pyomo 5.2
 
 import os
-import sys
+
 from pyomo.environ import *
+from pyomo.opt import SolverFactory
+from pyomo.pysp.ef import create_ef_instance
 from pyomo.pysp.scenariotree.manager import \
     ScenarioTreeManagerClientSerial
-from pyomo.pysp.ef import create_ef_instance
-from pyomo.opt import SolverFactory
-from time import time
-
-from IPython import embed as IP
 
 
 # To see detailed information about options
@@ -65,7 +62,6 @@ def solve_pf(p_model, p_data):
     import sys, os
     from collections import deque, defaultdict
     from pyomo.pysp.util.scenariomodels import scenario_tree_model
-    from pyomo.core import Objective
 
     (head, tail) = os.path.split(p_model)
     sys.path.insert(0, head)
@@ -123,8 +119,7 @@ def solve_pf(p_model, p_data):
             if not sStructure.ScenarioBasedData.value:
                 s2fp_dict[s].append(n + '.dat')
         s2cd_dict[s] = cp
-    
-    from pyomo.core import Objective
+
     if sStructure.ScenarioBasedData.value:
         for s in sStructure.Scenarios:
             s2fp_dict[s].append(s + '.dat')

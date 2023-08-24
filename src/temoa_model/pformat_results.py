@@ -28,21 +28,17 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 
 __all__ = ('pformat_results', 'stringify_data')
 
-from collections import defaultdict
-from sys import stderr as SE, stdout as SO
-from shutil import rmtree
-import sqlite3
 import os
 import re
-import subprocess
-import sys
+import sqlite3
+from collections import defaultdict
+from shutil import rmtree
+from sys import stderr as SE, stdout as SO
+
 import pandas as pd
 
-from temoa_config import TemoaConfig
-
-# Need line below to import DB_to_Excel.py from data_processing
-sys.path.append(os.path.join(os.getcwd(), 'data_processing'))
-from DB_to_Excel import make_excel
+from src.data_processing.DB_to_Excel import make_excel
+from src.temoa_model.temoa_config import TemoaConfig
 
 # Ensure compatibility with Python 2.7 and 3
 try:
@@ -73,7 +69,7 @@ def stringify_data ( data, ostream=SO, format='plain' ):
 
 
 def pformat_results ( pyomo_instance, pyomo_result, options ):
-	from pyomo.core import Objective, Var, Constraint
+	from pyomo.core import Objective
 
 	output = StringIO()
 

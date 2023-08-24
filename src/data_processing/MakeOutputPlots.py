@@ -1,11 +1,11 @@
-import sqlite3, sys
+import sqlite3
+import sys
+
 import matplotlib
+
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt, cm as cmx, colors
-from IPython import embed as IP
-import numpy as np
 import random
-import time
 import os
 import argparse
 

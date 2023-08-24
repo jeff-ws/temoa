@@ -1,20 +1,17 @@
-from pyomo.environ import *
-from pyomo.core import Constraint
-from pyomo.opt import SolverFactory
-import sys, os, platform
-from matplotlib import pyplot as plt
-import numpy as np
-from collections import OrderedDict, defaultdict
+import os
+from collections import defaultdict
 from time import time
-import pandas as pd
-from IPython import embed as IP
-from src.temoa_model import temoa_create_model
-from pyomo.core.base import Var, Constraint, Objective, maximize, minimize
-from pyomo.repn import generate_canonical_repn
 
-import cplex, CplexSolverError
-from openpyxl import Workbook
+import CplexSolverError
 import cplex
+import pandas as pd
+from matplotlib import pyplot as plt
+from openpyxl import Workbook
+from pyomo.environ import *
+from pyomo.opt import SolverFactory
+from pyomo.repn import generate_canonical_repn
+from temoa_model import temoa_create_model
+
 
 def return_Temoa_model():
 
@@ -36,7 +33,6 @@ def return_Temoa_data(model, list_dat):
 def return_c_vector(block, unfixed):
     # Note that this function is adapted function collect_linear_terms defined
     # in pyomo/repn/collect.py.
-    from pyutilib.misc import Bunch
 
     #
     # Variables are constraints of block

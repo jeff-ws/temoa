@@ -1,10 +1,12 @@
-import sqlite3
-import sys, itertools
-import re
 import getopt
+import itertools
+import re
+import sqlite3
+import sys
+
 import pandas as pd
-import xlsxwriter
 from pyam import IamDataFrame
+
 
 def make_excel(ifile, ofile, scenario):
 	

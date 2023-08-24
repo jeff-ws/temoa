@@ -1,10 +1,9 @@
-from subprocess import call
-import os
 import sys
+from subprocess import call
 
-from GraphVizUtil import *
 from DatabaseUtil import *
 from GraphVizFormats import *
+from GraphVizUtil import *
 
 
 class GraphvizDiagramGenerator(object):

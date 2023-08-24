@@ -19,41 +19,28 @@ in LICENSE.txt.  Users uncompressing this from an archive may not have
 received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from os import path, close as os_close
-from sys import argv, stderr as SE, stdout as SO
-from signal import signal, SIGINT, default_int_handler
-from shutil import copyfile, move
-
-from pyomo.opt import SolverFactory as SF
-from pyomo.opt import SolverManagerFactory
-from pyomo.environ import *
-
-from temoa_config import TemoaConfig
-
-import errno, warnings
+import os
 import re as reg_exp
-
-from argparse import Namespace
-from os import sep
-
-from pyutilib.services import TempfileManager
-from pyutilib.services import TempfileManager
-from pyutilib.common import ApplicationError
-
-from sys import version_info, exit
-
-from time import time
-import sys, os, gc
-
-from pyomo.environ import DataPortal
-
-from pformat_results import pformat_results
-
-from collections import defaultdict
-from temoa_rules import TotalCost_rule, ActivityByTech_Constraint
-from temoa_mga   import ActivityObj_rule, SlackedObjective_rule, PreviousAct_rule
 import traceback
+from collections import defaultdict
+from os import path
+from os import sep
+from shutil import copyfile, move
+from signal import signal, SIGINT, default_int_handler
+from sys import argv, stderr as SE
+from sys import version_info
+from time import time
 
+from pyomo.environ import *
+from pyomo.environ import DataPortal
+from pyomo.opt import SolverFactory as SF
+from pyutilib.common import ApplicationError
+from pyutilib.services import TempfileManager
+
+from src.temoa_model.pformat_results import pformat_results
+from src.temoa_model.temoa_config import TemoaConfig
+from src.temoa_model.temoa_mga import ActivityObj_rule, SlackedObjective_rule, PreviousAct_rule
+from src.temoa_model.temoa_rules import TotalCost_rule, ActivityByTech_Constraint
 
 signal(SIGINT, default_int_handler)
 
@@ -156,6 +143,7 @@ class TemoaSolver(object):
 		self.model.del_component( 'TotalCost' )
 		# Create concrete model
 		temoaInstance1 = TemoaSolverInstance(self.model, self.optimizer, self.options, self.txt_file)
+		self.instance_hook = temoaInstance1  # hook for pytest reference
 		for k in temoaInstance1.create_temoa_instance():
 			# yield "<div>" + k + "</div>"
 			yield k
@@ -231,11 +219,12 @@ class TemoaSolver(object):
 	def solveWithoutMGA(self):
 
 		temoaInstance1 = TemoaSolverInstance(self.model, self.optimizer, self.options, self.txt_file)
+		self.instance_hook = temoaInstance1  # hook for pytest reference
 
 		if hasattr(self.options, 'myopic') and self.options.myopic:
 
 			print ('This run is myopic ...')
-			from temoa_myopic import myopic_db_generator_solver
+			from src.temoa_model.temoa_myopic import myopic_db_generator_solver
 			myopic_db_generator_solver ( self )
 
 		else:
@@ -497,7 +486,7 @@ def get_solvers():
 
 def parse_args ( ):
 	"""Parse arguments specfied from command line or in config file."""
-	import argparse, sys
+	import argparse
 	import os, re
 	from os.path import dirname, abspath
 

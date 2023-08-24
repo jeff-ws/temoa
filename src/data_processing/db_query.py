@@ -1,8 +1,8 @@
-import sqlite3
-import os
-import sys
 import getopt
 import re
+import sqlite3
+import sys
+
 
 def send_query(inp_f, query_string):
 	db_result = []

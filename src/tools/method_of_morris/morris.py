@@ -1,20 +1,20 @@
 from __future__ import division
+
 import time
+
 start_time = time.time()
 from joblib import Parallel, delayed
 import multiprocessing
-import sys
 import os
 from shutil import copyfile
 import sqlite3
 from numpy import array
-from IPython import embed as IP
 from SALib.analyze import morris
 from SALib.sample.morris import sample
 from SALib.util import read_param_file, compute_groups_matrix
-import numpy as np
 
-def evaluate(param_names, param_values,k): 
+
+def evaluate(param_names, param_values,k):
 
 	m=len(param_values)
 	for j in range(0,m):

@@ -1,7 +1,8 @@
 from __future__ import division
+
 import sys
-from IPython import embed as IP
 import time
+
 start_time = time.time()
 from joblib import Parallel, delayed
 import multiprocessing
@@ -13,10 +14,7 @@ from numpy import array
 import csv
 from pyDOE import *
 
-
-from SALib.analyze import morris
-from SALib.sample.morris import sample
-from SALib.util import read_param_file, compute_groups_matrix
+from SALib.util import read_param_file
 import numpy as np
 
 def evaluate(param_values,k):

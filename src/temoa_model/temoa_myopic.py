@@ -30,13 +30,14 @@ All the results are written in the original database specified in the config fil
 
 """
 
-import sqlite3
-import pandas as pd    
-from shutil import copyfile
-import os
-import sys
-from IPython import embed as IP
 import io
+import os
+import sqlite3
+import sys
+from shutil import copyfile
+
+import pandas as pd
+
 
 def myopic_db_generator_solver ( self ):
     global db_path_org
@@ -229,8 +230,10 @@ def myopic_db_generator_solver ( self ):
                                                          WHERE scenario="+"'"+str(self.options.scenario)+"' AND \
                                                          vintage < "+str(time_periods[i-(N-1)][0])+";", con_org)
             df_new_ExistingCapacity.columns = ['regions','tech','vintage','exist_cap']
-            df_new_ExistingCapacity.to_sql('ExistingCapacity',con, if_exists='append', index=False)
-    
+            # TODO:  changed if_exists "append" --> "replace" to avoid UNIQUE error.  THIS MAY BE WRONG!
+            # df_new_ExistingCapacity.to_sql('ExistingCapacity',con, if_exists='append', index=False)
+            df_new_ExistingCapacity.to_sql('ExistingCapacity',con, if_exists='replace', index=False)
+
             #Create a copy of the first time period vintages for the two current vintage 
             #to prevent infeasibility (if it is not an 'existing' vintage in the 
             #original database and if it doesn't already have a current vintage). One example: 
@@ -394,7 +397,8 @@ def myopic_db_generator_solver ( self ):
 
         ifile.close()
         ofile.close()
-        os.system("python temoa_model/ --config=temoa_model/config_sample"+new_myopic_name)
+        # TODO:  this running of saved commands probably needs to change, minimally the location...
+        os.system("python ../src/temoa_model/ --config=temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
         # delete the temporary config file
         os.remove(new_config)
         if not self.options.KeepMyopicDBs:

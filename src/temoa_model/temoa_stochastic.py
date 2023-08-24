@@ -21,19 +21,18 @@ in LICENSE.txt.  Users uncompressing this from an archive may not have
 received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from temoa_initialize import Var, Objective, Constraint, NonNegativeReals, minimize
-from src.temoa_model import temoa_create_model
-from temoa_rules import PeriodCost_rule
-from temoa_run import parse_args
-from pformat_results import pformat_results
+import os
+
 from pyomo.environ import *
+from pyomo.opt import SolverFactory
+from pyomo.pysp.ef import create_ef_instance
 from pyomo.pysp.scenariotree.manager import \
     ScenarioTreeManagerClientSerial
-from pyomo.pysp.ef import create_ef_instance
-from pyomo.opt import SolverFactory
-from time import time
-import os
-import sys
+
+from pformat_results import pformat_results
+from temoa_model import temoa_create_model
+from temoa_rules import PeriodCost_rule
+from temoa_run import parse_args
 
 
 def return_CP_and_path(p_data):
@@ -107,8 +106,7 @@ def return_CP_and_path(p_data):
             if not sStructure.ScenarioBasedData.value:
                 s2fp_dict[s].append(n + '.dat')
         s2cd_dict[s] = cp
-    
-    from pyomo.core import Objective
+
     if sStructure.ScenarioBasedData.value:
         for s in sStructure.Scenarios:
             s2fp_dict[s].append(s + '.dat')
