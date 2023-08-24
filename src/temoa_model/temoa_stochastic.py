@@ -22,7 +22,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from temoa_initialize import Var, Objective, Constraint, NonNegativeReals, minimize
-from temoa_model import temoa_create_model
+from src.temoa_model import temoa_create_model
 from temoa_rules import PeriodCost_rule
 from temoa_run import parse_args
 from pformat_results import pformat_results

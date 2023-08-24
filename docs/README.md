@@ -10,7 +10,7 @@ The only additional software element required is LaTex. On a Mac, [MacTeX](https
 
 ## Producing documentation
 The Temoa documentation draws from a couple of sources: (1) the static descriptions of model elements included in [Documentation.rst](source//Documentation.rst), and (2) the doc strings
-embedded in [temoa_rules.py](../temoa_model/temoa_rules.py) that document the objective function and constraints. Sphinx retrieves these doc strings and generates LaTeX-formatted equations in the "Equations" section of the documentation.
+embedded in [temoa_rules.py](../src/temoa_model/temoa_rules.py) that document the objective function and constraints. Sphinx retrieves these doc strings and generates LaTeX-formatted equations in the "Equations" section of the documentation.
 
 
 From this folder, execute the following to generate the html documentation:

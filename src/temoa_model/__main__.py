@@ -25,7 +25,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 # or 
 # $ python temoa.py path/to/dat/file
 
-from temoa_model import *
+from src.temoa_model import *
 
 runModel()
 
