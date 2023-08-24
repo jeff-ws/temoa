@@ -7,3 +7,7 @@ data_files/untracked_data/
 
 # ignore the PyCharm .idea config directory
 .idea/*
+
+# ignore all outputs
+/output_files/*
+
