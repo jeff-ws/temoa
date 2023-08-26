@@ -20,6 +20,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from src.temoa_model.temoa_rules import TotalCost_rule
+from pyomo.core.kernel.numvalue import value
 
 def ActivityObj_rule ( M, prev_act_t ):
 	new_act = 0

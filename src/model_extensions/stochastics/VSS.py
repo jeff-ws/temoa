@@ -1,4 +1,4 @@
-Script to determine the value of the stochastic solution using Temoa
+#Script to determine the value of the stochastic solution using Temoa
 from pyomo.pysp.ef_writer_script_old import *
 from pyomo.pysp.ef_writer_script_old import *
 
