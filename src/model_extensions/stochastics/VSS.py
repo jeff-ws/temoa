@@ -1,7 +1,10 @@
 #Script to determine the value of the stochastic solution using Temoa
+import pyomo.environ
+from pyomo.opt import SolverFactory
+from pyomo.core import DataPortal
 from pyomo.pysp.ef_writer_script_old import *
-from pyomo.pysp.ef_writer_script_old import *
-
+from pyomo.pysp.ef_vss import *
+from IPython import embed as II
 
 def organize_csv():
 	#This function was imported from the EVPI script
@@ -97,9 +100,11 @@ def my_ef_writer(scenario_tree):
 def solve_ef(ef_options):
 	#This function solves a stochastic optimization problem via extensive form
 	#This function was imported from the EVPI script
-	pass
+	import os, sys
+	from collections import deque, defaultdict
+	from pyomo.core import Objective, Var #not sure if Var is right after the Objective
 
-    sif = ScenarioTreeInstanceFactory(ef_options.model_directory, ef_options.instance_directory, ef_options.verbose)
+	sif = ScenarioTreeInstanceFactory(ef_options.model_directory, ef_options.instance_directory, ef_options.verbose)
 	scenario_tree = GenerateScenarioTreeForEF(ef_options, sif)
 	ef = EFAlgorithmBuilder(ef_options, scenario_tree)
 	f = open(os.devnull, 'w'); sys.stdout = f
@@ -116,9 +121,11 @@ def solve_ef_fix(ef_options,avg_instance):
 	#where first stage decision variables are fixed at the optimal values from
 	#the deterministic model called here avg_instance
 
-	pass
+	import os, sys
+	from collections import deque, defaultdict
+	from pyomo.core import Objective, Var #not sure if Var is right after the Objective
 
-    sif = ScenarioTreeInstanceFactory(ef_options.model_directory, ef_options.instance_directory, ef_options.verbose)
+	sif = ScenarioTreeInstanceFactory(ef_options.model_directory, ef_options.instance_directory, ef_options.verbose)
 	scenario_tree = GenerateScenarioTreeForEF(ef_options, sif)
 	ef = EFAlgorithmBuilder(ef_options, scenario_tree)
 	
@@ -170,8 +177,11 @@ def solve_dm(p_model, p_data, opt_solver):
 		# Assuming there is only one objective function
 		return obj_values[0]
 
+	import sys, os
+	from collections import deque, defaultdict
+	from pyomo.core import Objective, Var #not sure if Var is right after the Objective
 
-(head, tail) = os.path.split(p_model)
+	(head, tail) = os.path.split(p_model)
 	sys.path.insert(0, head)
 	pwd = os.getcwd()
 	os.chdir(p_data)
@@ -202,14 +212,19 @@ def solve_dm(p_model, p_data, opt_solver):
 	return instance #Returning instance solved, values will be used later
 
 def runEVPI():
-    #EVPI_value = test_twotechs_vss_base()
+	from EVPI import *
+
+	#EVPI_value = test_twotechs_vss_base()
 	EVPI_value = test_sudan_VSS()
 	return EVPI_value
 
 def runECIU():
+	from time import time
+	import sys
 	import os
+	from subprocess import call
 
-    #folder_string = "stochastic/twotechs_vss_base/"
+	#folder_string = "stochastic/twotechs_vss_base/"
 	folder_string = "stochastic/utopia_vss/"
 	os.system("python temoa_model/ --eciu " + folder_string)	
 
@@ -219,9 +234,14 @@ def runVSS():
 	#As input, this function requires the path of the stochastic folder and temoa_stochastic.py file
 	#It assumes that an instance named ReferenceModel.dat is located inside the stochastic folder
 
-	pass
+	from time import time
+	import sys
+	import os
+	from subprocess import call
+	import sqlite3
+	import csv
 
-    sys.stderr.write('\nFinding the Value of the Stochastic Solution using Temoa\n')
+	sys.stderr.write('\nFinding the Value of the Stochastic Solution using Temoa\n')
 
 	p_model = '/home/arqueiroz/SSudan/S1_2_H/temoa_model/temoa_stochastic.py'
 	p_data  = '/home/arqueiroz/SSudan/S1_2_H/stochastic/S_Sudan_original_stoch_cap_cost_11'
