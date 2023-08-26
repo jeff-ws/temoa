@@ -34,6 +34,7 @@ from time import time
 from pyomo.environ import *
 from pyomo.environ import DataPortal
 from pyomo.opt import SolverFactory as SF
+from pyomo.core.kernel.numvalue import value
 from pyutilib.common import ApplicationError
 from pyutilib.services import TempfileManager
 

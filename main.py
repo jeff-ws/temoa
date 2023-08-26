@@ -1,7 +1,9 @@
 """
 new entry point for running the model.
 """
+import logging
 
+import definitions
 # Written by:  J. F. Hyink
 # jeff@westernspark.us
 # https://westernspark.us
@@ -11,8 +13,6 @@ new entry point for running the model.
 
 from src.temoa_model.temoa_model import TemoaModel
 from src.temoa_model.temoa_run import TemoaSolver
-
-
 
 def runModelUI(config_filename):
     """This function launches the model run from the Temoa GUI"""

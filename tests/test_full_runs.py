@@ -1,6 +1,8 @@
 """
 Test a couple full-runs to match objective function value and some internals
 """
+import json
+import logging
 import os
 
 import pyomo.environ as pyo
@@ -17,8 +19,10 @@ from tests.legacy_test_values import TestVals, test_vals
 # https://westernspark.us
 # Created on:  6/27/23
 
+
+logger = logging.getLogger(__name__)
 # list of test scenarios for which we have captured results in legacy_test_values.py
-legacy_config_files = ['config_utopia', 'config_test_system',] # 'config_utopia_myopic',]
+legacy_config_files = ['config_utopia', 'config_test_system'] #, 'config_utopia_myopic',]
 
 
 @pytest.fixture(params=legacy_config_files)
@@ -45,6 +49,7 @@ def test_against_legacy_outputs(system_test_run):
     This test compares tests of legacy models to captured test results
     """
     filename, res, mdl = system_test_run
+    logger.info("Starting output test on scenario: %s", filename)
     expected_vals = test_vals.get(filename)  # a dictionary of expected results
 
     # inspect some summary results
@@ -58,3 +63,25 @@ def test_against_legacy_outputs(system_test_run):
         TestVals.EFF_INDEX_SIZE], 'should match legacy numbers'
     assert len(efficiency_param._index) == expected_vals[TestVals.EFF_DOMAIN_SIZE], 'should match legacy numbers'
 
+def test_upoptia_set_consistency():
+    """
+    test the set membership of the utopia model against cached values to ensure consistency
+    """
+    config_file = os.path.join(PROJECT_ROOT, 'tests', 'testing_configs', 'config_utopia')
+    model = TemoaModel()
+    temoa_solver = TemoaSolver(model=model, config_filename=config_file)
+    for _ in temoa_solver.createAndSolve():
+        pass
+
+    # capture the sets within the model
+    model_sets = temoa_solver.instance_hook.instance.component_map(ctype=pyo.Set)
+    model_sets = {k: set(v) for k, v in model_sets.items()}
+
+    # retrieve the cache and convert the set values from list -> set (json can't store sets)
+    cache_file = os.path.join(PROJECT_ROOT, 'tests', 'testing_data', 'utopia_sets.json')
+    with open(cache_file, 'r') as src:
+        cached_sets = json.load(src)
+    print(cached_sets)
+    cached_sets = {k: set(tuple(t) if isinstance(t, list) else t for t in v) for (k, v) in cached_sets.items()}
+
+    assert model_sets == cached_sets, 'The utopia run sets did not match cached values'

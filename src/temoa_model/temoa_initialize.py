@@ -89,6 +89,7 @@ def CommodityBalanceConstraintErrorCheck(vflow_out, vflow_in, r, p, s, d, c):
                " - Is there a missing commodity in set 'commodity_physical'?\n"
                ' - Are there missing entries in the Efficiency parameter?\n'
                ' - Does a process need a longer LifetimeProcess parameter setting?')
+        logger.error(msg)
         raise Exception(msg.format(
             r, c, s, d, p, flow_in_expr.getvalue()
         ))
@@ -107,6 +108,7 @@ def CommodityBalanceConstraintErrorCheckAnnual(vflow_out, vflow_in, r, p, c):
                " - Is there a missing commodity in set 'commodity_physical'?\n"
                ' - Are there missing entries in the Efficiency parameter?\n'
                ' - Does a process need a longer LifetimeProcess parameter setting?')
+        logger.error(msg)
         raise Exception(msg.format(
             r, c, p, flow_in_expr.getvalue()
         ))
@@ -119,6 +121,7 @@ def DemandConstraintErrorCheck(supply, r, p, s, d, dem):
                ' - Is the Efficiency parameter missing an entry for this demand?\n'
                ' - Does a tech that satisfies this demand need a longer '
                'LifetimeProcess?\n')
+        logger.error(msg)
         raise Exception(msg.format(r, dem, p, s, d))
 
 
@@ -135,6 +138,7 @@ def validate_time(M):
 
         msg = ('Set "time_exist" requires integer-only elements.\n\n  Invalid '
                'element: "{}"')
+        logger.error(msg)
         raise Exception(msg.format(year))
 
     for year in M.time_future:
@@ -142,6 +146,7 @@ def validate_time(M):
 
         msg = ('Set "time_future" requires integer-only elements.\n\n  Invalid '
                'element: "{}"')
+        logger.error(msg.format(year))
         raise Exception(msg.format(year))
 
     if len(M.time_future) < 2:
@@ -151,6 +156,7 @@ def validate_time(M):
                '(in years) of each period.  Note that this means that there will be '
                'one less optimization period than the number of elements in this set.'
                )
+        logger.error(msg)
         raise Exception(msg)
 
     # Ensure that the time_exist < time_future
@@ -160,6 +166,7 @@ def validate_time(M):
     if not (max_exist < min_horizon):
         msg = ('All items in time_future must be larger than in time_exist.\n'
                'time_exist max:   {}\ntime_future min: {}')
+        logger.error(msg.format(max_exist, min_horizon))
         raise Exception(msg.format(max_exist, min_horizon))
 
 
@@ -182,7 +189,7 @@ def validate_SegFrac(M):
         msg = ('The values of the SegFrac parameter do not sum to 1.  Each item '
                'in SegFrac represents a fraction of a year, so they must total to '
                '1.  Current values:\n   {}\n\tsum = {}')
-
+        logger.error(msg.format(items, total))
         raise Exception(msg.format(items, total))
 
 
@@ -216,6 +223,7 @@ def CheckEfficiencyIndices(M):
                'following elements to the commodity_demand Set.'
                '\n\n    Element(s): {}')
         diff = (str(i) for i in diff)
+        logger.error(msg.format(', '.join(diff)))
         raise Exception(msg.format(', '.join(diff)))
 
 
@@ -256,6 +264,7 @@ def CreateCapacityFactors(M):
         # CFP._constructed = False
         for r, s, d, t, v in unspecified_cfs:
             CFP[r, s, d, t, v] = M.CapacityFactorTech[r, s, d, t]
+        logger.debug("Created Capacity Factors for %d unspecified processes.", len(unspecified_cfs))
     # CFP._constructed = True
 
 
@@ -290,12 +299,14 @@ def CreateLifetimes(M):
         # LLN._constructed = False
         for r, t, v in unspecified_loan_lives:
             LLN[r, t, v] = M.LifetimeLoanTech[(r, t)]
+        logger.debug("Created Loan Lives for %d processes without an explicit specification.", len(unspecified_loan_lives))
     # LLN._constructed = True
 
     if unspecified_tech_lives:
         # LPR._constructed = False
         for r, t, v in unspecified_tech_lives:
             LPR[r, t, v] = M.LifetimeTech[(r, t)]
+        logger.debug("Created Lifetime for %d processes without an explicit specification.", len(unspecified_tech_lives))
     # LPR._constructed = True
 
 
@@ -330,6 +341,7 @@ def CreateDemands(M):
     if unused_dems:
         for dem in unused_dems:
             msg = ("Warning: Demand '{}' is unused\n")
+            logger.warning(msg.format(dem))
             SE.write(msg.format(dem))
 
     # Step 2
@@ -367,7 +379,7 @@ def CreateDemands(M):
                'demands are distributed among the time slices (i.e., time_season, '
                'time_of_day), so together, the data must total to 1.  Current '
                'values:\n   {}\n\tsum = {}')
-
+        logger.error(msg.format(items, total))
         raise Exception(msg.format(items, total))
 
     # Step 4
@@ -414,7 +426,7 @@ def CreateDemands(M):
                    'time_of_day).  Within each end-use Demand, then, the distribution '
                    'must total to 1.\n\n   Demand-specific distribution in error: '
                    ' {}\n\n   {}\n\tsum = {}')
-
+            logger.error(msg.format(dem, items, total))
             raise Exception(msg.format(dem, items, total))
 
 
@@ -478,6 +490,7 @@ def CreateRegionalIndices(M):
     regional_indices = set()
     for r_i in M.regions:
         if "-" in r_i:
+            logger.error("Individual region names can not have '-' in their names: %s", str(r_i))
             raise Exception("Individual region names can not have '-' in their names: " + str(r_i))
         for r_j in M.regions:
             if r_i == r_j:

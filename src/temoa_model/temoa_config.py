@@ -24,6 +24,9 @@ from os.path import abspath, isfile, splitext
 from definitions import PROJECT_ROOT
 from src.temoa_model.dat_file_maker import db_2_dat
 
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 class TemoaConfig( object ):
 	states = (
@@ -100,6 +103,9 @@ class TemoaConfig( object ):
 			self.solver = kwargs['d_solver']
 		else:
 			self.solver = None
+
+		logger.debug("Created an empty TemoaConfig instance")
+
 
 	def __repr__(self):
 		width = 25

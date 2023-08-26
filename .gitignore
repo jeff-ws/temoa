@@ -11,3 +11,6 @@ data_files/untracked_data/
 # ignore all outputs
 /output_files/*
 
+# ignore changes to sqlite databases to prevent bloat.
+*.sqlite
+

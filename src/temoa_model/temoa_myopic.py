@@ -398,7 +398,10 @@ def myopic_db_generator_solver ( self ):
         ifile.close()
         ofile.close()
         # TODO:  this running of saved commands probably needs to change, minimally the location...
-        os.system("python ../src/temoa_model/ --config=temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
+        # os.system("python ../src/temoa_model/ --config=temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
+        os.system("python ../main.py --config=temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
+
+
         # delete the temporary config file
         os.remove(new_config)
         if not self.options.KeepMyopicDBs:
