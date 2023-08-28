@@ -147,7 +147,6 @@ capacity.
         * M.V_Capacity[r, t, v] >= activity_rptv
 
 
-
 def ActivityByTech_Constraint(M: 'TemoaModel', t):
     r"""
 This constraint is utilized by the MGA objective function and defines

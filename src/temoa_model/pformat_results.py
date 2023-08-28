@@ -46,7 +46,7 @@ try:
 except ImportError:
     from io import StringIO
 
-from pyomo.core import value
+from pyomo.core.kernel.numvalue import value
 
 
 def stringify_data ( data, ostream=SO, format='plain' ):

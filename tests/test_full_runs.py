@@ -81,7 +81,27 @@ def test_upoptia_set_consistency():
     cache_file = os.path.join(PROJECT_ROOT, 'tests', 'testing_data', 'utopia_sets.json')
     with open(cache_file, 'r') as src:
         cached_sets = json.load(src)
-    print(cached_sets)
+    # print(cached_sets)
     cached_sets = {k: set(tuple(t) if isinstance(t, list) else t for t in v) for (k, v) in cached_sets.items()}
 
-    assert model_sets == cached_sets, 'The utopia run sets did not match cached values'
+    assert model_sets == cached_sets, 'The utopia run-produced sets did not match cached values'
+
+def test_test_system_set_consistency():
+    """
+    Test the set membership of the Test System model against cache.
+    """
+    # this could be combined with the similar test for utopia to use the fixture at some time...
+    config_file = os.path.join(PROJECT_ROOT, 'tests', 'testing_configs', 'config_test_system')
+    model = TemoaModel()
+    temoa_solver = TemoaSolver(model=model, config_filename=config_file)
+    for _ in temoa_solver.createAndSolve():
+        pass
+    model_sets = temoa_solver.instance_hook.instance.component_map(ctype=pyo.Set)
+    model_sets = {k: set(v) for k, v in model_sets.items()}
+
+    cache_file = os.path.join(PROJECT_ROOT, 'tests', 'testing_data', 'test_system_sets.json')
+    with open(cache_file, 'r') as src:
+        cached_sets = json.load(src)
+    cached_sets = {k: set(tuple(t) if isinstance(t, list) else t for t in v) for (k, v) in cached_sets.items()}
+
+    assert model_sets == cached_sets, 'The Test System run-produced sets did not match cached values'

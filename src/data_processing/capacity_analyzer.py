@@ -7,7 +7,7 @@ import sqlite3
 
 from matplotlib import pyplot as plt
 
-import definitions
+
 
 # Written by:  J. F. Hyink
 # jeff@westernspark.us
@@ -15,7 +15,8 @@ import definitions
 
 # Created on:  7/18/23
 
-source_db_file = os.path.join(definitions.PROJECT_ROOT, 'data_files', 'US_9R_TS.sqlite')
+source_db_file = os.path.join('..', '..', 'data_files', 'US_9R_TS.sqlite')
+print(source_db_file)
 res =[]
 try:
     con = sqlite3.connect(source_db_file)
@@ -36,7 +37,7 @@ for row in res[:10]:
 # chain them together into a list
 caps = list(itertools.chain(*res))
 
-cutoff = 5 # GW
+cutoff = 1 # GW : An arbitrary cutoff between big and small capacity systems.
 small_cap_sources = [c for c in caps if c <= cutoff]
 large_cap_sources = [c for c in caps if c > cutoff]
 
@@ -47,4 +48,19 @@ print(f'{len(small_cap_sources)} small cap sources account for: {aggregate_small
 print(f'{len(large_cap_sources)} large cap sources account for: {aggregate_large_cap: 0.1f} GW')
 
 plt.hist(caps, bins=100)
+plt.show()
+
+
+# make a cumulative contribution plot
+caps.sort()
+total_cap = sum(caps)
+cumulative_caps = [caps[0]/total_cap, ]
+for i, cap in enumerate(caps[1:]):
+    cumulative_caps.append(cap/total_cap + cumulative_caps[i])
+
+plt.plot(range(len(cumulative_caps)), cumulative_caps)
+plt.xlabel('Aggregated Sources')
+plt.ylabel('Proportion of Total Capacity')
+plt.title('Aggregate Capacity vs. Number of Sources')
+
 plt.show()

@@ -207,7 +207,9 @@ def CheckEfficiencyIndices(M):
                'the following elements to the Set commodity_physical.'
                '\n\n    Element(s): {}')
         symdiff = (str(i) for i in symdiff)
-        raise Exception(msg.format(', '.join(symdiff)))
+        f_msg = msg.format(', '.join(symdiff))
+        logger.error(f_msg)
+        raise Exception(f_msg)
 
     symdiff = techs.symmetric_difference(M.tech_all)
     if symdiff:
@@ -215,7 +217,9 @@ def CheckEfficiencyIndices(M):
                'the following technology(ies) to the tech_resource or '
                'tech_production Sets.\n\n    Technology(ies): {}')
         symdiff = (str(i) for i in symdiff)
-        raise Exception(msg.format(', '.join(symdiff)))
+        f_msg = msg.format(', '.join(symdiff))
+        logger.error(f_msg)
+        raise Exception(f_msg)
 
     diff = M.commodity_demand - c_outputs
     if diff:
@@ -223,8 +227,9 @@ def CheckEfficiencyIndices(M):
                'following elements to the commodity_demand Set.'
                '\n\n    Element(s): {}')
         diff = (str(i) for i in diff)
-        logger.error(msg.format(', '.join(diff)))
-        raise Exception(msg.format(', '.join(diff)))
+        f_msg = msg.format(', '.join(diff))
+        logger.error(f_msg)
+        raise Exception(f_msg)
 
 
 def CreateCapacityFactors(M):
@@ -471,7 +476,7 @@ def CreateCosts(M):
                 CV[r, p, t, v] = M.CostVariableVintageDefault[r, t, v]
     # CV._constructed = True
     logger.debug('created M.CostFixed with size: %d', len(M.CostFixed))
-    logger.debug('created m.CostVariable with size: %d', len(M.CostVariable))
+    logger.debug('created M.CostVariable with size: %d', len(M.CostVariable))
 
 
 def init_set_time_optimize(M):
@@ -528,8 +533,10 @@ def CreateSparseDicts(M):
     logger.debug('Starting creation of SparseDicts with Efficiency table size: %d', len(M.Efficiency))
     for r, i, t, v, o in M.Efficiency.sparse_iterkeys():
         if "-" in r and t not in M.tech_exchange:
-            raise Exception("Technology " + str(t) + " seems to be an exchange \
-				technology but it is not specified in tech_exchange set")
+            msg = "Technology " + str(t) + " seems to be an exchange \
+				technology but it is not specified in tech_exchange set"
+            logger.error(msg)
+            raise Exception(msg)
         l_process = (r, t, v)
         l_lifetime = value(M.LifetimeProcess[l_process])
         # Do some error checking for the user.
@@ -679,7 +686,9 @@ def CreateSparseDicts(M):
                                    'an efficiency of 100%, with the {} commodity as the input and output. '
                                    'The dummy technology may also need a corresponding row in the ExistingCapacity '
                                    'table with capacity values that equal the {} technology.')
-                            raise Exception(msg.format(t1, r1, t, t1, t1, o1, t1))
+                            f_msg = msg.format(t1, r1, t, t1, t1, o1, t1)
+                            logger.error(f_msg)
+                            raise Exception(f_msg)
 
     l_unused_techs = M.tech_all - l_used_techs
     if l_unused_techs:

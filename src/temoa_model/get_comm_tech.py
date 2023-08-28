@@ -294,7 +294,7 @@ def get_info(inputs):
 		db_or_dat = True
 		
 	else :
-		print("The input file type %s is not recognized. Please specify a database or a text file." % inp_f)
+		print("The input file type %s is not recognized. Please specify a database or a text file." % inp_file)
 		sys.exit(2)
 
 		
