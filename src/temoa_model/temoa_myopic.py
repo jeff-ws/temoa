@@ -35,9 +35,11 @@ import os
 import sqlite3
 import sys
 from shutil import copyfile
+from logging import  getLogger
 
 import pandas as pd
 
+logger = getLogger(__name__)
 
 def myopic_db_generator_solver ( self ):
     global db_path_org
@@ -50,10 +52,14 @@ def myopic_db_generator_solver ( self ):
     cur_org.execute("DELETE FROM MyopicBaseyear")
     cur_org.execute("INSERT INTO MyopicBaseyear (year) VALUES ("+str(time_periods[0][0])+")")
     con_org.commit()
+    # this is a manual split of the output path to capture the name of the output database as db_name
+    # TODO:  fix this with a proper split of the path
     loc1 = max(loc for loc, val in enumerate(self.options.output) if val == '/' or val=='\\')
     loc2 = max(loc for loc, val in enumerate(self.options.output) if val == '.')
     db_name = self.options.output[loc1+1:loc2]
+    # copy and rename the original database...  This is ugly.
     copyfile(db_path_org, os.path.join(self.options.path_to_data,db_name)+"_blank"+self.options.output[loc2:])
+    logger.debug("copied base database to location: %s", os.path.join(self.options.path_to_data,db_name)+"_blank"+self.options.output[loc2:])
 
     # group 1 consists of non output tables in which "periods" is a column name 
     tables_group1 = ['CostFixed','CostVariable','Demand','EmissionLimit','MaxActivity','MaxCapacity', \
@@ -68,7 +74,8 @@ def myopic_db_generator_solver ( self ):
     if 1 <= int(N) <= len(time_periods)-2:
         N = int(N)
     else:
-        print ("Error: The number of myopic years must between 1 and "+str(len(time_periods)-2))
+        logger.error('The number of myopic periods must be between 1 and %d', len(time_periods) - 2)
+        raise ValueError('Invalid number of myopic periods.  See Log file.')
 
     for i in range(N-1,len(time_periods)-1):
 
@@ -378,11 +385,11 @@ def myopic_db_generator_solver ( self ):
         # the database is ready. It is run via a temporary config file in 
         # a perfect foresight fashion.
         # ---------------------------------------------------------------
-        new_config = os.path.join(os.getcwd(), "temoa_model", "config_sample")+new_myopic_name
+        new_config = os.path.join(os.getcwd(), "src", "temoa_model", "config_sample")+new_myopic_name
         if version<3:
-            ifile = io.open(os.path.join(os.getcwd(), "temoa_model", "config_sample"), encoding='utf-8')
+            ifile = io.open(os.path.join(os.getcwd(), "src", "temoa_model", "config_sample"), encoding='utf-8')
         else:
-            ifile = open(os.path.join(os.getcwd(), "temoa_model", "config_sample"), encoding='utf-8')
+            ifile = open(os.path.join(os.getcwd(), "src", "temoa_model", "config_sample"), encoding='utf-8')
 
         ofile = open(new_config,'w')
         for line in ifile:
@@ -399,7 +406,7 @@ def myopic_db_generator_solver ( self ):
         ofile.close()
         # TODO:  this running of saved commands probably needs to change, minimally the location...
         # os.system("python ../src/temoa_model/ --config=temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
-        os.system("python ../main.py --config=temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
+        os.system("python main.py --config=src/temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
 
 
         # delete the temporary config file

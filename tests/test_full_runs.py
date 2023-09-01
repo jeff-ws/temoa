@@ -22,7 +22,7 @@ from tests.legacy_test_values import TestVals, test_vals
 
 logger = logging.getLogger(__name__)
 # list of test scenarios for which we have captured results in legacy_test_values.py
-legacy_config_files = ['config_utopia', 'config_test_system'] #, 'config_utopia_myopic',]
+legacy_config_files = ['config_utopia', 'config_test_system', 'config_utopia_myopic',]
 
 
 @pytest.fixture(params=legacy_config_files)
