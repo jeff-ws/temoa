@@ -46,6 +46,7 @@ logger = getLogger(__name__)
 def myopic_db_generator_solver ( self ):
     global db_path_org
     db_path_org = self.options.output
+    print('***************', db_path_org)
     # original database specified in the ../config_sample file
     con_org = sqlite3.connect(db_path_org)
     cur_org = con_org.cursor()            
@@ -89,6 +90,8 @@ def myopic_db_generator_solver ( self ):
 
         new_db_loc = os.path.join(self.options.path_to_data, db_name)+new_myopic_name+self.options.output[loc2:]
         copyfile(os.path.join(self.options.path_to_data, db_name) +"_blank"+self.options.output[loc2:], new_db_loc)
+        old_db = os.path.join(self.options.path_to_data, db_name) +"_blank"+self.options.output[loc2:]
+        print('************* copying this forward: ', old_db)
         con = sqlite3.connect(new_db_loc)
         cur = con.cursor()
         table_list.sort()
