@@ -32,7 +32,7 @@ from src.temoa_model.temoa_initialize import *
 from src.temoa_model.temoa_rules import *
 
 # set the target folder for output from this run
-output_path = os.path.join(PROJECT_ROOT, "output_files", datetime.now().strftime("%Y-%b-%d %H%Mh"))
+output_path = os.path.join(PROJECT_ROOT, "output_files", datetime.now().strftime("%Y-%m-%d %H%Mh"))
 if not os.path.exists(output_path):
     os.mkdir(output_path)
 

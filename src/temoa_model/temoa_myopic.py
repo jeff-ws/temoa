@@ -39,11 +39,14 @@ from logging import  getLogger
 
 import pandas as pd
 
+from definitions import PROJECT_ROOT
+
 logger = getLogger(__name__)
 
 def myopic_db_generator_solver ( self ):
     global db_path_org
     db_path_org = self.options.output
+    print('***************', db_path_org)
     # original database specified in the ../config_sample file
     con_org = sqlite3.connect(db_path_org)
     cur_org = con_org.cursor()            
@@ -87,6 +90,8 @@ def myopic_db_generator_solver ( self ):
 
         new_db_loc = os.path.join(self.options.path_to_data, db_name)+new_myopic_name+self.options.output[loc2:]
         copyfile(os.path.join(self.options.path_to_data, db_name) +"_blank"+self.options.output[loc2:], new_db_loc)
+        old_db = os.path.join(self.options.path_to_data, db_name) +"_blank"+self.options.output[loc2:]
+        print('************* copying this forward: ', old_db)
         con = sqlite3.connect(new_db_loc)
         cur = con.cursor()
         table_list.sort()
@@ -237,9 +242,7 @@ def myopic_db_generator_solver ( self ):
                                                          WHERE scenario="+"'"+str(self.options.scenario)+"' AND \
                                                          vintage < "+str(time_periods[i-(N-1)][0])+";", con_org)
             df_new_ExistingCapacity.columns = ['regions','tech','vintage','exist_cap']
-            # TODO:  changed if_exists "append" --> "replace" to avoid UNIQUE error.  THIS MAY BE WRONG!
-            # df_new_ExistingCapacity.to_sql('ExistingCapacity',con, if_exists='append', index=False)
-            df_new_ExistingCapacity.to_sql('ExistingCapacity',con, if_exists='replace', index=False)
+            df_new_ExistingCapacity.to_sql('ExistingCapacity',con, if_exists='append', index=False)
 
             #Create a copy of the first time period vintages for the two current vintage 
             #to prevent infeasibility (if it is not an 'existing' vintage in the 
@@ -389,6 +392,9 @@ def myopic_db_generator_solver ( self ):
         if version<3:
             ifile = io.open(os.path.join(os.getcwd(), "src", "temoa_model", "config_sample"), encoding='utf-8')
         else:
+            # patch to make test work
+            # ifile = open(os.path.join(PROJECT_ROOT, 'tests', 'testing_configs', 'config_utopia_myopic'), encoding='utf-8')
+            # new_config = os.path.join(PROJECT_ROOT, 'tests', 'testing_configs', 'config_utopia_myopic' + new_myopic_name)
             ifile = open(os.path.join(os.getcwd(), "src", "temoa_model", "config_sample"), encoding='utf-8')
 
         ofile = open(new_config,'w')

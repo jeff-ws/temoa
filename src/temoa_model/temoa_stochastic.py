@@ -23,6 +23,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
 
+
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
 from pyomo.pysp.ef import create_ef_instance
@@ -33,6 +34,9 @@ from pformat_results import pformat_results
 from temoa_model import temoa_create_model
 from temoa_rules import PeriodCost_rule
 from temoa_run import parse_args
+
+# TODO:  The pysp module is no longer maintained.  This should be refactored according to guidance here:
+# https://pyomo.readthedocs.io/en/stable/modeling_extensions/stochastic_programming.html#stochastic-programming-in-pyomo
 
 
 def return_CP_and_path(p_data):
@@ -112,7 +116,7 @@ def return_CP_and_path(p_data):
             s2fp_dict[s].append(s + '.dat')
     os.chdir(pwd)
     return (s2cd_dict, s2fp_dict)
-
+@DeprecationWarning('pysp module is no longer supported, this needs refactor')
 def solve_ef(p_model, p_data, temoa_options = None):
     """
     solve_ef(p_model, p_data) -> objective value of the extensive form
