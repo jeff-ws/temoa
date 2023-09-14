@@ -23,6 +23,7 @@ import os
 import re as reg_exp
 import traceback
 from collections import defaultdict
+from logging import getLogger
 from os import path
 from os import sep
 from shutil import copyfile, move
@@ -66,6 +67,7 @@ This is followed all the way through to the first function_call of the UI where 
 as a StreamingHttpResponse().
 '''
 
+logger = getLogger(__name__)
 
 class TemoaSolver(object):
     def __init__(self, model, config_filename):
@@ -359,6 +361,16 @@ class TemoaSolverInstance(object):
             SE.write('\r[%8.2f]\n' % duration())
             self.txt_file.write('[%8.2f]\n' % duration())
 
+            # gather some stats...
+            c_count = 0
+            v_count = 0
+            for constraint in self.instance.component_objects(ctype=Constraint):
+                c_count += len(constraint)
+            for var in self.instance.component_objects(ctype=Var):
+                v_count += len(var)
+            logger.info("model built...  Variables: %d, Constraints: %d", v_count, c_count)
+
+
         except Exception as model_exc:
             yield "Exception found in create_temoa_instance\n"
             SE.write("Exeception found in create_temoa_instance\n")
@@ -407,6 +419,14 @@ class TemoaSolverInstance(object):
                 self.txt_file.write(formatted_results.getvalue())
                 if formatted_results.getvalue() == 'No solution found.':
                     SE.write(formatted_results.getvalue() + '\n')
+                # normal (non-MGA) run will have a TotalCost as the OBJ:
+                if hasattr(self.instance, 'TotalCost'):
+                    logger.info("objective value: %0.2f", value(self.instance.TotalCost))
+                # MGA runs should have either a FirstObj or SecondObj
+                if hasattr(self.instance, 'FirstObj'):
+                    logger.info("MGA First Obj value: %0.2f", value(self.instance.FirstObj))
+                elif hasattr(self.instance, 'SecondObj'):
+                    logger.info("MGA Second Obj value: %0.2f", value(self.instance.SecondObj))
             else:
                 yield '\r---------- Not solving: no available solver\n'
                 SE.write('\r---------- Not solving: no available solver\n')

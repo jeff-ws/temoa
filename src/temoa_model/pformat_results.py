@@ -137,6 +137,7 @@ def pformat_results ( pyomo_instance, pyomo_result, options ):
 	LLN = m.LifetimeLoanProcess
 	x   = 1 + GDR    # convenience variable, nothing more
 
+	# TODO:  This is an implicit hook to the myopic runs which are hard-coded to make this filename.  Needs to change
 	if hasattr(options, 'file_location') and os.path.join('temoa_model', 'config_sample_myopic') in options.file_location:
 		original_dbpath = options.output
 		con = sqlite3.connect(original_dbpath)
@@ -223,6 +224,7 @@ def pformat_results ( pyomo_instance, pyomo_result, options ):
 		svars['V_FlowOut'][r, p, s, d, i, t, v, o] -= val_out
 
 	# Extract optimal decision variable values related to capacity:
+	# TODO:  This is an implicit hook to the myopic runs which are hard-coded to make this filename.  Needs to change
 	if hasattr(options, 'file_location') and os.path.join('temoa_model', 'config_sample_myopic') not in options.file_location:
 		for r, t, v in m.V_Capacity:
 			val = value( m.V_Capacity[r, t, v] )
@@ -240,7 +242,8 @@ def pformat_results ( pyomo_instance, pyomo_result, options ):
 		if abs(val) < epsilon: continue
 		svars['V_CapacityAvailableByPeriodAndTech'][r, p, t] = val
 
-	# Calculate model costs:	
+	# Calculate model costs:
+	# TODO:  This is an implicit hook to the myopic runs which are hard-coded to make this filename.  Needs to change
 	if hasattr(options, 'file_location') and os.path.join('temoa_model', 'config_sample_myopic') not in options.file_location: 
 		# This is a generic workaround.  Not sure how else to automatically discover 
 		# the objective name
@@ -379,6 +382,7 @@ def pformat_results ( pyomo_instance, pyomo_result, options ):
 	   'Objective function value (%s): %s\n'
 	   'Non-zero variable values:\n'
 	)
+	# TODO:  This is an implicit hook to the myopic runs which are hard-coded to make this filename.  Needs to change
 	if hasattr(options, 'file_location') and os.path.join('temoa_model', 'config_sample_myopic') not in options.file_location:
 		output.write( msg % (m.name, obj_name, obj_value) )
 
@@ -427,6 +431,7 @@ def pformat_results ( pyomo_instance, pyomo_result, options ):
 	db_tables = ['time_periods', 'time_season', 'time_of_day', 'technologies', 'commodities',\
 				'LifetimeTech', 'LifetimeProcess', 'Efficiency', 'EmissionActivity', 'ExistingCapacity']
 
+	# TODO:  Why would options NOT be an instance of TemoaConfig?
 	if isinstance(options, TemoaConfig):	
 		if not options.output:
 			if options.saveTEXTFILE or options.keepPyomoLP:
@@ -457,7 +462,7 @@ def pformat_results ( pyomo_instance, pyomo_result, options ):
 			is_db_empty = True #True for non-empty db file
 			break
 		
-		
+		# TODO:  Need clarity/example of what type of database has table called "input_file"
 		if is_db_empty: #This file could be schema with populated results from previous run. Or it could be a normal db file.
 			cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='input_file';")
 			does_input_file_table_exist = False
