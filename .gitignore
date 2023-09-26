@@ -1,7 +1,6 @@
 *.pyc
 data_files/debug_logs/*.log
 data_files/debug_logs/lp_files/*
-data_files/untracked_data/
 .DS_Store
 *.ipynb_checkpoints
 
@@ -11,6 +10,9 @@ data_files/untracked_data/
 # ignore all outputs
 /output_files/*
 
-# ignore changes to sqlite databases to prevent bloat.
+# ignore new sqlite databases (that aren't already added) to prevent bloat.
 *.sqlite
 
+/developer_notes/*
+
+/configs/*

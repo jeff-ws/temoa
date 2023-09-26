@@ -383,14 +383,16 @@ def myopic_db_generator_solver ( self ):
         # the database is ready. It is run via a temporary config file in 
         # a perfect foresight fashion.
         # ---------------------------------------------------------------
-        new_config = os.path.join(os.getcwd(), "src", "temoa_model", "config_sample")+new_myopic_name
+        # the cwd inject below allows this to work from either the "normal" location in the temoa_model
+        # folder, or from within a "fake" temoa_model folder within the testing folders to enable tests to run
+        new_config = os.path.join(os.getcwd(),  "temoa_model", "config_sample")+new_myopic_name
         if version<3:
             ifile = io.open(os.path.join(os.getcwd(), "src", "temoa_model", "config_sample"), encoding='utf-8')
         else:
             # patch to make test work
+            ifile = open(os.path.join(os.getcwd(),  "temoa_model", "config_sample"), encoding='utf-8')
             # ifile = open(os.path.join(PROJECT_ROOT, 'tests', 'testing_configs', 'config_utopia_myopic'), encoding='utf-8')
             # new_config = os.path.join(PROJECT_ROOT, 'tests', 'testing_configs', 'config_utopia_myopic' + new_myopic_name)
-            ifile = open(os.path.join(os.getcwd(), "src", "temoa_model", "config_sample"), encoding='utf-8')
 
         ofile = open(new_config,'w')
         for line in ifile:
@@ -406,8 +408,12 @@ def myopic_db_generator_solver ( self ):
         ifile.close()
         ofile.close()
         # TODO:  this running of saved commands probably needs to change, minimally the location...
-        # os.system("python ../src/temoa_model/ --config=temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
-        os.system("python main.py --config=src/temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
+
+        # for running the current unit tests...
+        os.system("python ../main.py --config=temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
+
+        # un-comment for "normal" runs until changed
+        # os.system("python main.py --config=src/temoa_model/config_sample"+new_myopic_name)  # this is changed to locate the executable
 
 
         # delete the temporary config file

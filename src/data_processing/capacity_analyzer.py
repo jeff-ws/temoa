@@ -31,8 +31,8 @@ except sqlite3.Error as e:
 finally:
     con.close()
 # sample first 10 for QA
-for row in res[:10]:
-    print(row)
+# for row in res[:10]:
+#     print(row)
 
 # chain them together into a list
 caps = list(itertools.chain(*res))

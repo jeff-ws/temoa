@@ -22,8 +22,5 @@ test_vals = {'config_test_system': {TestVals.OBJ_VALUE: 491521.71997678,
              'config_utopia': {TestVals.OBJ_VALUE: 36535.631200,
                                TestVals.EFF_DOMAIN_SIZE: 12312,
                                TestVals.EFF_INDEX_SIZE: 64},
-             'config_utopia_myopic': {TestVals.OBJ_VALUE: 0.0,
-                                      TestVals.EFF_DOMAIN_SIZE: 0,
-                                      TestVals.EFF_INDEX_SIZE: 0
-                                    }}
+             }
 

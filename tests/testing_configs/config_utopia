@@ -12,7 +12,7 @@
 
 # Output File (Mandatory)
 # The output file must be a existing .sqlite file
-# --output=data_files/temoa_test_system.sqlite
+--output=testing_data/utopia_temp.sqlite
 
 # Scenario Name (Mandatory) 
 # This scenario name is used to store results within the output .sqlite file

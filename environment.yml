@@ -36,3 +36,6 @@ dependencies:
     # cbc solver below cannot be installed via Conda on Windows
     - coincbc
 
+    # new requirements
+    - pytest
+
