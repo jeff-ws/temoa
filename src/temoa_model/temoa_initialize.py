@@ -630,6 +630,8 @@ def CreateSparseDicts(M):
                 M.ProcessByPeriodAndOutput[r, p, o] = set()
             if t in M.tech_reserve and (r, p) not in M.processReservePeriods:
                 M.processReservePeriods[r, p] = set()
+            # TODO:  This construct is goofy.  Using regex to split a string.  Perhaps consider a SQL query
+            #        to a table that has exchange members by tech (future growth?)
             if t in M.tech_exchange and (r[:r.find("-")], p, i) not in M.exportRegions:
                 M.exportRegions[r[:r.find(
                     "-")], p, i] = set()  # since t is in M.tech_exchange, r here has *-* format (e.g. 'US-Mexico').

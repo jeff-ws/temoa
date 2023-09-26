@@ -34,7 +34,9 @@ sphinx
 sphinxcontrib-htmlhelp
 sphinxcontrib-serializinghtml
 # nxcontrib-bibtex <- not available on pypi
-# cbc solver below cannot be installed via Conda on Windows
+# cbc solver should be installed separately
+
+# new requirements
 pytest
 
 
