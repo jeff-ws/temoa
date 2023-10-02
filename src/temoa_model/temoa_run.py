@@ -156,6 +156,8 @@ class TemoaSolver(object):
         # Now add back the objective function that we earlier removed; note that name
         # we choose here (FirstObj) will be copied to the output file.
         temoaInstance1.instance.FirstObj = Objective(rule=TotalCost_rule, sense=minimize)
+        # TODO:  The call below should not be necessary.  This was "old pyomo"
+        # ref:  (search for preproces) http://www.pyomo.org/blog
         temoaInstance1.instance.preprocess()
         temoaInstance1.instance.V_ActivityByTech = Var(temoaInstance1.instance.tech_all, domain=NonNegativeReals)
         temoaInstance1.instance.ActivityByTechConstraint = Constraint(temoaInstance1.instance.tech_all,
@@ -369,7 +371,6 @@ class TemoaSolverInstance(object):
             for var in self.instance.component_objects(ctype=Var):
                 v_count += len(var)
             logger.info("model built...  Variables: %d, Constraints: %d", v_count, c_count)
-
 
         except Exception as model_exc:
             yield "Exception found in create_temoa_instance\n"
