@@ -710,7 +710,7 @@ def CreateSparseDicts(M: 'TemoaModel'):
             for (r1, i1, t1, v1, o1) in M.Efficiency.sparse_iterkeys():
                 if (r1 == reg) & (o1 == i):
                     for p in M.time_optimize:
-                        if (r1, p, o1) not in M.commodityDStreamProcess:
+                        if p >= v and (r1, p, o1) not in M.commodityDStreamProcess:
                             msg = ('The {} process in region {} has no downstream process other '
                                    'than a transport ({}) process. This will cause the commodity '
                                    'balance constraint to fail. Add a dummy technology downstream '
