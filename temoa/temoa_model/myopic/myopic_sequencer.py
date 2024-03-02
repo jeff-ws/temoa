@@ -45,6 +45,7 @@ from temoa.temoa_model.myopic.myopic_progress_mapper import MyopicProgressMapper
 from temoa.temoa_model.pformat_results import pformat_results
 from temoa.temoa_model.pricing_check import price_checker
 from temoa.temoa_model.source_check import source_trace
+from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
 
@@ -80,6 +81,7 @@ class MyopicSequencer:
     tables_with_period_reference = [
         'MyopicNetCapacity',
         'MyopicCost',
+        'Output_Costs_2'
     ]
 
     legacy_tables_with_period_reference = [
@@ -105,6 +107,7 @@ class MyopicSequencer:
         # break out what is needed from the config
         myopic_options = config.myopic_inputs
         self.progress_mapper: MyopicProgressMapper | None = None
+        self.table_writer = TableWriter(self.config, self.con)
         if not myopic_options:
             logger.error(
                 'The myopic mode was selected, but no options were received.\n %s',
@@ -296,6 +299,7 @@ class MyopicSequencer:
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'report')
             pformat_results(model, results, self.config)
+            self.table_writer.write_costs(m=model)
 
             # prep next loop
             last_base_year = idx.base_year  # update

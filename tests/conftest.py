@@ -64,7 +64,12 @@ logging.getLogger('pyutilib').setLevel(logging.WARNING)
 # to catch data.  These are just sumps to absorb non-inspected output to keep the input sources "pristine"
 data_output_path = os.path.join(PROJECT_ROOT, 'tests', 'testing_outputs')
 data_source_path = os.path.join(PROJECT_ROOT, 'tests', 'testing_data')
-databases = 'temoa_utopia.sqlite', 'temoa_test_system.sqlite', 'storageville.sqlite', 'mediumville.sqlite'
+databases = (
+    'temoa_utopia.sqlite',
+    'temoa_test_system.sqlite',
+    'storageville.sqlite',
+    'mediumville.sqlite',
+)
 for db in databases:
     if not os.path.exists(os.path.join(data_output_path, db)):
         shutil.copy(os.path.join(data_source_path, db), os.path.join(data_output_path, db))

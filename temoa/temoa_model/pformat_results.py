@@ -277,6 +277,11 @@ def gather_cost_data(m: 'TemoaModel', epsilon: float, myopic_iteration) -> dict[
     # Calculate model costs:
     # TODO:  The 'file_location' variable in the old config was the path to the config file, and it was used
     #        to key some operations (as below) and also to determine the running mode (myopic or not)
+
+    # dev note:  This is somewhat complex for exchange technologies...
+    # In the model, a capacity variable is created for BOTH direction on an exchange, and each direction needs to be
+    # defined separately in the dataset (Efficiency).
+    # Due to fact that both direction capacity var
     if not myopic_iteration:
         objs = list(m.component_data_objects(Objective))
         if len(objs) > 1:

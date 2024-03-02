@@ -46,6 +46,7 @@ from temoa.temoa_model.run_actions import (
     check_solve_status,
 )
 from temoa.temoa_model.source_check import source_trace
+from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_mode import TemoaMode
 from temoa.temoa_model.temoa_model import TemoaModel
@@ -193,6 +194,8 @@ class TemoaSequencer:
                     )
                     sys.exit(-1)
                 handle_results(self.pf_solved_instance, self.pf_results, self.config)
+                table_writer = TableWriter(self.config, con)
+                table_writer.write_costs(instance)
 
             case TemoaMode.MYOPIC:
                 # create a myopic sequencer and shift control to it
