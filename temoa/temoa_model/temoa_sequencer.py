@@ -35,17 +35,17 @@ from pathlib import Path
 
 import pyomo.opt
 
-from temoa.extensions.myopic.myopic_sequencer import MyopicSequencer
-from temoa.temoa_model.hybrid_loader import HybridLoader
-from temoa.temoa_model.model_checking import source_check
-from temoa.temoa_model.model_checking.pricing_check import price_checker
-from temoa.temoa_model.model_checking.source_check import source_trace
+from temoa.temoa_model import source_check
+from temoa.temoa_model.myopic.hybrid_loader import HybridLoader
+from temoa.temoa_model.myopic.myopic_sequencer import MyopicSequencer
+from temoa.temoa_model.pricing_check import price_checker
 from temoa.temoa_model.run_actions import (
     build_instance,
     solve_instance,
     handle_results,
     check_solve_status,
 )
+from temoa.temoa_model.source_check import source_trace
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_mode import TemoaMode
@@ -153,39 +153,27 @@ class TemoaSequencer:
                 # data_portal: DataPortal = load_portal_from_dat(self.config.dat_file, silent=self.config.silent)
                 # TODO:  This connection should probably be made in the loader?
                 con = sqlite3.connect(self.config.input_file)
-                hybrid_loader = HybridLoader(db_connection=con, config=None)
+                hybrid_loader = HybridLoader(db_connection=con)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(data_portal, silent=self.config.silent)
-                con.close()
                 return instance
 
             case TemoaMode.CHECK:
                 # TODO:  This connection should probably be made in the loader?
                 con = sqlite3.connect(self.config.input_file)
-                hybrid_loader = HybridLoader(db_connection=con, config=None)
+                hybrid_loader = HybridLoader(db_connection=con)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
 
-                instance = build_instance(
-                    data_portal,
-                    silent=self.config.silent,
-                    keep_lp_file=self.config.save_lp_file,
-                    lp_path=self.config.output_path,
-                )
+                instance = build_instance(data_portal, silent=self.config.silent)
                 # disregard what the config says about price_check and source_check and just do it...
                 price_checker(instance)
                 source_trace(instance, temoa_config=self.config)
-                con.close()
 
             case TemoaMode.PERFECT_FORESIGHT:
                 con = sqlite3.connect(self.config.input_file)
-                hybrid_loader = HybridLoader(db_connection=con, config=None)
+                hybrid_loader = HybridLoader(db_connection=con)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
-                instance = build_instance(
-                    data_portal,
-                    silent=self.config.silent,
-                    keep_lp_file=self.config.save_lp_file,
-                    lp_path=self.config.output_path,
-                )
+                instance = build_instance(data_portal, silent=self.config.silent)
                 if self.config.price_check:
                     price_checker(instance)
                 if self.config.source_check:
@@ -193,6 +181,7 @@ class TemoaSequencer:
                 self.pf_solved_instance, self.pf_results = solve_instance(
                     instance,
                     self.config.solver_name,
+                    self.config.save_lp_file,
                     silent=self.config.silent,
                 )
                 good_solve, msg = check_solve_status(self.pf_results)
@@ -205,16 +194,8 @@ class TemoaSequencer:
                     )
                     sys.exit(-1)
                 handle_results(self.pf_solved_instance, self.pf_results, self.config)
-                # these require that the new cost table be built, which is not guaranteed at this time...
-                # temporary patch while we work through new cost table...
-                exists = con.execute(
-                    "SELECT * FROM sqlite_master WHERE name LIKE 'Output_Cost_2'"
-                ).fetchone()
-                if exists:
-                    table_writer = TableWriter(self.config, con)
-                    table_writer.clear_scenario()
-                    table_writer.write_costs(instance)
-                con.close()
+                table_writer = TableWriter(self.config, con)
+                table_writer.write_costs(instance)
 
             case TemoaMode.MYOPIC:
                 # create a myopic sequencer and shift control to it

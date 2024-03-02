@@ -376,6 +376,8 @@ def loan_cost(
     :param vintage: the base year of the loan
     :return: fixed number or pyomo expression based on input types
     """
+    if GDR == 0:  # return the non-discounted result
+        return capacity * invest_cost * loan_annualize * lifetime_loan_process
     x = 1 + GDR  # a convenience
     res = (
         capacity
@@ -890,8 +892,10 @@ def ResourceExtraction_Constraint(M: 'TemoaModel', reg, p, r):
        \sum_{I, t \in T^r \& t \in T^{a}, V} \textbf{FOA}_{r, p, i, t, v, c} \le RSC_{r, p, c}
 
        \forall \{r, p, c\} \in \Theta_{\text{ResourceExtraction}}"""
-    logger.warning('The ResourceBound parameter / ResourceExtraction constraint is not currently supported.  '
-                   'Recommend removing data from supporting table')
+    logger.warning(
+        'The ResourceBound parameter / ResourceExtraction constraint is not currently supported.  '
+        'Recommend removing data from supporting table'
+    )
     # dev note:  This constraint does not have a table in the current schema
     #            Additionally, the below (incorrect) construct assumes that a resource cannot be used
     #            by BOTH a non-annual and annual tech.  It should be re-written to add these
@@ -2234,8 +2238,10 @@ def MaxResource_Constraint(M: 'TemoaModel', r, t):
        \sum_{P} \textbf{CAPAVL}_{r, p, t} \le MAR_{r, t}
 
        \forall \{r, t\} \in \Theta_{\text{MaxCapacity}}"""
-    logger.warning('The MaxResource constraint is not currently supported in the model, pending review.  Recommend '
-                   'removing data from the MaxResource Table')
+    logger.warning(
+        'The MaxResource constraint is not currently supported in the model, pending review.  Recommend '
+        'removing data from the MaxResource Table'
+    )
     # dev note:  this constraint is a misnomer.  It is actually a "global activity constraint on a tech"
     max_resource = value(M.MaxResource[r, t])
     try:

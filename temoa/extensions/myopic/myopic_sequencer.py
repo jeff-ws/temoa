@@ -30,6 +30,7 @@ import sqlite3
 import sys
 from collections import deque, defaultdict
 from pathlib import Path
+from shutil import copyfile
 from sqlite3 import Connection
 from sys import stderr as SE
 
@@ -37,13 +38,13 @@ import deprecated
 from pyomo.core import value
 
 import definitions
-from temoa.extensions.myopic.myopic_index import MyopicIndex
-from temoa.extensions.myopic.myopic_progress_mapper import MyopicProgressMapper
 from temoa.temoa_model import run_actions
-from temoa.temoa_model.hybrid_loader import HybridLoader
-from temoa.temoa_model.model_checking.pricing_check import price_checker
-from temoa.temoa_model.model_checking.source_check import source_trace
+from temoa.temoa_model.myopic.hybrid_loader import HybridLoader
+from temoa.temoa_model.myopic.myopic_index import MyopicIndex
+from temoa.temoa_model.myopic.myopic_progress_mapper import MyopicProgressMapper
 from temoa.temoa_model.pformat_results import pformat_results
+from temoa.temoa_model.pricing_check import price_checker
+from temoa.temoa_model.source_check import source_trace
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
@@ -51,7 +52,7 @@ from temoa.temoa_model.temoa_model import TemoaModel
 logger = logging.getLogger(__name__)
 
 table_script_file = Path(
-    definitions.PROJECT_ROOT, 'temoa/extensions/myopic', 'make_myopic_tables.sql'
+    definitions.PROJECT_ROOT, 'temoa/temoa_model/myopic', 'make_myopic_tables.sql'
 )
 
 
@@ -61,7 +62,9 @@ class MyopicSequencer:
     """
 
     # these are the tables that are incrementally built by the myopic instances
-    tables_with_scenario_reference = [
+    tables_with_scenarior_reference = [
+        'MyopicNetCapacity',
+        'MyopicCost',
         'Output_CapacityByPeriodAndTech',
         'Output_Curtailment',
         'Output_Emissions',
@@ -69,18 +72,18 @@ class MyopicSequencer:
         'Output_V_RetiredCapacity',
         'Output_VFlow_In',
         'Output_VFlow_Out',
-        'Output_Duals',
     ]
     tables_without_scenario_reference = [
-        'MyopicNetCapacity',
         'MyopicEfficiency',
     ]
 
     # note:  below excludes MyopicEfficiency, which is managed separately
-    tables_with_period_reference = [ 'Output_Costs_2',]
-    tables_with_period_no_scneario_ref = [
+    tables_with_period_reference = [
         'MyopicNetCapacity',
+        'MyopicCost',
+        'Output_Costs_2'
     ]
+
     legacy_tables_with_period_reference = [
         'Output_CapacityByPeriodAndTech',
         'Output_Curtailment',
@@ -99,12 +102,12 @@ class MyopicSequencer:
         self.config = config
         # establish a connection to the controlling db
         # allow a "shunt" (None) here so we can test parts of this by passing a None config
-        self.output_con = self.get_connection() if isinstance(config, TemoaConfig) else None
-        self.cursor = self.output_con.cursor()
-        self.progress_mapper: MyopicProgressMapper | None = None
-        self.table_writer = TableWriter(self.config, self.output_con)
+        self.con = self.get_connection() if isinstance(config, TemoaConfig) else None
+        self.cursor = self.con.cursor()
         # break out what is needed from the config
         myopic_options = config.myopic_inputs
+        self.progress_mapper: MyopicProgressMapper | None = None
+        self.table_writer = TableWriter(self.config, self.con)
         if not myopic_options:
             logger.error(
                 'The myopic mode was selected, but no options were received.\n %s',
@@ -142,22 +145,31 @@ class MyopicSequencer:
             )
             raise RuntimeError('Received improper input file type.  See log file.')
 
-        # check to see if the output_db IS the input_db, if so go forward with it.
+        # check to see if the output_db IS the input_db, if so go forward with it.  If not,
+        # make a copy of the input db in the output_path folder and use that, disregarding
+        # the output db and warning user
+        # TODO:  handle a "null" for output DB here and in the temoa_sequencer
         if input_file == output_db:
             con = sqlite3.connect(input_file)
             logger.info('Connected to database: %s', input_file)
         else:
             msg = (
-                'Myopic Mode processing only supports a single database (i.e. input_file = output_db).\n'
-                'This is due to the linkage between input and output and the use of Myopic tables\n'
-                'in the database to orchestrate the run.  Either reset both input and output to point\n'
-                'to the same db or make a copy to preserve the original and point both input/output\n'
-                'to the copy.'
+                'Currently, myopic mode output can either target the original input db or a\n'
+                'copy of the input db.  Connecting to a secondary db is not currently\n'
+                'permitted to ensure data integrity for the run, as the run will use data from\n'
+                'and place results into the same db.\n\n'
+                'A copy of the input db will be used and place in the output folder.\n'
             )
             SE.write(msg)
-            logger.error('Run aborted.  I/O database pointers are different')
-            sys.exit(-1)
-
+            logger.warning(
+                'The output db was disregarded, and the output will be sent to a '
+                'copied db in the output folder.'
+            )
+            new_db_name = input_file.name
+            new_db_path = output_path / new_db_name
+            copyfile(input_file, new_db_path)
+            con = sqlite3.connect(new_db_path)
+            logger.info('Established connection to copied db at: %s', new_db_path)
         return con
 
     def start(self):
@@ -175,7 +187,7 @@ class MyopicSequencer:
         self.initialize_myopic_efficiency_table()
 
         # make a data loader
-        data_loader = HybridLoader(self.output_con, None)
+        data_loader = HybridLoader(self.con)
 
         # start the fundamental control loop
         # 1.  get feedback from previous instance execution (optimal/infeasible/...)
@@ -188,7 +200,6 @@ class MyopicSequencer:
         # 8.  run the model and assess
         # 9.  commit or back out any data as necessary
         # 10.  report findings
-        # 11.  compact the db
 
         last_instance_status = None  # solve status
         last_base_year = None
@@ -237,9 +248,6 @@ class MyopicSequencer:
                 loaded_portal=data_portal,
                 model_name=self.config.scenario,
                 silent=True,  # override this, we do our own reporting...
-                keep_lp_file=self.config.save_lp_file,
-                lp_path=self.config.output_path
-                / ''.join(('LP', str(idx.base_year))),  # base year folder
             )
 
             # 7.  Run checks... check the commodity network
@@ -252,15 +260,14 @@ class MyopicSequencer:
                 if not good_network:
                     SE.write(
                         'Source Trace of the Commodity Network failed for some demands.  '
-                        'See log file ERRORs for failed demands.\n'
+                        'Rolling back.  See log file for failed demands.\n'
                     )
-                    logger.warning('Myopic iteration has bad source trace')
-                    # Dev Note:  The lines below can be un-commented to cause this type of failure to
-                    #            fail the iteration and roll back.  Data is not "tight" enough to enforce
-                    #            this right now, maybe soon...?
-                    # last_instance_status = 'roll_back'
-                    # # skip the rest of the loop
-                    # continue
+                    logger.warning(
+                        'FAILED myopic iteration due to bad demand trace.  Rolling back...'
+                    )
+                    last_instance_status = 'roll_back'
+                    # skip the rest of the loop
+                    continue
 
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'solve')
@@ -268,6 +275,7 @@ class MyopicSequencer:
                 instance=instance,
                 solver_name=self.config.solver_name,
                 silent=True,  # override this, we do our own reporting...
+                keep_LP_files=self.config.save_lp_file,
             )
 
             # 8.  Run the model and assess solve status
@@ -291,17 +299,10 @@ class MyopicSequencer:
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'report')
             pformat_results(model, results, self.config)
-            self.table_writer.write_costs(M=model)
+            self.table_writer.write_costs(m=model)
 
             # prep next loop
             last_base_year = idx.base_year  # update
-
-            # delete anything in the Output_Objective table, it is nonsensical...
-            self.output_con.execute('DELETE FROM Output_Objective WHERE 1')
-            self.output_con.commit()
-
-            # 11.  Compact the db...  lots of writes/deletes leads to bloat
-            self.output_con.execute('VACUUM;')
 
     def initialize_myopic_efficiency_table(self):
         """
@@ -333,7 +334,7 @@ class MyopicSequencer:
         if self.debugging:
             print(query)
         self.cursor.execute(query)
-        self.output_con.commit()
+        self.con.commit()
 
         if self.debugging:
             q2 = (
@@ -378,33 +379,26 @@ class MyopicSequencer:
             sector = raw[0][0]
             try:
                 self.cursor.execute(
-                    'INSERT INTO MyopicNetCapacity ' 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                    (myopic_idx.base_year, r, p, sector, t, v, val, lifetime),
+                    'INSERT INTO MyopicNetCapacity ' 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (myopic_idx.base_year, self.config.scenario, r, p, sector, t, v, val, lifetime),
                 )
             except sqlite3.IntegrityError:
                 SE.write(
                     f'choked updating MyopicNetCapacity on : {myopic_idx.base_year, r, p, t, v, val, lifetime}.\n'
                     'check clearing process.'
                 )
-        self.output_con.commit()
+        self.con.commit()
 
         # we also need to add in any newly available unrestricted capacity techs, for which there is no V_Capacity
         # it is probably easier/quicker to filter the model Efficiency data container vs.
         # pulling data from the old Efficiency table...  This should keep copying forward any
         # unrestricted capacity process seen up to this point.  They eventually will not show up in
         # activeFlow after their lifetime and fall out naturally.
-
-        # we need to pull these indices from both the annual and non-annual flow sets
-        # the non-annuals...
         new_unrestricted_cap_entries = {
             (r, p, t, v)
             for r, p, s, d, i, t, v, o in model.activeFlow_rpsditvo
             if t in model.tech_uncap
         }
-        # update with the annuals
-        new_unrestricted_cap_entries.update(
-            {(r, p, t, v) for r, p, i, t, v, o in model.activeFlow_rpitvo if t in model.tech_uncap}
-        )
         for r, p, t, v in sorted(new_unrestricted_cap_entries):
             lifetime = model.LifetimeProcess[r, t, v]
             # need to pull the sector...
@@ -414,9 +408,10 @@ class MyopicSequencer:
             sector = raw[0][0]
             try:
                 self.cursor.execute(
-                    'INSERT INTO MyopicNetCapacity ' 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO MyopicNetCapacity ' 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     (
                         myopic_idx.base_year,
+                        self.config.scenario,
                         r,
                         p,
                         sector,
@@ -442,7 +437,7 @@ class MyopicSequencer:
                     t,
                     v,
                 )
-        self.output_con.commit()
+        self.con.commit()
 
     # below not currently used.  Preserved for not as an alternative example to output writing.
     # if used, probably needs a shift to named outputs vice (?, ?, ?, ...)
@@ -458,7 +453,7 @@ class MyopicSequencer:
         self.cursor.execute(
             f'DELETE FROM main.MyopicFlowOut WHERE period >= {myopic_idx.base_year}'
         )
-        self.output_con.commit()
+        self.con.commit()
 
         # write it...
         for (r, p, s, d, i, t, v, o), flow in model.V_FlowOut.items():
@@ -483,7 +478,7 @@ class MyopicSequencer:
                     f'choked updating MyopicFlowOut on : { self.config.scenario, r, sector, p, s, d, i, t, v, o, flow}'
                 )
                 logger.error('Failed to add flow for tech %s to MyopicFlowOut in period %d', t, p)
-        self.output_con.commit()
+        self.con.commit()
 
     def update_myopic_efficiency_table(self, myopic_index: MyopicIndex, prev_base: int):
         """
@@ -504,15 +499,16 @@ class MyopicSequencer:
 
         base = myopic_index.base_year
         last_demand_year = myopic_index.last_demand_year
-        logger.info('Starting update of MyopicEfficiency Table retaining [%s, %s)', prev_base, base)
 
         # 0.  Clear any future things past the base year for housekeeping
         #     ease with steps, depth, etc.  These may have been added if we are stepping less
         #     than the previous solve depth or if backtracking.
+        # TODO:  We *might* be able to do something more efficient here and just keep adding
+        #        but this should be most reliable way for now.
         self.cursor.execute(
-            'DELETE FROM MyopicEfficiency WHERE MyopicEfficiency.vintage >= ?', (base,)
+            'DELETE FROM MyopicEfficiency WHERE MyopicEfficiency.vintage >= (?)', (base,)
         )
-        self.output_con.commit()
+        self.con.commit()
 
         # 1.  Clean up stuff not implemented in previous step
         query = (
@@ -539,10 +535,10 @@ class MyopicSequencer:
             for i, removal in enumerate(removals):
                 print(f'{i}. Removing:  {removal}')
         self.cursor.execute(query)
-        self.output_con.commit()
+        self.con.commit()
 
         # 2.  Add the new stuff now visible
-        # dev note:  the `coalesce()` command is a nested if-else.  The first hit wins, so it is priority:
+        # dev note:  the `coalesce()` command is a nested if-else.  The first hit wins so it is priority:
         #            process lifetime > tech lifetime > lifetime default
         lifetime = TemoaModel.default_lifetime_tech
         query = (
@@ -563,7 +559,7 @@ class MyopicSequencer:
             f'  AND Efficiency.vintage <= {last_demand_year}'
         )
         if self.debugging:
-            # note:  the debug query below omits the lifetime computation for brevity, but is very useful without...
+            # note:  the debug query below omits the lifetime computation
             raw = self.cursor.execute(
                 f'SELECT {base}, regions, input_comm, tech, vintage, output_comm, efficiency '
                 'FROM Efficiency '
@@ -575,7 +571,7 @@ class MyopicSequencer:
                 print(idx, t)
             print()
         self.cursor.execute(query)
-        self.output_con.commit()  # MUST commit here to push the INSERTs
+        self.con.commit()  # MUST commit here to push the INSERTs
 
     def characterize_run(self, future_periods: list[int] | None = None) -> None:
         """
@@ -625,9 +621,9 @@ class MyopicSequencer:
         """
         with open(script_file, 'r') as table_script:
             sql_commands = table_script.read()
-        logger.debug('Executing sql from file: %s on connection: %s', script_file, self.output_con)
+        logger.debug('Executing sql from file: %s on connection: %s', script_file, self.con)
         self.cursor.executescript(sql_commands)
-        self.output_con.commit()
+        self.con.commit()
 
     def clear_old_results(self):
         """
@@ -636,9 +632,9 @@ class MyopicSequencer:
         """
         scenario_name = self.config.scenario
         logger.debug('Deleting old results for scenario name %s', scenario_name)
-        for table in self.tables_with_scenario_reference:
+        for table in self.tables_with_scenarior_reference:
             try:
-                self.cursor.execute(f'DELETE FROM {table} WHERE scenario = ?', (scenario_name,))
+                self.cursor.execute(f'DELETE FROM {table} WHERE scenario = (?)', (scenario_name,))
             except sqlite3.OperationalError:
                 SE.write(f'no scenario ref in table {table}\n')
                 raise sqlite3.OperationalError
@@ -648,7 +644,7 @@ class MyopicSequencer:
             except sqlite3.OperationalError:
                 SE.write(f'Failed to clear table {table}.\n')
                 raise sqlite3.OperationalError
-        self.output_con.commit()
+        self.con.commit()
 
     def clear_results_after(self, period):
         """
@@ -682,26 +678,15 @@ class MyopicSequencer:
             except sqlite3.OperationalError:
                 SE.write(f'Failed trying to clear periods from table {table}\n')
                 raise sqlite3.OperationalError
-        for table in self.tables_with_period_no_scneario_ref:
-            try:
-                self.cursor.execute(
-                    f'DELETE FROM {table} WHERE period >= (?) ',
-                    (period,),
-                )
-            except sqlite3.OperationalError:
-                SE.write(f'Failed trying to clear periods from table {table}\n')
-                raise sqlite3.OperationalError
 
         # special case... new capacity has vintage only...
         self.cursor.execute(
             'DELETE FROM main.Output_V_NewCapacity WHERE main.Output_V_NewCapacity.vintage >= (?) AND scenario = (?)',
             (period, self.config.scenario),
         )
-        self.output_con.commit()
+        self.con.commit()
 
     def __del__(self):
         """ensure the connection is closed when destructor is called."""
-        if (
-            hasattr(self, 'output_con') and self.output_con is not None
-        ):  # it may not be constructed yet...
-            self.output_con.close()
+        if hasattr(self, 'con') and self.con is not None:  # it may not be constructed yet...
+            self.con.close()
