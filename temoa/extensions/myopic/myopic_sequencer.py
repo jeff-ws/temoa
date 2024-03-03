@@ -299,7 +299,7 @@ class MyopicSequencer:
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'report')
             pformat_results(model, results, self.config)
-            self.table_writer.write_costs(m=model)
+            self.table_writer.write_costs(M=model)
 
             # prep next loop
             last_base_year = idx.base_year  # update
