@@ -3,9 +3,9 @@ tool for writing outputs to database tables
 """
 from collections import defaultdict
 from enum import Enum, unique
-from functools import cache
 from logging import getLogger
 from sqlite3 import Connection
+from typing import TYPE_CHECKING, Union
 
 from pyomo.core import value
 
@@ -13,6 +13,9 @@ from temoa.temoa_model import temoa_rules
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_mode import TemoaMode
 from temoa.temoa_model.temoa_model import TemoaModel
+
+if TYPE_CHECKING:
+    from tests.test_exchange_cost_ledger import Namespace
 
 """
 Tools for Energy Model Optimization and Analysis (Temoa):
@@ -63,14 +66,9 @@ class CostType(Enum):
 
 
 class ExchangeTechCostLedger:
-    def __init__(self, M: TemoaModel) -> None:
+    def __init__(self, M: Union[TemoaModel, 'Namespace']) -> None:
         self.cost_records: dict[CostType, dict] = defaultdict(dict)
-
-        # self.invest_records: dict[tuple, dict] = defaultdict(dict)
-        # self.fixed_records: dict[tuple, dict] = defaultdict(dict)
-        # self.var_records: dict[tuple, dict] = defaultdict(dict)
-
-        # self.ratio: dict[tuple, dict] = defaultdict(dict)
+        # could be a Namespace for testing purposes...  See the related test
         self.M = M
 
     def add_cost_record(self, link: str, period, tech, vintage, cost: float, cost_type: CostType):
@@ -84,7 +82,6 @@ class ExchangeTechCostLedger:
         # add to the "seen" records for appropriate cost type
         self.cost_records[cost_type][r1, r2, tech, vintage, period] = cost
 
-    @cache
     def get_use_ratio(self, exporter, importer, period, tech, vintage) -> float:
         """
         use flow to calculate the use ratio for these 2 entities for cost apportioning purposes
@@ -97,12 +94,12 @@ class ExchangeTechCostLedger:
         """
         M = self.M
         # need to temporarily reconstitute the names
-        t1 = '-'.join([exporter, importer])
-        t2 = '-'.join([importer, exporter])
+        rr1 = '-'.join([exporter, importer])
+        rr2 = '-'.join([importer, exporter])
         if any(
             (
-                period >= vintage + value(M.LifetimeProcess[t1, tech, vintage]),
-                period >= vintage + value(M.LifetimeProcess[t2, tech, vintage]),
+                period >= vintage + value(M.LifetimeProcess[rr1, tech, vintage]),
+                period >= vintage + value(M.LifetimeProcess[rr2, tech, vintage]),
                 period < vintage,
             )
         ):
@@ -110,35 +107,35 @@ class ExchangeTechCostLedger:
         if tech not in M.tech_annual:
             act_dir1 = value(
                 sum(
-                    M.V_FlowOut[t1, period, s, d, S_i, tech, vintage, S_o]
+                    M.V_FlowOut[rr1, period, s, d, S_i, tech, vintage, S_o]
                     for s in M.time_season
                     for d in M.time_of_day
-                    for S_i in M.processInputs[t1, period, tech, vintage]
-                    for S_o in M.ProcessOutputsByInput[t1, period, tech, vintage, S_i]
+                    for S_i in M.processInputs[rr1, period, tech, vintage]
+                    for S_o in M.ProcessOutputsByInput[rr1, period, tech, vintage, S_i]
                 )
             )
             act_dir2 = value(
                 sum(
-                    M.V_FlowOut[t2, period, s, d, S_i, tech, vintage, S_o]
+                    M.V_FlowOut[rr2, period, s, d, S_i, tech, vintage, S_o]
                     for s in M.time_season
                     for d in M.time_of_day
-                    for S_i in M.processInputs[t2, period, tech, vintage]
-                    for S_o in M.ProcessOutputsByInput[t2, period, tech, vintage, S_i]
+                    for S_i in M.processInputs[rr2, period, tech, vintage]
+                    for S_o in M.ProcessOutputsByInput[rr2, period, tech, vintage, S_i]
                 )
             )
         else:
             act_dir1 = value(
                 sum(
-                    M.V_FlowOutAnnual[t1, period, S_i, tech, vintage, S_o]
-                    for S_i in M.processInputs[t1, period, tech, vintage]
-                    for S_o in M.ProcessOutputsByInput[t1, period, tech, vintage, S_i]
+                    M.V_FlowOutAnnual[rr1, period, S_i, tech, vintage, S_o]
+                    for S_i in M.processInputs[rr1, period, tech, vintage]
+                    for S_o in M.ProcessOutputsByInput[rr1, period, tech, vintage, S_i]
                 )
             )
             act_dir2 = value(
                 sum(
-                    M.V_FlowOutAnnual[t2, period, S_i, tech, vintage, S_o]
-                    for S_i in M.processInputs[t2, period, tech, vintage]
-                    for S_o in M.ProcessOutputsByInput[t2, period, tech, vintage, S_i]
+                    M.V_FlowOutAnnual[rr2, period, S_i, tech, vintage, S_o]
+                    for S_i in M.processInputs[rr2, period, tech, vintage]
+                    for S_o in M.ProcessOutputsByInput[rr2, period, tech, vintage, S_i]
                 )
             )
 
@@ -154,13 +151,13 @@ class ExchangeTechCostLedger:
             records = self.cost_records[cost_type].copy()
             while records:
                 (r1, r2, tech, vintage, period), cost = records.popitem()  # pops a random item
-                # try to get the partner, if it exists
+                # try to get the partner (reversed regions), if it exists
                 partner_cost = records.pop((r2, r1, tech, vintage, period), None)
                 if (
                     partner_cost
                 ):  # they are both entered, so we just record the costs... no splitting
-                    region_costs[r2, period, tech, vintage].update({cost_type: partner_cost})
-                    region_costs[r1, period, tech, vintage].update({cost_type: cost})
+                    region_costs[r2, period, tech, vintage].update({cost_type: cost})
+                    region_costs[r1, period, tech, vintage].update({cost_type: partner_cost})
                 else:
                     # only one side had costs: the signal to split based on use
                     use_ratio = self.get_use_ratio(r1, r2, period, tech, vintage)
@@ -249,8 +246,6 @@ class TableWriter:
         """
         Gather the cost data vars
         :param M: the Temoa Model
-        :param epsilon: cutoff to ignore as zero
-        :param myopic_iteration: True if the iteration is myopic
         :return: dictionary of results of format variable name -> {idx: value}
         """
 
@@ -405,6 +400,8 @@ class TableWriter:
             )
             for (r, p, t, v) in entries
         ]
+        # let's be kind and sort by something reasonable (r, v, t, p)
+        rows.sort(key=lambda r: (r[1], r[4], r[3], r[2]))
         # TODO:  maybe extract this to a pure writing function...we shall see
         cur = self.con.cursor()
         qry = 'INSERT INTO Output_Costs_2 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
