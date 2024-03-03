@@ -68,8 +68,8 @@ def test_loan_costs(param):
     """
     # we will test with a 1% error to accommodate the approximation of GDR=0
     model_cost, undiscounted_cost = table_writer.TableWriter.loan_costs(**param)
-    assert model_cost == pytest.approx(param[('model_cost')], rel=0.01)
-    assert undiscounted_cost == pytest.approx(param[('undiscounted_cost')], rel=0.01)
+    assert model_cost == pytest.approx(param['model_cost'], rel=0.01)
+    assert undiscounted_cost == pytest.approx(param['undiscounted_cost'], rel=0.01)
 
 
 @pytest.mark.parametrize('param', params_with_zero_GDR)
@@ -78,5 +78,5 @@ def test_loan_costs_with_zero_GDR(param):
     Test the formula with zero for GDR to make sure it is handled correctly
     """
     model_cost, undiscounted_cost = table_writer.TableWriter.loan_costs(**param)
-    assert model_cost == pytest.approx(param[('model_cost')], abs=0.01)
-    assert undiscounted_cost == pytest.approx(param[('undiscounted_cost')], abs=0.01)
+    assert model_cost == pytest.approx(param['model_cost'], abs=0.01)
+    assert undiscounted_cost == pytest.approx(param['undiscounted_cost'], abs=0.01)
