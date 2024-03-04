@@ -46,7 +46,6 @@ from temoa.temoa_model.run_actions import (
     check_solve_status,
 )
 from temoa.temoa_model.source_check import source_trace
-from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_mode import TemoaMode
 from temoa.temoa_model.temoa_model import TemoaModel
@@ -173,7 +172,7 @@ class TemoaSequencer:
                 con = sqlite3.connect(self.config.input_file)
                 hybrid_loader = HybridLoader(db_connection=con)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
-                instance = build_instance(data_portal, silent=self.config.silent)
+                instance = build_instance(data_portal, silent=self.config.silent, keep_lp_file=self.config.save_lp_file, lp_path=self.config.output_path)
                 if self.config.price_check:
                     price_checker(instance)
                 if self.config.source_check:
@@ -181,7 +180,6 @@ class TemoaSequencer:
                 self.pf_solved_instance, self.pf_results = solve_instance(
                     instance,
                     self.config.solver_name,
-                    self.config.save_lp_file,
                     silent=self.config.silent,
                 )
                 good_solve, msg = check_solve_status(self.pf_results)
@@ -195,9 +193,9 @@ class TemoaSequencer:
                     sys.exit(-1)
                 handle_results(self.pf_solved_instance, self.pf_results, self.config)
                 # these require that the new cost table be built, which is not guaranteed at this time...
-                table_writer = TableWriter(self.config, con)
-                table_writer.clear_scenario()
-                table_writer.write_costs(instance)
+                # table_writer = TableWriter(self.config, con)
+                # table_writer.clear_scenario()
+                # table_writer.write_costs(instance)
 
             case TemoaMode.MYOPIC:
                 # create a myopic sequencer and shift control to it

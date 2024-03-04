@@ -34,7 +34,7 @@ from typing import Tuple
 
 import pyomo.opt
 from pyomo.environ import DataPortal, Suffix, Var, Constraint, value, UnknownSolver, SolverFactory
-from pyomo.opt import SolverResults, SolverStatus, TerminationCondition
+from pyomo.opt import SolverResults
 
 from temoa.temoa_model.pformat_results import pformat_results
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -63,13 +63,7 @@ def load_portal_from_dat(dat_file: Path, silent: bool = False) -> DataPortal:
     return loaded_portal
 
 
-def build_instance(
-    loaded_portal: DataPortal,
-    model_name=None,
-    silent=False,
-    keep_lp_file=False,
-    lp_path: Path = None,
-) -> TemoaModel:
+def build_instance(loaded_portal: DataPortal, model_name=None, silent=False, keep_lp_file=False, lp_path:Path= None) -> TemoaModel:
     """
     Build a Temoa Instance from data
     :param loaded_portal: a DataPortal instance
@@ -102,7 +96,7 @@ def build_instance(
             if not Path.is_dir(lp_path):
                 Path.mkdir(lp_path)
             filename = lp_path / 'model.lp'
-            instance.write(filename, format='lp', io_options={'symbolic_solver_labels': True})
+            instance.write(filename,format='lp' ,io_options={'symbolic_solver_labels': True})
 
     # gather some stats...
     c_count = 0
@@ -116,7 +110,7 @@ def build_instance(
 
 
 def solve_instance(
-    instance: TemoaModel, solver_name, silent: bool = False
+    instance: TemoaModel, solver_name,  silent: bool = False
 ) -> Tuple[TemoaModel, SolverResults]:
     """
     Solve the instance and return a loaded instance
@@ -172,19 +166,12 @@ def solve_instance(
                 optimizer.options['barrier convergetol'] = 1.0e-5
                 optimizer.options['feasopt tolerance'] = 1.0e-6
 
-            elif solver_name == 'highs':
-                optimizer = SolverFactory('appsi_highs')
+            # TODO: still need to add gurobi parameters.
 
-            # TODO: still need to add gurobi parameters?
+            # solver = pyomo.environ.SolverFactory('appsi_highs')
+            # result = solver.solve(instance, tee=True)
 
-            result = optimizer.solve(
-                instance, load_solutions=False
-            )  # , tee=True)  <-- if needed for T/S
-            if (
-                result.solver.status == SolverStatus.ok
-                and result.solver.termination_condition == TerminationCondition.optimal
-            ):
-                instance.solutions.load_from(result)
+            result = optimizer.solve(instance)
 
             # opt = appsi.solvers.Highs()
             # # opt.config.load_solution=False
@@ -201,6 +188,8 @@ def solve_instance(
         if not silent:
             SE.write('\r[%8.2f] Model solved.\n' % (time() - hack))
             SE.flush()
+
+        instance.dual.display()
 
     except Exception as model_exc:
         # yield "Exception found in solve_temoa_instance\n"

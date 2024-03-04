@@ -62,7 +62,7 @@ class MyopicSequencer:
     """
 
     # these are the tables that are incrementally built by the myopic instances
-    tables_with_scenarior_reference = [
+    tables_with_scenario_reference = [
         'MyopicNetCapacity',
         'MyopicCost',
         'Output_CapacityByPeriodAndTech',
@@ -72,6 +72,7 @@ class MyopicSequencer:
         'Output_V_RetiredCapacity',
         'Output_VFlow_In',
         'Output_VFlow_Out',
+        'Output_Duals'
     ]
     tables_without_scenario_reference = [
         'MyopicEfficiency',
@@ -83,7 +84,6 @@ class MyopicSequencer:
         'MyopicCost',
         'Output_Costs_2'
     ]
-
     legacy_tables_with_period_reference = [
         'Output_CapacityByPeriodAndTech',
         'Output_Curtailment',
@@ -248,6 +248,8 @@ class MyopicSequencer:
                 loaded_portal=data_portal,
                 model_name=self.config.scenario,
                 silent=True,  # override this, we do our own reporting...
+                keep_lp_file=self.config.save_lp_file,
+                lp_path=self.config.output_path / ''.join(('LP',str(idx.base_year)))  # base year folder
             )
 
             # 7.  Run checks... check the commodity network
@@ -275,7 +277,6 @@ class MyopicSequencer:
                 instance=instance,
                 solver_name=self.config.solver_name,
                 silent=True,  # override this, we do our own reporting...
-                keep_LP_files=self.config.save_lp_file,
             )
 
             # 8.  Run the model and assess solve status
@@ -303,6 +304,10 @@ class MyopicSequencer:
 
             # prep next loop
             last_base_year = idx.base_year  # update
+
+            # delete anything in the Output_Objective table, it is nonsensical...
+            self.con.execute('DELETE FROM Output_Objective WHERE 1')
+            self.con.commit()
 
     def initialize_myopic_efficiency_table(self):
         """
@@ -503,10 +508,8 @@ class MyopicSequencer:
         # 0.  Clear any future things past the base year for housekeeping
         #     ease with steps, depth, etc.  These may have been added if we are stepping less
         #     than the previous solve depth or if backtracking.
-        # TODO:  We *might* be able to do something more efficient here and just keep adding
-        #        but this should be most reliable way for now.
         self.cursor.execute(
-            'DELETE FROM MyopicEfficiency WHERE MyopicEfficiency.vintage >= (?)', (base,)
+            'DELETE FROM MyopicEfficiency WHERE MyopicEfficiency.vintage >= ?', (base,)
         )
         self.con.commit()
 
@@ -538,7 +541,7 @@ class MyopicSequencer:
         self.con.commit()
 
         # 2.  Add the new stuff now visible
-        # dev note:  the `coalesce()` command is a nested if-else.  The first hit wins so it is priority:
+        # dev note:  the `coalesce()` command is a nested if-else.  The first hit wins, so it is priority:
         #            process lifetime > tech lifetime > lifetime default
         lifetime = TemoaModel.default_lifetime_tech
         query = (
@@ -559,7 +562,7 @@ class MyopicSequencer:
             f'  AND Efficiency.vintage <= {last_demand_year}'
         )
         if self.debugging:
-            # note:  the debug query below omits the lifetime computation
+            # note:  the debug query below omits the lifetime computation for brevity, but is very useful without...
             raw = self.cursor.execute(
                 f'SELECT {base}, regions, input_comm, tech, vintage, output_comm, efficiency '
                 'FROM Efficiency '
@@ -632,9 +635,9 @@ class MyopicSequencer:
         """
         scenario_name = self.config.scenario
         logger.debug('Deleting old results for scenario name %s', scenario_name)
-        for table in self.tables_with_scenarior_reference:
+        for table in self.tables_with_scenario_reference:
             try:
-                self.cursor.execute(f'DELETE FROM {table} WHERE scenario = (?)', (scenario_name,))
+                self.cursor.execute(f'DELETE FROM {table} WHERE scenario = ?', (scenario_name,))
             except sqlite3.OperationalError:
                 SE.write(f'no scenario ref in table {table}\n')
                 raise sqlite3.OperationalError
