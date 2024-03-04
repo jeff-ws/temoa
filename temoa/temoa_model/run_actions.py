@@ -189,8 +189,6 @@ def solve_instance(
             SE.write('\r[%8.2f] Model solved.\n' % (time() - hack))
             SE.flush()
 
-        instance.dual.display()
-
     except Exception as model_exc:
         # yield "Exception found in solve_temoa_instance\n"
         SE.write('Exception found in solve_temoa_instance\n')
