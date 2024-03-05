@@ -32,12 +32,12 @@ import logging
 import os
 import pathlib
 import shutil
+from typing import Any
 
-import pyomo.opt
 import pytest
+from pyomo.opt import SolverResults
 
 from definitions import PROJECT_ROOT
-from temoa.temoa_model.temoa_mode import TemoaMode
 from temoa.temoa_model.temoa_model import TemoaModel
 from temoa.temoa_model.temoa_sequencer import TemoaSequencer
 
@@ -78,7 +78,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture()
-def system_test_run(request, tmp_path) -> tuple[str, pyomo.opt.SolverResults, TemoaModel]:
+def system_test_run(request, tmp_path) -> tuple[Any, SolverResults | None, TemoaModel | None, TemoaSequencer]:
     """
     spin up the model, solve it, and hand over the model and result for inspection
     """
@@ -91,10 +91,9 @@ def system_test_run(request, tmp_path) -> tuple[str, pyomo.opt.SolverResults, Te
     sequencer = TemoaSequencer(
         config_file=config_file,
         output_path=tmp_path,
-        mode_override=TemoaMode.PERFECT_FORESIGHT,
         **options,
     )
     sequencer.start()
     res = sequencer.pf_results
     mdl = sequencer.pf_solved_instance
-    return data_name, res, mdl
+    return data_name, res, mdl, sequencer
