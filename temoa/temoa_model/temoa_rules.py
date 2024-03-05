@@ -498,9 +498,9 @@ def PeriodCost_rule(M: 'TemoaModel', p):
     )
     sponge_cost = 0
     if M.troubleshooting:
-        sponge_cost = 10000 * sum(M.sponge_abs[r, p, c] for r in M.regions for c in M.commodity_demand)
+        sponge_cost = 100 * sum(M.sponge[r, p, c] for r in M.regions for c in M.commodity_demand)
         # and add in the excess flows...
-        sponge_cost += 10000 * sum(M.sump_abs[rpsdc] for rpsdc in M.sump if rpsdc[1] == p)
+        sponge_cost += 10 * sum(M.sump[rpsdc] for rpsdc in M.sump if rpsdc[1] == p)
 
     period_costs = loan_costs + fixed_costs + variable_costs + variable_costs_annual + sponge_cost
     return period_costs

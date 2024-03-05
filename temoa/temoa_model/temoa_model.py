@@ -379,25 +379,18 @@ class TemoaModel(AbstractModel):
             # introducing a sponge variable for T/S purposes
             ################################################
             M.sponge = Var(M.regions, M.time_optimize, M.commodity_demand, domain=Reals)
-            M.sponge_abs = Var(M.regions, M.time_optimize, M.commodity_demand, domain=NonNegativeReals)
-
+            M.sponge_pos = Var(M.regions, M.time_optimize, M.commodity_demand, domain=NonNegativeReals)
+            M.sponge_neg = Var(M.regions, M.time_optimize, M.commodity_demand, domain=NonNegativeReals)
             @M.Constraint(M.regions, M.time_optimize, M.commodity_demand)
             def pos_sponge(M, r, p, d):
-                return M.sponge_abs[r, p, d] >= M.sponge[r, p, d]
+                return M.sponge[r, p, d] >= M.sponge_pos[r, p, d]
             @M.Constraint(M.regions, M.time_optimize, M.commodity_demand)
             def neg_sponge(M, r, p, d):
-                return M.sponge_abs[r, p, d] >= -M.sponge[r, p, d]
+                return M.sponge[r, p, d] >= -M.sponge_neg[r, p, d]
 
             # and a flow sump...
-            M.sump = Var(M.regions, M.time_optimize, M.time_season, M.time_of_day, M.commodity_all, domain=Reals, initialize=zero_or_none)
-            M.sump_abs = Var(M.regions, M.time_optimize, M.time_season, M.time_of_day, M.commodity_all, domain=NonNegativeReals, initialize=zero_or_none)
-            @M.Constraint(M.sump.index_set())
-            def pos_sump(M, *idx):
-                return M.sump_abs[idx] >= M.sump[idx]
+            M.sump = Var(M.regions, M.time_optimize, M.time_season, M.time_of_day, M.commodity_all, domain=NonNegativeReals, initialize=zero_or_none)
 
-            @M.Constraint(M.sump.index_set())
-            def neg_sump(M, *idx):
-                return M.sump_abs[idx] >= -M.sump[idx]
 
         # Define base decision variables
         M.FlowVar_rpsditvo = Set(dimen=8, initialize=FlowVariableIndices)
