@@ -23,7 +23,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 from itertools import product
 
 from pyomo.core import BuildCheck
-from pyomo.environ import (Any, NonNegativeReals, AbstractModel, BuildAction, Param, Set, Objective, minimize)
+from pyomo.environ import (Any, NonNegativeReals, AbstractModel, BuildAction, Param, Set, Objective, minimize, Reals)
 
 from temoa.temoa_model.temoa_initialize import *
 from temoa.temoa_model.temoa_rules import *
@@ -362,46 +362,81 @@ class TemoaModel(AbstractModel):
 
         M.progress_marker_3 = BuildAction(['Starting to build Variables'],
                                           rule=progress_check)
+        M.troubleshooting = False
+        # dev note:  apparently with the changed process in run_actions to load the model results, zero
+        #            initialization is needed.  The "old way" by letting the solver do it seems to load
+        #            fine without this...  perhaps it doesn't care as it just captures "last value".
+        #            Initializing everything to zero gets all tests to pass.  Will leave it in for now.
+        def zero_or_none(M, *idx):
+            # if M.troubleshooting:
+            #   return 0
+            # else:
+            #   return None
+            return 0
+
+        if M.troubleshooting:
+            ################################################
+            # introducing a sponge variable for T/S purposes
+            ################################################
+            M.sponge = Var(M.regions, M.time_optimize, M.commodity_demand, domain=Reals)
+            M.sponge_abs = Var(M.regions, M.time_optimize, M.commodity_demand, domain=NonNegativeReals)
+
+            @M.Constraint(M.regions, M.time_optimize, M.commodity_demand)
+            def pos_sponge(M, r, p, d):
+                return M.sponge_abs[r, p, d] >= M.sponge[r, p, d]
+            @M.Constraint(M.regions, M.time_optimize, M.commodity_demand)
+            def neg_sponge(M, r, p, d):
+                return M.sponge_abs[r, p, d] >= -M.sponge[r, p, d]
+
+            # and a flow sump...
+            M.sump = Var(M.regions, M.time_optimize, M.time_season, M.time_of_day, M.commodity_all, domain=Reals, initialize=zero_or_none)
+            M.sump_abs = Var(M.regions, M.time_optimize, M.time_season, M.time_of_day, M.commodity_all, domain=NonNegativeReals, initialize=zero_or_none)
+            @M.Constraint(M.sump.index_set())
+            def pos_sump(M, *idx):
+                return M.sump_abs[idx] >= M.sump[idx]
+
+            @M.Constraint(M.sump.index_set())
+            def neg_sump(M, *idx):
+                return M.sump_abs[idx] >= -M.sump[idx]
 
         # Define base decision variables
         M.FlowVar_rpsditvo = Set(dimen=8, initialize=FlowVariableIndices)
-        M.V_FlowOut = Var(M.FlowVar_rpsditvo, domain=NonNegativeReals)
+        M.V_FlowOut = Var(M.FlowVar_rpsditvo, domain=NonNegativeReals, initialize=zero_or_none)
 
         M.FlowVarAnnual_rpitvo = Set(dimen=6, initialize=FlowVariableAnnualIndices)
-        M.V_FlowOutAnnual = Var(M.FlowVarAnnual_rpitvo, domain=NonNegativeReals)
+        M.V_FlowOutAnnual = Var(M.FlowVarAnnual_rpitvo, domain=NonNegativeReals, initialize=zero_or_none)
 
         M.FlexVar_rpsditvo = Set(dimen=8, initialize=FlexVariablelIndices)
-        M.V_Flex = Var(M.FlexVar_rpsditvo, domain=NonNegativeReals)
+        M.V_Flex = Var(M.FlexVar_rpsditvo, domain=NonNegativeReals, initialize=zero_or_none)
 
         M.FlexVarAnnual_rpitvo = Set(dimen=6, initialize=FlexVariableAnnualIndices)
-        M.V_FlexAnnual = Var(M.FlexVarAnnual_rpitvo, domain=NonNegativeReals)
+        M.V_FlexAnnual = Var(M.FlexVarAnnual_rpitvo, domain=NonNegativeReals, initialize=zero_or_none)
 
         M.CurtailmentVar_rpsditvo = Set(dimen=8, initialize=CurtailmentVariableIndices)
-        M.V_Curtailment = Var(M.CurtailmentVar_rpsditvo, domain=NonNegativeReals)
+        M.V_Curtailment = Var(M.CurtailmentVar_rpsditvo, domain=NonNegativeReals, initialize=zero_or_none)
 
         M.FlowInStorage_rpsditvo = Set(dimen=8, initialize=FlowInStorageVariableIndices)
-        M.V_FlowIn = Var(M.FlowInStorage_rpsditvo, domain=NonNegativeReals)
+        M.V_FlowIn = Var(M.FlowInStorage_rpsditvo, domain=NonNegativeReals, initialize=zero_or_none)
 
         M.StorageLevel_rpsdtv = Set(dimen=6, initialize=StorageVariableIndices)
-        M.V_StorageLevel = Var(M.StorageLevel_rpsdtv, domain=NonNegativeReals)
-        M.V_StorageInit = Var(M.StorageInit_rtv, domain=NonNegativeReals)
+        M.V_StorageLevel = Var(M.StorageLevel_rpsdtv, domain=NonNegativeReals, initialize=zero_or_none)
+        M.V_StorageInit = Var(M.StorageInit_rtv, domain=NonNegativeReals, initialize=zero_or_none)
 
         # Derived decision variables
 
         M.CapacityVar_rptv = Set(dimen=4, initialize=CostFixedIndices)
-        M.V_Capacity = Var(M.CapacityVar_rptv, domain=NonNegativeReals)
+        M.V_Capacity = Var(M.CapacityVar_rptv, domain=NonNegativeReals, initialize=zero_or_none)
 
         M.NewCapacityVar_rtv = Set(dimen=3, initialize=CapacityVariableIndices)
-        M.V_NewCapacity = Var(M.NewCapacityVar_rtv, domain=NonNegativeReals, initialize=0)
+        M.V_NewCapacity = Var(M.NewCapacityVar_rtv, domain=NonNegativeReals, initialize=zero_or_none)
 
         M.RetiredCapacityVar_rptv = Set(dimen=4, initialize=RetiredCapacityVariableIndices)
-        M.V_RetiredCapacity = Var(M.RetiredCapacityVar_rptv, domain=NonNegativeReals,
-                                  initialize=0)
+        M.V_RetiredCapacity = Var(M.RetiredCapacityVar_rptv, domain=NonNegativeReals, initialize=0)
 
         M.CapacityAvailableVar_rpt = Set(dimen=3,
                                          initialize=CapacityAvailableVariableIndices)
         M.V_CapacityAvailableByPeriodAndTech = Var(M.CapacityAvailableVar_rpt,
-                                                   domain=NonNegativeReals)
+                                                   domain=NonNegativeReals, initialize=zero_or_none)
 
         ################################################
         #              Objective Function              #
