@@ -750,11 +750,16 @@ class HybridLoader:
 
         # RenewablePortfolioStandard
         if self.table_exists('RenewablePortfolioStandard'):
-            raw = cur.execute(
-                'SELECT regions, periods, rps FROM main.RenewablePortfolioStandard '
-                ' WHERE periods >= ? AND periods <= ?',
-                (mi.base_year, mi.last_demand_year)
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT regions, periods, rps FROM main.RenewablePortfolioStandard '
+                    ' WHERE periods >= ? AND periods <= ?',
+                    (mi.base_year, mi.last_demand_year)
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT regions, periods, rps FROM main.RenewablePortfolioStandard '
+                ).fetchall()
             load_element(M.RenewablePortfolioStandard, raw)
 
         # CostFixed
@@ -865,45 +870,63 @@ class HybridLoader:
             else:
                 raw = cur.execute(
                     'SELECT regions, periods, tech, maxcap FROM main.MaxNewCapacity '
-                    'WHERE periods >= ? AND periods <= ?',
-                    (mi.base_year, mi.last_demand_year),
                 ).fetchall()
             load_element(M.MaxNewCapacity, raw, self.viable_rt, (0, 2))
 
         # MaxCapacityGroup
         if self.table_exists('MaxCapacityGroup'):
-            raw = cur.execute(
-                'SELECT regions, t_periods, group_name, max_cap_g FROM main.MaxCapacityGroup '
-                ' WHERE t_periods >= ? AND t_periods <= ?',
-                (mi.base_year, mi.last_demand_year)
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT regions, t_periods, group_name, max_cap_g FROM main.MaxCapacityGroup '
+                    ' WHERE t_periods >= ? AND t_periods <= ?',
+                    (mi.base_year, mi.last_demand_year)
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT regions, t_periods, group_name, max_cap_g FROM main.MaxCapacityGroup '
+                ).fetchall()
             load_element(M.MaxCapacityGroup, raw)
 
         # MinCapacityGroup
         if self.table_exists('MinCapacityGroup'):
-            raw = cur.execute(
-                'SELECT regions, t_periods, group_name, min_cap_g FROM main.MinCapacityGroup '
-                ' WHERE t_periods >= ? AND t_periods <= ?',
-                (mi.base_year, mi.last_demand_year)
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT regions, t_periods, group_name, min_cap_g FROM main.MinCapacityGroup '
+                    ' WHERE t_periods >= ? AND t_periods <= ?',
+                    (mi.base_year, mi.last_demand_year)
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT regions, t_periods, group_name, min_cap_g FROM main.MinCapacityGroup '
+                ).fetchall()
             load_element(M.MinCapacityGroup, raw)
 
         # MinNewCapacityGroup
         if self.table_exists('MinNewCapacityGroup'):
-            raw = cur.execute(
-                'SELECT regions, periods, group_name, minnewcap FROM main.MinNewCapacityGroup '
-                ' WHERE t_periods >= ? AND t_periods <= ?',
-                (mi.base_year, mi.last_demand_year)
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT regions, periods, group_name, minnewcap FROM main.MinNewCapacityGroup '
+                    ' WHERE t_periods >= ? AND t_periods <= ?',
+                    (mi.base_year, mi.last_demand_year)
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT regions, periods, group_name, minnewcap FROM main.MinNewCapacityGroup '
+                ).fetchall()
             load_element(M.MinNewCapacityGroup, raw)
 
         # MaxNewCapacityGroup
         if self.table_exists('MaxNewCapacityGroup'):
-            raw = cur.execute(
-                'SELECT regions, periods, group_name, maxnewcap FROM main.MaxNewCapacityGroup '
-                ' WHERE t_periods >= ? AND t_periods <= ?',
-                (mi.base_year, mi.last_demand_year)
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT regions, periods, group_name, maxnewcap FROM main.MaxNewCapacityGroup '
+                    ' WHERE t_periods >= ? AND t_periods <= ?',
+                    (mi.base_year, mi.last_demand_year)
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT regions, periods, group_name, maxnewcap FROM main.MaxNewCapacityGroup '
+                ).fetchall()
             load_element(M.MaxNewCapacityGroup, raw)
 
         # MinCapacityShare
@@ -936,20 +959,30 @@ class HybridLoader:
 
         # MinActivityGroup
         if self.table_exists('MinActivityGroup'):
-            raw = cur.execute(
-                'SELECT regions, t_periods, group_name, min_act_g FROM main.MinActivityGroup '
-                ' WHERE t_periods >= ? AND t_periods <= ?',
-                (mi.base_year, mi.last_demand_year)
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT regions, t_periods, group_name, min_act_g FROM main.MinActivityGroup '
+                    ' WHERE t_periods >= ? AND t_periods <= ?',
+                    (mi.base_year, mi.last_demand_year)
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT regions, t_periods, group_name, min_act_g FROM main.MinActivityGroup '
+                ).fetchall()
             load_element(M.MinActivityGroup, raw)
 
         # MaxActivityGroup
         if self.table_exists('MaxActivityGroup'):
-            raw = cur.execute(
-                'SELECT regions, t_periods, group_name, max_act_g FROM main.MaxActivityGroup '
-                ' WHERE t_periods >= ? AND t_periods <= ?',
-                (mi.base_year, mi.last_demand_year)
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT regions, t_periods, group_name, max_act_g FROM main.MaxActivityGroup '
+                    ' WHERE t_periods >= ? AND t_periods <= ?',
+                    (mi.base_year, mi.last_demand_year)
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT regions, t_periods, group_name, max_act_g FROM main.MaxActivityGroup '
+                ).fetchall()
             load_element(M.MaxActivityGroup, raw)
 
         # MinActivityShare
@@ -1038,8 +1071,6 @@ class HybridLoader:
             else:
                 raw = cur.execute(
                     'SELECT regions, periods, emis_comm, emis_limit FROM main.EmissionLimit '
-                    ' WHERE periods >= ? AND periods <= ?',
-                    (mi.base_year, mi.last_demand_year)
                 ).fetchall()
 
             load_element(M.EmissionLimit, raw)
