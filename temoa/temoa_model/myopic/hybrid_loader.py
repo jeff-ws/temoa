@@ -131,8 +131,16 @@ class HybridLoader:
             # we will add any already built (existing capacity) techs to "OK techs" because they are de-facto
             # already in existence.  This *might* cause a model warning regarding unused outputs if there is no
             # longer a receiver for their output.
-            if v < myopic_index.base_year:
-                existing_techs.add(row)
+
+            # CHANGE HERE.  It is actually possible for an earlier vintage tech to be invalid/problematic
+            # if it produces an output that is not wanted by anything (all possible receivers have been
+            # suppressed).  In that case, the build will crash because the output commodity from that
+            # tech will not be in the legal physical commodities.  So, we do need to screen them too.
+            # will leave the code in case another alternative is discovered.
+
+            # if v < myopic_index.base_year:
+            #     existing_techs.add(row)
+
             ok_techs.add(row)
             # we screen here to not worry about demand/emission outputs
             if c2 in phys_commodities:
@@ -330,7 +338,7 @@ class HybridLoader:
             Helper to alleviate some typing!
             Expects that the values passed in are an iterable of tuples, like a standard
             query result.  Note that any filtering is disregarded if there is no myopic index in use
-            :param c: the model component
+            :param c: the model component to load
             :param values: the keys for param or the item values for set as tuples
             :param validation: the set to validate the keys/set value against
             :param val_loc: tuple of the positions of r, t, v in the key for validation
@@ -344,13 +352,29 @@ class HybridLoader:
 
             match c:
                 case Set():  # it is a pyomo Set
-                    # check for multi-dim sets (none expected)
-                    if len(values) > 0 and len(values[0]) > 1:
-                        if validation:
-                            raise ValueError(
-                                'Encountered a multi-dimensional Set during data load with a validation schema. '
-                                '\nNot currently supported'
-                            )
+                    # note:  we will put the set values into lists to establish order.  Passing a set into
+                    #        pyomo as an initializer will raise a warning about initializing from non-ordered...
+
+                    # check for multi-dim sets
+                    if len(values) > 0 and len(values[0]) > 1:  # this contains multi-dim values
+                        if validation and mi:
+                            if not val_loc:
+                                raise ValueError('Trying to use a validation but missing location field in call.')
+                            if validation is self.viable_rtv:
+                                data[c.name] = [
+                                    t for t in values
+                                    if (t[val_loc[0]], t[val_loc[1]], t[val_loc[2]]) in self.viable_rtv
+                                ]
+                            if validation is self.viable_rt:
+                                data[c.name] = [
+                                    t for t in values
+                                    if (t[val_loc[0]], t[val_loc[1]]) in self.viable_rt
+                                ]
+                            if validation is self.viable_vintages:
+                                data[c.name] = [
+                                    t for t in values
+                                    if t[val_loc[0]] in self.viable_vintages
+                                ]
                         else:
                             data[c.name] = [t for t in values]
 
@@ -727,7 +751,9 @@ class HybridLoader:
         # RenewablePortfolioStandard
         if self.table_exists('RenewablePortfolioStandard'):
             raw = cur.execute(
-                'SELECT regions, periods, rps FROM main.RenewablePortfolioStandard'
+                'SELECT regions, periods, rps FROM main.RenewablePortfolioStandard '
+                ' WHERE periods >= ? AND periods <= ?',
+                (mi.base_year, mi.last_demand_year)
             ).fetchall()
             load_element(M.RenewablePortfolioStandard, raw)
 
@@ -848,6 +874,8 @@ class HybridLoader:
         if self.table_exists('MaxCapacityGroup'):
             raw = cur.execute(
                 'SELECT regions, t_periods, group_name, max_cap_g FROM main.MaxCapacityGroup '
+                ' WHERE t_periods >= ? AND t_periods <= ?',
+                (mi.base_year, mi.last_demand_year)
             ).fetchall()
             load_element(M.MaxCapacityGroup, raw)
 
@@ -855,20 +883,26 @@ class HybridLoader:
         if self.table_exists('MinCapacityGroup'):
             raw = cur.execute(
                 'SELECT regions, t_periods, group_name, min_cap_g FROM main.MinCapacityGroup '
+                ' WHERE t_periods >= ? AND t_periods <= ?',
+                (mi.base_year, mi.last_demand_year)
             ).fetchall()
             load_element(M.MinCapacityGroup, raw)
 
         # MinNewCapacityGroup
         if self.table_exists('MinNewCapacityGroup'):
             raw = cur.execute(
-                'SELECT regions, periods, group_name, minnewcap FROM main.MinNewCapacityGroup'
+                'SELECT regions, periods, group_name, minnewcap FROM main.MinNewCapacityGroup '
+                ' WHERE t_periods >= ? AND t_periods <= ?',
+                (mi.base_year, mi.last_demand_year)
             ).fetchall()
             load_element(M.MinNewCapacityGroup, raw)
 
         # MaxNewCapacityGroup
         if self.table_exists('MaxNewCapacityGroup'):
             raw = cur.execute(
-                'SELECT regions, periods, group_name, maxnewcap FROM main.MaxNewCapacityGroup'
+                'SELECT regions, periods, group_name, maxnewcap FROM main.MaxNewCapacityGroup '
+                ' WHERE t_periods >= ? AND t_periods <= ?',
+                (mi.base_year, mi.last_demand_year)
             ).fetchall()
             load_element(M.MaxNewCapacityGroup, raw)
 
@@ -903,14 +937,18 @@ class HybridLoader:
         # MinActivityGroup
         if self.table_exists('MinActivityGroup'):
             raw = cur.execute(
-                'SELECT regions, t_periods, group_name, min_act_g FROM main.MinActivityGroup'
+                'SELECT regions, t_periods, group_name, min_act_g FROM main.MinActivityGroup '
+                ' WHERE t_periods >= ? AND t_periods <= ?',
+                (mi.base_year, mi.last_demand_year)
             ).fetchall()
             load_element(M.MinActivityGroup, raw)
 
         # MaxActivityGroup
         if self.table_exists('MaxActivityGroup'):
             raw = cur.execute(
-                'SELECT regions, t_periods, group_name, max_act_g FROM main.MaxActivityGroup'
+                'SELECT regions, t_periods, group_name, max_act_g FROM main.MaxActivityGroup '
+                ' WHERE t_periods >= ? AND t_periods <= ?',
+                (mi.base_year, mi.last_demand_year)
             ).fetchall()
             load_element(M.MaxActivityGroup, raw)
 
@@ -1000,8 +1038,10 @@ class HybridLoader:
             else:
                 raw = cur.execute(
                     'SELECT regions, periods, emis_comm, emis_limit FROM main.EmissionLimit '
+                    ' WHERE periods >= ? AND periods <= ?',
+                    (mi.base_year, mi.last_demand_year)
                 ).fetchall()
-            # emission commodities are always legal, so we don't need to filter down
+
             load_element(M.EmissionLimit, raw)
 
         # EmissionActivity

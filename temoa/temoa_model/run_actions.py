@@ -34,7 +34,7 @@ from typing import Tuple
 
 import pyomo.opt
 from pyomo.environ import DataPortal, Suffix, Var, Constraint, value, UnknownSolver, SolverFactory
-from pyomo.opt import SolverResults
+from pyomo.opt import SolverResults, SolverStatus, TerminationCondition
 
 from temoa.temoa_model.pformat_results import pformat_results
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -158,6 +158,7 @@ def solve_instance(
                 # optimizer.options["zeroTolerance"] = 1e-12
                 # optimizer.options["crossover"] = 'off'
 
+
             elif solver_name == 'cplex':
                 # Note: these parameter values are taken to be the same as those in PyPSA
                 # (see: https://pypsa-eur.readthedocs.io/en/latest/configuration.html)
@@ -166,12 +167,17 @@ def solve_instance(
                 optimizer.options['barrier convergetol'] = 1.0e-5
                 optimizer.options['feasopt tolerance'] = 1.0e-6
 
+            elif solver_name == 'highs':
+                optimizer = SolverFactory('appsi_highs')
+
             # TODO: still need to add gurobi parameters.
 
             # solver = pyomo.environ.SolverFactory('appsi_highs')
             # result = solver.solve(instance, tee=True)
 
-            result = optimizer.solve(instance)
+            result = optimizer.solve(instance, load_solutions=False)
+            if result.solver.status == SolverStatus.ok and result.solver.termination_condition == TerminationCondition.optimal:
+                instance.solutions.load_from(result)
 
             # opt = appsi.solvers.Highs()
             # # opt.config.load_solution=False

@@ -23,8 +23,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 from itertools import product
 
 from pyomo.core import BuildCheck
-from pyomo.environ import (Any, NonNegativeReals, AbstractModel, BuildAction, Param, Set, Var,
-                           Objective, minimize)
+from pyomo.environ import (Any, NonNegativeReals, AbstractModel, BuildAction, Param, Set, Objective, minimize)
 
 from temoa.temoa_model.temoa_initialize import *
 from temoa.temoa_model.temoa_rules import *
@@ -136,7 +135,8 @@ class TemoaModel(AbstractModel):
         M.tech_groups = Set(within=M.RegionalGlobalIndices * M.groups * M.tech_all)
         # Define techs with constant output
         M.tech_annual = Set(within=M.tech_all)
-        M.tech_uncap = Set(within=M.tech_all - M.tech_annual)
+        # TODO:  come back and figure out why I thought annual techs were ineligible!
+        M.tech_uncap = Set(within=M.tech_all - M.tech_reserve - M.tech_capacity_min - M.tech_capacity_max) # - M.tech_annual)
         """techs with unlimited capacity, ALWAYS available within lifespan"""
         # the below is a convenience for domain checking in params below that should not accept uncap techs...
         M.tech_with_capacity = Set(initialize=M.tech_all - M.tech_uncap)

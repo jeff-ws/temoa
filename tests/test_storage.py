@@ -36,7 +36,7 @@ def test_initialization_in_last_period(system_test_run):
     The last period should end up back at the initialization value
     """
     model: TemoaModel  # helps with typing for some reason...
-    data_name, results, model = system_test_run
+    data_name, results, model, _ = system_test_run
     assert len(model.V_StorageInit.index_set()) > 0, (
         'This model does not appear to have' 'any available storage components'
     )
@@ -66,7 +66,7 @@ def test_initialization_in_first_period(system_test_run):
     """
 
     model: TemoaModel  # helps with typing for some reason...
-    data_name, results, model = system_test_run
+    data_name, results, model, _ = system_test_run
     assert len(model.V_StorageInit.index_set()) > 0, (
         'This model does not appear to have' 'any available storage components'
     )
@@ -117,7 +117,7 @@ def test_storage_flow_balance(system_test_run):
     Note:  inflows are taxed by efficiency, so that is replicated here
     """
     model: TemoaModel  # helps with typing for some reason...
-    data_name, results, model = system_test_run
+    data_name, results, model, _ = system_test_run
     assert len(model.V_StorageInit.index_set()) > 0, (
         'This model does not appear to have' 'any available storage components'
     )

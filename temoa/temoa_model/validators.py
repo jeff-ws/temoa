@@ -272,7 +272,7 @@ def validate_CapacityFactorProcess(M: 'TemoaModel', val, r, s, d, t, v) -> bool:
     )
 
 def validate_Efficiency(M: 'TemoaModel', val, r, si, t, v, so) -> bool:
-
+    """Handy for troubleshooting problematic entries"""
 
     if all(
         (

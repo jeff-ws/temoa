@@ -49,7 +49,6 @@ class CommodityNetwork:
 
     def __init__(self, region, period: int, M: TemoaModel):
         # check the marking of source commodities first, as the db may not be configured for source check...
-
         self.source_commodities: set[str] = set(M.commodity_source)
         if not self.source_commodities:
             logger.error(
@@ -211,7 +210,7 @@ class CommodityNetwork:
                 self.region,
                 self.period,
             )
-        for orphan in self.other_orphans:
+        for orphan in sorted(self.other_orphans, key=lambda x: x[1]):
             logger.debug(
                 'Bad (orphan/disconnected) process should be investigated/removed: \n'
                 '   %s in region %s, period %d',
@@ -219,7 +218,7 @@ class CommodityNetwork:
                 self.region,
                 self.period,
             )
-        for orphan in self.demand_orphans:
+        for orphan in sorted(self.demand_orphans, key=lambda x: x[1]):
             logger.error(
                 'Orphan process on demand side may cause erroneous results: %s in region %s, period %d',
                 orphan,
@@ -234,7 +233,9 @@ class CommodityNetwork:
             layers[c] = 2  # physical
         for c in self.M.commodity_source:
             layers[c] = 1
-        for c in self.M.commodity_demand:
+        # here we want to use this particular region-period to ID demands, as some commodities
+        # may be producible, but *may* not be a demand in a particular region-period
+        for c in self.demand_commodities:
             layers[c] = 3
         edge_colors = {}
         edge_weights = {}
