@@ -235,6 +235,9 @@ class CommodityNetwork:
             layers[c] = 1
         # here we want to use this particular region-period to ID demands, as some commodities
         # may be producible, but *may* not be a demand in a particular region-period
+        # if self.demand_commodities < self.M.commodity_demand:
+        #     print(f'short commodities in period {self.period}/{self.region}')
+        #     print(self.M.commodity_demand - self.demand_commodities)
         for c in self.demand_commodities:
             layers[c] = 3
         edge_colors = {}

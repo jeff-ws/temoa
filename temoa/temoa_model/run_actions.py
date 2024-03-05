@@ -96,7 +96,7 @@ def build_instance(loaded_portal: DataPortal, model_name=None, silent=False, kee
             if not Path.is_dir(lp_path):
                 Path.mkdir(lp_path)
             filename = lp_path / 'model.lp'
-            instance.write(filename,format='lp' ,io_options={'symbolic_solver_labels': True})
+            instance.write(filename, format='lp' ,io_options={'symbolic_solver_labels': True})
 
     # gather some stats...
     c_count = 0
@@ -175,7 +175,7 @@ def solve_instance(
             # solver = pyomo.environ.SolverFactory('appsi_highs')
             # result = solver.solve(instance, tee=True)
 
-            result = optimizer.solve(instance, load_solutions=False)
+            result = optimizer.solve(instance, load_solutions=False, symbolic_solver_labels=True, tee=True)
             if result.solver.status == SolverStatus.ok and result.solver.termination_condition == TerminationCondition.optimal:
                 instance.solutions.load_from(result)
 

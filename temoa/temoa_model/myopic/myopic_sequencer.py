@@ -102,12 +102,12 @@ class MyopicSequencer:
         self.config = config
         # establish a connection to the controlling db
         # allow a "shunt" (None) here so we can test parts of this by passing a None config
-        self.con = self.get_connection() if isinstance(config, TemoaConfig) else None
-        self.cursor = self.con.cursor()
+        self.output_con = self.get_connection() if isinstance(config, TemoaConfig) else None
+        self.cursor = self.output_con.cursor()
         # break out what is needed from the config
         myopic_options = config.myopic_inputs
         self.progress_mapper: MyopicProgressMapper | None = None
-        self.table_writer = TableWriter(self.config, self.con)
+        self.table_writer = TableWriter(self.config, self.output_con)
         if not myopic_options:
             logger.error(
                 'The myopic mode was selected, but no options were received.\n %s',
@@ -187,7 +187,7 @@ class MyopicSequencer:
         self.initialize_myopic_efficiency_table()
 
         # make a data loader
-        data_loader = HybridLoader(self.con)
+        data_loader = HybridLoader(self.output_con)
 
         # start the fundamental control loop
         # 1.  get feedback from previous instance execution (optimal/infeasible/...)
@@ -262,14 +262,15 @@ class MyopicSequencer:
                 if not good_network:
                     SE.write(
                         'Source Trace of the Commodity Network failed for some demands.  '
-                        'Rolling back.  See log file for failed demands.\n'
+                        'See log file for failed demands.\n'
                     )
                     logger.warning(
                         'FAILED myopic iteration due to bad demand trace.  Rolling back...'
                     )
-                    last_instance_status = 'roll_back'
-                    # skip the rest of the loop
-                    continue
+                    # TODO:  We probably should roll back here, but we will continue for now...
+                    # last_instance_status = 'roll_back'
+                    # # skip the rest of the loop
+                    # continue
 
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'solve')
@@ -306,8 +307,8 @@ class MyopicSequencer:
             last_base_year = idx.base_year  # update
 
             # delete anything in the Output_Objective table, it is nonsensical...
-            self.con.execute('DELETE FROM Output_Objective WHERE 1')
-            self.con.commit()
+            self.output_con.execute('DELETE FROM Output_Objective WHERE 1')
+            self.output_con.commit()
 
     def initialize_myopic_efficiency_table(self):
         """
@@ -339,7 +340,7 @@ class MyopicSequencer:
         if self.debugging:
             print(query)
         self.cursor.execute(query)
-        self.con.commit()
+        self.output_con.commit()
 
         if self.debugging:
             q2 = (
@@ -392,18 +393,25 @@ class MyopicSequencer:
                     f'choked updating MyopicNetCapacity on : {myopic_idx.base_year, r, p, t, v, val, lifetime}.\n'
                     'check clearing process.'
                 )
-        self.con.commit()
+        self.output_con.commit()
 
         # we also need to add in any newly available unrestricted capacity techs, for which there is no V_Capacity
         # it is probably easier/quicker to filter the model Efficiency data container vs.
         # pulling data from the old Efficiency table...  This should keep copying forward any
         # unrestricted capacity process seen up to this point.  They eventually will not show up in
         # activeFlow after their lifetime and fall out naturally.
+
+        # we need to pull these indices from both the annual and non-annual flow sets
+        # the non-annuals...
         new_unrestricted_cap_entries = {
             (r, p, t, v)
             for r, p, s, d, i, t, v, o in model.activeFlow_rpsditvo
             if t in model.tech_uncap
         }
+        # update with the annuals
+        new_unrestricted_cap_entries.update(
+            {(r, p, t, v) for r, p, i, t, v, o in model.activeFlow_rpitvo if t in model.tech_uncap}
+        )
         for r, p, t, v in sorted(new_unrestricted_cap_entries):
             lifetime = model.LifetimeProcess[r, t, v]
             # need to pull the sector...
@@ -442,7 +450,7 @@ class MyopicSequencer:
                     t,
                     v,
                 )
-        self.con.commit()
+        self.output_con.commit()
 
     # below not currently used.  Preserved for not as an alternative example to output writing.
     # if used, probably needs a shift to named outputs vice (?, ?, ?, ...)
@@ -458,7 +466,7 @@ class MyopicSequencer:
         self.cursor.execute(
             f'DELETE FROM main.MyopicFlowOut WHERE period >= {myopic_idx.base_year}'
         )
-        self.con.commit()
+        self.output_con.commit()
 
         # write it...
         for (r, p, s, d, i, t, v, o), flow in model.V_FlowOut.items():
@@ -483,7 +491,7 @@ class MyopicSequencer:
                     f'choked updating MyopicFlowOut on : { self.config.scenario, r, sector, p, s, d, i, t, v, o, flow}'
                 )
                 logger.error('Failed to add flow for tech %s to MyopicFlowOut in period %d', t, p)
-        self.con.commit()
+        self.output_con.commit()
 
     def update_myopic_efficiency_table(self, myopic_index: MyopicIndex, prev_base: int):
         """
@@ -504,6 +512,7 @@ class MyopicSequencer:
 
         base = myopic_index.base_year
         last_demand_year = myopic_index.last_demand_year
+        logger.info('Starting update of MyopicEfficiency Table retaining [%s, %s)', prev_base, base)
 
         # 0.  Clear any future things past the base year for housekeeping
         #     ease with steps, depth, etc.  These may have been added if we are stepping less
@@ -511,7 +520,7 @@ class MyopicSequencer:
         self.cursor.execute(
             'DELETE FROM MyopicEfficiency WHERE MyopicEfficiency.vintage >= ?', (base,)
         )
-        self.con.commit()
+        self.output_con.commit()
 
         # 1.  Clean up stuff not implemented in previous step
         query = (
@@ -538,7 +547,7 @@ class MyopicSequencer:
             for i, removal in enumerate(removals):
                 print(f'{i}. Removing:  {removal}')
         self.cursor.execute(query)
-        self.con.commit()
+        self.output_con.commit()
 
         # 2.  Add the new stuff now visible
         # dev note:  the `coalesce()` command is a nested if-else.  The first hit wins, so it is priority:
@@ -574,7 +583,7 @@ class MyopicSequencer:
                 print(idx, t)
             print()
         self.cursor.execute(query)
-        self.con.commit()  # MUST commit here to push the INSERTs
+        self.output_con.commit()  # MUST commit here to push the INSERTs
 
     def characterize_run(self, future_periods: list[int] | None = None) -> None:
         """
@@ -624,9 +633,9 @@ class MyopicSequencer:
         """
         with open(script_file, 'r') as table_script:
             sql_commands = table_script.read()
-        logger.debug('Executing sql from file: %s on connection: %s', script_file, self.con)
+        logger.debug('Executing sql from file: %s on connection: %s', script_file, self.output_con)
         self.cursor.executescript(sql_commands)
-        self.con.commit()
+        self.output_con.commit()
 
     def clear_old_results(self):
         """
@@ -647,7 +656,7 @@ class MyopicSequencer:
             except sqlite3.OperationalError:
                 SE.write(f'Failed to clear table {table}.\n')
                 raise sqlite3.OperationalError
-        self.con.commit()
+        self.output_con.commit()
 
     def clear_results_after(self, period):
         """
@@ -687,9 +696,9 @@ class MyopicSequencer:
             'DELETE FROM main.Output_V_NewCapacity WHERE main.Output_V_NewCapacity.vintage >= (?) AND scenario = (?)',
             (period, self.config.scenario),
         )
-        self.con.commit()
+        self.output_con.commit()
 
     def __del__(self):
         """ensure the connection is closed when destructor is called."""
-        if hasattr(self, 'con') and self.con is not None:  # it may not be constructed yet...
-            self.con.close()
+        if hasattr(self, 'output_con') and self.output_con is not None:  # it may not be constructed yet...
+            self.output_con.close()
