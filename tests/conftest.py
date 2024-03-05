@@ -41,8 +41,6 @@ from definitions import PROJECT_ROOT
 from temoa.temoa_model.temoa_model import TemoaModel
 from temoa.temoa_model.temoa_sequencer import TemoaSequencer
 
-logger = logging.getLogger(__name__)
-
 # set the target folder for output from testing
 output_path = os.path.join(PROJECT_ROOT, 'tests', 'testing_log')
 if not os.path.exists(output_path):
@@ -76,27 +74,16 @@ for db in databases:
     if not os.path.exists(os.path.join(data_output_path, db)):
         shutil.copy(os.path.join(data_source_path, db), os.path.join(data_output_path, db))
 
-
-# make a fresh copy of utopia for myopic use, when called for
-def copy_utopia_for_myopic():
-    logger.debug('Making a copy of utopia for testing')
-    shutil.copy(
-        os.path.join(data_source_path, 'temoa_utopia.sqlite'),
-        os.path.join(data_output_path, 'myo_temoa_utopia.sqlite'),
-    )
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture()
-def system_test_run(
-    request, tmp_path
-) -> tuple[Any, SolverResults | None, TemoaModel | None, TemoaSequencer]:
+def system_test_run(request, tmp_path) -> tuple[Any, SolverResults | None, TemoaModel | None, TemoaSequencer]:
     """
     spin up the model, solve it, and hand over the model and result for inspection
     """
     data_name = request.param['name']
     logger.info('Setting up and solving: %s', data_name)
-    if data_name == 'myopic utopia':
-        copy_utopia_for_myopic()
     filename = request.param['filename']
     options = {'silent': True, 'debug': True}
     config_file = pathlib.Path(PROJECT_ROOT, 'tests', 'testing_configs', filename)
