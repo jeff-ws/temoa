@@ -377,7 +377,9 @@ def loan_cost(
     :return: fixed number or pyomo expression based on input types
     """
     if GDR == 0:  # return the non-discounted result
-        return capacity * invest_cost * loan_annualize * lifetime_loan_process
+        regular_payment = capacity * invest_cost * loan_annualize
+        payments_made = (P_e - vintage)
+        return regular_payment * payments_made
     x = 1 + GDR  # a convenience
     res = (
         capacity
