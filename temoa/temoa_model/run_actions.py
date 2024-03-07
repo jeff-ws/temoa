@@ -63,7 +63,13 @@ def load_portal_from_dat(dat_file: Path, silent: bool = False) -> DataPortal:
     return loaded_portal
 
 
-def build_instance(loaded_portal: DataPortal, model_name=None, silent=False, keep_lp_file=False, lp_path:Path= None) -> TemoaModel:
+def build_instance(
+    loaded_portal: DataPortal,
+    model_name=None,
+    silent=False,
+    keep_lp_file=False,
+    lp_path: Path = None,
+) -> TemoaModel:
     """
     Build a Temoa Instance from data
     :param loaded_portal: a DataPortal instance
@@ -96,7 +102,7 @@ def build_instance(loaded_portal: DataPortal, model_name=None, silent=False, kee
             if not Path.is_dir(lp_path):
                 Path.mkdir(lp_path)
             filename = lp_path / 'model.lp'
-            instance.write(filename, format='lp' ,io_options={'symbolic_solver_labels': True})
+            instance.write(filename, format='lp', io_options={'symbolic_solver_labels': True})
 
     # gather some stats...
     c_count = 0
@@ -110,7 +116,7 @@ def build_instance(loaded_portal: DataPortal, model_name=None, silent=False, kee
 
 
 def solve_instance(
-    instance: TemoaModel, solver_name,  silent: bool = False
+    instance: TemoaModel, solver_name, silent: bool = False
 ) -> Tuple[TemoaModel, SolverResults]:
     """
     Solve the instance and return a loaded instance
@@ -158,7 +164,6 @@ def solve_instance(
                 # optimizer.options["zeroTolerance"] = 1e-12
                 # optimizer.options["crossover"] = 'off'
 
-
             elif solver_name == 'cplex':
                 # Note: these parameter values are taken to be the same as those in PyPSA
                 # (see: https://pypsa-eur.readthedocs.io/en/latest/configuration.html)
@@ -170,13 +175,15 @@ def solve_instance(
             elif solver_name == 'highs':
                 optimizer = SolverFactory('appsi_highs')
 
-            # TODO: still need to add gurobi parameters.
+            # TODO: still need to add gurobi parameters?
 
-            # solver = pyomo.environ.SolverFactory('appsi_highs')
-            # result = solver.solve(instance, tee=True)
-
-            result = optimizer.solve(instance, load_solutions=False, symbolic_solver_labels=True, tee=True)
-            if result.solver.status == SolverStatus.ok and result.solver.termination_condition == TerminationCondition.optimal:
+            result = optimizer.solve(
+                instance, load_solutions=False
+            )  # , tee=True)  <-- if needed for T/S
+            if (
+                result.solver.status == SolverStatus.ok
+                and result.solver.termination_condition == TerminationCondition.optimal
+            ):
                 instance.solutions.load_from(result)
 
             # opt = appsi.solvers.Highs()

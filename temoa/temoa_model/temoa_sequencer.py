@@ -164,7 +164,12 @@ class TemoaSequencer:
                 hybrid_loader = HybridLoader(db_connection=con)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
 
-                instance = build_instance(data_portal, silent=self.config.silent)
+                instance = build_instance(
+                    data_portal,
+                    silent=self.config.silent,
+                    keep_lp_file=self.config.save_lp_file,
+                    lp_path=self.config.output_path,
+                )
                 # disregard what the config says about price_check and source_check and just do it...
                 price_checker(instance)
                 source_trace(instance, temoa_config=self.config)
@@ -173,7 +178,12 @@ class TemoaSequencer:
                 con = sqlite3.connect(self.config.input_file)
                 hybrid_loader = HybridLoader(db_connection=con)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
-                instance = build_instance(data_portal, silent=self.config.silent, keep_lp_file=self.config.save_lp_file, lp_path=self.config.output_path)
+                instance = build_instance(
+                    data_portal,
+                    silent=self.config.silent,
+                    keep_lp_file=self.config.save_lp_file,
+                    lp_path=self.config.output_path,
+                )
                 if self.config.price_check:
                     price_checker(instance)
                 if self.config.source_check:
@@ -195,7 +205,9 @@ class TemoaSequencer:
                 handle_results(self.pf_solved_instance, self.pf_results, self.config)
                 # these require that the new cost table be built, which is not guaranteed at this time...
                 # temporary patch while we work through new cost table...
-                exists = con.execute("SELECT * FROM sqlite_master WHERE name LIKE 'Output_Cost_2'").fetchone()
+                exists = con.execute(
+                    "SELECT * FROM sqlite_master WHERE name LIKE 'Output_Cost_2'"
+                ).fetchone()
                 if exists:
                     table_writer = TableWriter(self.config, con)
                     table_writer.clear_scenario()
