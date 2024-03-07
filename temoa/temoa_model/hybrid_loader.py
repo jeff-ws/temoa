@@ -359,21 +359,25 @@ class HybridLoader:
                     if len(values) > 0 and len(values[0]) > 1:  # this contains multi-dim values
                         if validation and mi:
                             if not val_loc:
-                                raise ValueError('Trying to use a validation but missing location field in call.')
+                                raise ValueError(
+                                    'Trying to use a validation but missing location field in call.'
+                                )
                             if validation is self.viable_rtv:
                                 data[c.name] = [
-                                    t for t in values
-                                    if (t[val_loc[0]], t[val_loc[1]], t[val_loc[2]]) in self.viable_rtv
+                                    t
+                                    for t in values
+                                    if (t[val_loc[0]], t[val_loc[1]], t[val_loc[2]])
+                                    in self.viable_rtv
                                 ]
                             if validation is self.viable_rt:
                                 data[c.name] = [
-                                    t for t in values
+                                    t
+                                    for t in values
                                     if (t[val_loc[0]], t[val_loc[1]]) in self.viable_rt
                                 ]
                             if validation is self.viable_vintages:
                                 data[c.name] = [
-                                    t for t in values
-                                    if t[val_loc[0]] in self.viable_vintages
+                                    t for t in values if t[val_loc[0]] in self.viable_vintages
                                 ]
                         else:
                             data[c.name] = [t for t in values]
@@ -628,7 +632,7 @@ class HybridLoader:
             # noinspection SqlUnused
             raw = cur.execute(
                 'SELECT region, tech, vintage, capacity FROM main.MyopicNetCapacity '
-                ' WHERE period = (?) '
+                ' WHERE period = ? '
                 '  AND tech NOT IN (SELECT tech FROM main.technologies WHERE technologies.unlim_cap > 0)'
                 'UNION '
                 '  SELECT regions, tech, vintage, exist_cap FROM main.ExistingCapacity ',
@@ -754,7 +758,7 @@ class HybridLoader:
                 raw = cur.execute(
                     'SELECT regions, periods, rps FROM main.RenewablePortfolioStandard '
                     ' WHERE periods >= ? AND periods <= ?',
-                    (mi.base_year, mi.last_demand_year)
+                    (mi.base_year, mi.last_demand_year),
                 ).fetchall()
             else:
                 raw = cur.execute(
@@ -879,7 +883,7 @@ class HybridLoader:
                 raw = cur.execute(
                     'SELECT regions, t_periods, group_name, max_cap_g FROM main.MaxCapacityGroup '
                     ' WHERE t_periods >= ? AND t_periods <= ?',
-                    (mi.base_year, mi.last_demand_year)
+                    (mi.base_year, mi.last_demand_year),
                 ).fetchall()
             else:
                 raw = cur.execute(
@@ -893,7 +897,7 @@ class HybridLoader:
                 raw = cur.execute(
                     'SELECT regions, t_periods, group_name, min_cap_g FROM main.MinCapacityGroup '
                     ' WHERE t_periods >= ? AND t_periods <= ?',
-                    (mi.base_year, mi.last_demand_year)
+                    (mi.base_year, mi.last_demand_year),
                 ).fetchall()
             else:
                 raw = cur.execute(
@@ -907,7 +911,7 @@ class HybridLoader:
                 raw = cur.execute(
                     'SELECT regions, periods, group_name, minnewcap FROM main.MinNewCapacityGroup '
                     ' WHERE t_periods >= ? AND t_periods <= ?',
-                    (mi.base_year, mi.last_demand_year)
+                    (mi.base_year, mi.last_demand_year),
                 ).fetchall()
             else:
                 raw = cur.execute(
@@ -921,7 +925,7 @@ class HybridLoader:
                 raw = cur.execute(
                     'SELECT regions, periods, group_name, maxnewcap FROM main.MaxNewCapacityGroup '
                     ' WHERE t_periods >= ? AND t_periods <= ?',
-                    (mi.base_year, mi.last_demand_year)
+                    (mi.base_year, mi.last_demand_year),
                 ).fetchall()
             else:
                 raw = cur.execute(
@@ -963,7 +967,7 @@ class HybridLoader:
                 raw = cur.execute(
                     'SELECT regions, t_periods, group_name, min_act_g FROM main.MinActivityGroup '
                     ' WHERE t_periods >= ? AND t_periods <= ?',
-                    (mi.base_year, mi.last_demand_year)
+                    (mi.base_year, mi.last_demand_year),
                 ).fetchall()
             else:
                 raw = cur.execute(
@@ -977,7 +981,7 @@ class HybridLoader:
                 raw = cur.execute(
                     'SELECT regions, t_periods, group_name, max_act_g FROM main.MaxActivityGroup '
                     ' WHERE t_periods >= ? AND t_periods <= ?',
-                    (mi.base_year, mi.last_demand_year)
+                    (mi.base_year, mi.last_demand_year),
                 ).fetchall()
             else:
                 raw = cur.execute(

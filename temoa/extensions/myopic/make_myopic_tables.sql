@@ -3,7 +3,6 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS MyopicNetCapacity
 (
     basis_year integer,
-    scenario   text,
     region     text,
     period     integer,
     sector     text,
@@ -16,7 +15,7 @@ CREATE TABLE IF NOT EXISTS MyopicNetCapacity
     FOREIGN KEY (vintage) REFERENCES time_periods (t_periods),
     FOREIGN KEY (tech) REFERENCES technologies (tech),
 
-    PRIMARY KEY (scenario, region, period, tech, vintage),
+    PRIMARY KEY (region, period, tech, vintage),
     CHECK ( capacity >= 0 )
 );
 CREATE TABLE IF NOT EXISTS Output_Costs_2
