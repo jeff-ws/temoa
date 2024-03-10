@@ -395,7 +395,7 @@ class TemoaModel(AbstractModel):
         # non-negative values of these 2 variables into the log file for inspection.
         M.troubleshooting = False
 
-        # dev note:  apparently with the changed process in run_actions to load the model results, zero
+        # dev note:  apparently with the changed process in run_actions to load the model results, some
         #            initialization is needed.  The "old way" by letting the solver do it seems to load
         #            fine without this...  perhaps it doesn't care as it just captures "last value".
         #            Initializing everything to zero gets all tests to pass.  Will leave it in for now.
@@ -407,9 +407,9 @@ class TemoaModel(AbstractModel):
             return 0
 
         if M.troubleshooting:
-            ################################################
-            # introducing a sponge variable for T/S purposes
-            ################################################
+            ########################################
+            # introducing variables for T/S purposes
+            ########################################
             M.sponge = Var(M.regions, M.time_optimize, M.commodity_demand, domain=Reals)
             M.sponge_abs = Var(
                 M.regions, M.time_optimize, M.commodity_demand, domain=NonNegativeReals

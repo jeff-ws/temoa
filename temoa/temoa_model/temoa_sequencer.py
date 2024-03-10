@@ -156,6 +156,7 @@ class TemoaSequencer:
                 hybrid_loader = HybridLoader(db_connection=con)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(data_portal, silent=self.config.silent)
+                con.close()
                 return instance
 
             case TemoaMode.CHECK:
@@ -173,6 +174,7 @@ class TemoaSequencer:
                 # disregard what the config says about price_check and source_check and just do it...
                 price_checker(instance)
                 source_trace(instance, temoa_config=self.config)
+                con.close()
 
             case TemoaMode.PERFECT_FORESIGHT:
                 con = sqlite3.connect(self.config.input_file)
@@ -212,6 +214,7 @@ class TemoaSequencer:
                     table_writer = TableWriter(self.config, con)
                     table_writer.clear_scenario()
                     table_writer.write_costs(instance)
+                con.close()
 
             case TemoaMode.MYOPIC:
                 # create a myopic sequencer and shift control to it
