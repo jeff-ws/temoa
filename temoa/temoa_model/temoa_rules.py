@@ -378,7 +378,7 @@ def loan_cost(
     """
     if GDR == 0:  # return the non-discounted result
         regular_payment = capacity * invest_cost * loan_annualize
-        payments_made = (P_e - vintage)
+        payments_made = min(lifetime_loan_process, P_e - vintage)
         return regular_payment * payments_made
     x = 1 + GDR  # a convenience
     res = (
@@ -2259,6 +2259,7 @@ def MaxResource_Constraint(M: 'TemoaModel', r, t):
         'removing data from the MaxResource Table'
     )
     # dev note:  this constraint is a misnomer.  It is actually a "global activity constraint on a tech"
+    #            regardless of whatever "resources" are consumed.
     max_resource = value(M.MaxResource[r, t])
     try:
         activity_rt = sum(
