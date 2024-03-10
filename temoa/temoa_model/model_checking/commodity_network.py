@@ -106,7 +106,9 @@ class CommodityNetwork:
         # self.input_sockets: ...
 
     def connect_linked_techs(self):
-        # add implicit connections from linked tech...
+        # add implicit connections from linked tech...  Meaning:  For the DRIVEN tech, we need to make an
+        # implicit connection back to the output of the driver (even though it is actually feeding off of
+        # the emission) so that the driven tech is not orphaned.
         for (r, driver, emission), driven in self.M.LinkedTechs.items():
             if r == self.region:
                 # check that the driven tech only has 1 input....
