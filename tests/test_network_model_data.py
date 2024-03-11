@@ -25,13 +25,13 @@ https://westernspark.us
 Created on:  3/11/24
 
 """
-
+from itertools import chain
 from unittest.mock import MagicMock
 
 import pytest
 
 from temoa.temoa_model.model_checking import network_model_data
-from temoa.temoa_model.model_checking.source_check import CommodityNetwork
+from temoa.temoa_model.model_checking.commodity_network import CommodityNetwork
 
 # a couple of test cases with diagrams in the flow...
 params = [
@@ -137,7 +137,7 @@ def test__build_from_db(mock_db_connection):
     """test a couple values in the load"""
     conn, expected = mock_db_connection
     network_data = network_model_data._build_from_db(conn)
-    assert len(network_data.demand_commodities) == expected['demands'], 'demand count failed'
+    assert len(tuple(chain(*network_data.demand_commodities.values()))) == expected['demands'], 'demand count failed'
     assert (
         len(network_data.available_techs['R1', 2020]) == expected['techs']
     ), '6 techs are available'
