@@ -25,7 +25,7 @@ https://westernspark.us
 Created on:  2/6/24
 
 """
-from temoa.temoa_model.model_checking.source_check import _visited_dfs, _mark_good_connections
+from temoa.temoa_model.model_checking.commodity_network import _mark_good_connections, _visited_dfs
 
 
 def test_network_analysis():
