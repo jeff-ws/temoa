@@ -285,15 +285,14 @@ class CommodityNetwork:
 
     def unsupported_demands(self) -> set[str]:
         """
-        Look for demand commodities that are amongst the "bad connections" set which would indicate
-        that they cannot be traced back to a source and are suspect to magically being filled by some
-        dangling intermediate tech
+        Look for demand commodities that are not connected via a "good connection"
         :return: set of improperly supported demands
         """
+        supported_demands = {t[2] for t in self.good_connections}
         bad_demands = {
-            oc
-            for ic, tech, oc in self.other_orphans
-            if oc in self.model_data.demand_commodities[self.region, self.period]
+            d
+            for d in self.model_data.demand_commodities[self.region, self.period]
+            if d not in supported_demands
         }
         return bad_demands
 
