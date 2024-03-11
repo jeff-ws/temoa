@@ -38,12 +38,12 @@ import networkx as nx
 
 
 def graph_connections(
-        connections: Iterable[tuple],
-        layer_map,
-        edge_colors,
-        edge_weights,
-        file_label: str,
-        output_path: Path,
+    connections: Iterable[tuple],
+    layer_map,
+    edge_colors,
+    edge_weights,
+    file_label: str,
+    output_path: Path,
 ):
     """
     Make an HTML file containing the network graph

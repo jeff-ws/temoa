@@ -2,12 +2,13 @@
 This module is used to verify that all demand commodities are traceable back to designated
 source technologies
 """
-
 from collections import defaultdict
 from itertools import chain
 from logging import getLogger
 
-from temoa.temoa_model.commodity_graph import graph_connections
+from temoa.temoa_model.model_checking import network_model_data
+from temoa.temoa_model.model_checking.commodity_graph import graph_connections
+from temoa.temoa_model.model_checking.network_model_data import NetworkModelData, Tech
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
 
@@ -47,10 +48,10 @@ class CommodityNetwork:
     class to hold the data and the network for a particular region/period
     """
 
-    def __init__(self, region, period: int, M: TemoaModel):
+    def __init__(self, region, period: int, model_data: NetworkModelData):
         # check the marking of source commodities first, as the db may not be configured for source check...
-        self.source_commodities: set[str] = set(M.commodity_source)
-        if not self.source_commodities:
+        self.model_data = model_data
+        if not self.model_data.source_commodities:
             logger.error(
                 'No source commodities discovered when initializing Commodity Network.  '
                 'Have source commodities been identified in commodities '
@@ -61,39 +62,34 @@ class CommodityNetwork:
                 'Have source commodities been identified in commodities '
                 "table with 's'?"
             )
-        self.demand_orphans: set[tuple] | None = None
-        self.other_orphans: set[tuple] | None = None
-        self.good_connections: set[tuple] | None = None
-
-        self.M = M
+        self.demand_orphans: set[tuple] = set()
+        self.other_orphans: set[tuple] = set()
+        self.good_connections: set[tuple] = set()
         self.region = region
         self.period = period
         # the cataloguing of inputs/outputs by tech is needed for implicit links like via emissions in LinkedTech
-        self.tech_inputs: dict[str, set[str]] | None = defaultdict(set)
-        self.tech_outputs: dict[str, set[str]] | None = defaultdict(set)
+        self.tech_inputs: dict[str, set[str]] = defaultdict(set)
+        self.tech_outputs: dict[str, set[str]] = defaultdict(set)
         self.connections: dict[str, set[tuple]] = defaultdict(set)
         """All connections in the model {oc: {(ic, tech), ...}}"""
-        self.orig_connex: set[tuple] | None = None
-        self.demand_commodities: set[str] = {
-            d for (r, p, d) in M.Demand if r == self.region and p == self.period
-        }
-        if not self.demand_commodities:
+        self.orig_connex: set[tuple] = set()
+
+        if not self.model_data.demand_commodities[self.region, self.period]:
             raise ValueError(
                 f'No demand commodities discovered in region {self.region} period {self.period}.  Check '
                 f'Demand table data'
             )
-        # scan non-annual techs...
-        for r, p, s, d, ic, tech, v, oc in self.M.activeFlow_rpsditvo:
-            if r == self.region and p == self.period:
-                self.connections[oc].add((ic, tech))
-                self.tech_inputs[tech].add(ic)
-                self.tech_outputs[tech].add(oc)
-        # scan annual techs...
-        for r, p, ic, tech, v, oc in M.activeFlow_rpitvo:
-            if r == self.region and p == self.period:
-                self.connections[oc].add((ic, tech))
-                self.tech_inputs[tech].add(ic)
-                self.tech_outputs[tech].add(oc)
+        # dev note:  This code was originally designed/tested to run on tuples of (ic, tech_name, oc)
+        #            since the implementation of Tech named tuple, we could switch over to that soon,
+        #            but it will be work to re-work the tests.  The networks are smaller this way
+        #            because of reduced redundant links for multi-vintages, but we will have to
+        #            filter the Tech tuples for output generation against the names...
+
+        # scan techs for this r, p
+        for tech in self.model_data.available_techs[self.region, self.period]:
+            self.connections[tech.oc].add((tech.ic, tech.tech_name))
+            self.tech_inputs[tech.tech_name].add(tech.ic)
+            self.tech_outputs[tech.tech_name].add(tech.oc)
 
         # make synthetic connection between linked techs
         self.connect_linked_techs()
@@ -105,11 +101,32 @@ class CommodityNetwork:
         # self.output_sockets: dict[str, set[str]] = dict()
         # self.input_sockets: ...
 
+    def get_valid_tech(self) -> set[Tech]:
+        return {
+            tech
+            for tech in self.model_data.available_techs[self.region, self.period]
+            if (tech.ic, tech.tech_name, tech.oc) in self.good_connections
+        }
+
+    def get_demand_side_orphans(self) -> set[Tech]:
+        return {
+            tech
+            for tech in self.model_data.available_techs[self.region, self.period]
+            if (tech.ic, tech.tech_name, tech.oc) in self.demand_orphans
+        }
+
+    def get_other_orphans(self) -> set[Tech]:
+        return {
+            tech
+            for tech in self.model_data.available_techs[self.region, self.period]
+            if (tech.ic, tech.tech_name, tech.oc) in self.other_orphans
+        }
+
     def connect_linked_techs(self):
         # add implicit connections from linked tech...  Meaning:  For the DRIVEN tech, we need to make an
         # implicit connection back to the output of the driver (even though it is actually feeding off of
         # the emission) so that the driven tech is not orphaned.
-        for (r, driver, emission), driven in self.M.LinkedTechs.items():
+        for r, driver, emission, driven in self.model_data.available_linked_techs:
             if r == self.region:
                 # check that the driven tech only has 1 input....
                 # Dev Note:  It isn't clear how to link to a driven tech with multiple inputs as the linkage
@@ -166,7 +183,9 @@ class CommodityNetwork:
         # dev note:  send a copy of connections...
         # it is consumed by the function.  (easier than managing it in the recursion)
         discovered_sources, demand_side_connections = _visited_dfs(
-            self.demand_commodities, self.source_commodities, self.connections.copy()
+            self.model_data.demand_commodities[self.region, self.period],
+            self.model_data.source_commodities,
+            self.connections.copy(),
         )
         self.good_connections = _mark_good_connections(
             good_ic=discovered_sources, connections=demand_side_connections.copy()
@@ -207,7 +226,7 @@ class CommodityNetwork:
         if self.other_orphans:
             logger.info(
                 'Source tracing revealed %d orphaned processes in region %s, period %d.  '
-                'Enable DEBUG level longging with "-d" to have them logged',
+                'Enable DEBUG level logging with "-d" to have them logged',
                 len(self.other_orphans),
                 self.region,
                 self.period,
@@ -231,16 +250,16 @@ class CommodityNetwork:
     def graph_network(self, temoa_config: TemoaConfig):
         # trial graphing...
         layers = {}
-        for c in self.M.commodity_all:
+        for c in self.model_data.all_commodities:
             layers[c] = 2  # physical
-        for c in self.M.commodity_source:
+        for c in self.model_data.source_commodities:
             layers[c] = 1
         # here we want to use this particular region-period to ID demands, as some commodities
         # may be producible, but *may* not be a demand in a particular region-period
         # if self.demand_commodities < self.M.commodity_demand:
         #     print(f'short commodities in period {self.period}/{self.region}')
         #     print(self.M.commodity_demand - self.demand_commodities)
-        for c in self.demand_commodities:
+        for c in self.model_data.demand_commodities[self.region, self.period]:
             layers[c] = 3
         edge_colors = {}
         edge_weights = {}
@@ -271,7 +290,11 @@ class CommodityNetwork:
         dangling intermediate tech
         :return: set of improperly supported demands
         """
-        bad_demands = {oc for ic, tech, oc in self.other_orphans if oc in self.demand_commodities}
+        bad_demands = {
+            oc
+            for ic, tech, oc in self.other_orphans
+            if oc in self.model_data.demand_commodities[self.region, self.period]
+        }
         return bad_demands
 
 
@@ -374,7 +397,8 @@ def source_trace(M: 'TemoaModel', temoa_config: TemoaConfig) -> bool:
     demands_traceable = True
     for region in M.regions:
         for p in M.time_optimize:
-            commodity_network = CommodityNetwork(region=region, period=p, M=M)
+            data = network_model_data.build(M)
+            commodity_network = CommodityNetwork(region=region, period=p, model_data=data)
             commodity_network.analyze_network()
             if temoa_config.plot_commodity_network:
                 commodity_network.graph_network(temoa_config)

@@ -38,12 +38,12 @@ from pyomo.core import value
 
 import definitions
 from temoa.temoa_model import run_actions
+from temoa.temoa_model.model_checking.pricing_check import price_checker
+from temoa.temoa_model.model_checking.source_check import source_trace
 from temoa.temoa_model.myopic.hybrid_loader import HybridLoader
 from temoa.temoa_model.myopic.myopic_index import MyopicIndex
 from temoa.temoa_model.myopic.myopic_progress_mapper import MyopicProgressMapper
 from temoa.temoa_model.pformat_results import pformat_results
-from temoa.temoa_model.pricing_check import price_checker
-from temoa.temoa_model.source_check import source_trace
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
