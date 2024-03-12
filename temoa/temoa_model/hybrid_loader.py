@@ -11,8 +11,11 @@ from typing import Sequence
 import deprecated
 from pyomo.core import Param, Set
 from pyomo.dataportal import DataPortal
-from temoa.temoa_model.myopic.myopic_index import MyopicIndex
 
+from temoa.extensions.myopic.myopic_index import MyopicIndex
+from temoa.temoa_model.model_checking import network_model_data
+from temoa.temoa_model.model_checking.commodity_network import CommodityNetwork
+from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
 
 """
@@ -65,9 +68,10 @@ class HybridLoader:
     An instance of the HybridLoader
     """
 
-    def __init__(self, db_connection: Connection):
+    def __init__(self, db_connection: Connection, config: TemoaConfig):
         self.debugging = False  # for T/S, will print to screen the data load values
         self.con = db_connection
+        self.config = config
 
         # filters for myopic ops
         self.viable_techs: set[str] = set()
@@ -79,6 +83,48 @@ class HybridLoader:
         self.viable_rt: set[tuple[str, str]] = set()
         self.efficiency_values: list[tuple] = []
 
+    def _build_eff_table(self, myopic_index: MyopicIndex | None):
+        """Build efficiency data by using the source_check functionality on the data
+        to analyze the network and deterimine good/bad techs before loading anything else.  Use this to
+        load the filters..."""
+        cur = self.con.cursor()
+        self._clear_filters()
+        network_data = network_model_data.build(self.con)
+
+        # need regions and periods to execute the source check by [r, p].  At this point, we can only pull from DB
+        regions = {region for region, _ in cur.execute('SELECT regions FROM regions').fetchall()}
+        periods = {period for period, _ in cur.execute("SELECT t_periods FROM time_periods WHERE flag = 'f'")}
+        good_tech = set()
+        # we need to work through all region-period pairs and:
+        # (1) run the source trace
+        # (2) pull the "good connections" (techs) out and add them to efficiency data
+        # (3) make a plot, if requested
+        # (4) log the orphans
+        for region in regions:
+            for period in periods:
+                network = CommodityNetwork(region=region, period=period, model_data=network_data)
+                network.analyze_network()
+                good_tech.update(network.get_valid_tech())
+                if self.config and self.config.plot_commodity_network:
+                    network.graph_network(self.config)
+
+                for tech in network.get_demand_side_orphans():
+                    logger.warning('tech %s is a demand-side orphan and has been removed', tech)
+                for tech in network.get_other_orphans():
+                    logger.warning('tech %s is an "other orphan" and has been removed', tech)
+
+        # pull the elements "for real" and filter them...
+
+        contents = cur.execute(
+            'SELECT region, input_comm, tech, vintage, output_comm, efficiency, lifetime  '
+            'FROM MyopicEfficiency '
+            'WHERE vintage + lifetime > ?',
+            (myopic_index.base_year,),
+            ).fetchall()
+        logger.debug('polled %d elements from MyopicEfficiency table', len(contents))
+        efficiency_entries = {
+            (r, i, t, v, o, eff, lifetime) for r, i, t, v, o, eff, lifetime in contents
+        }
     def _build_myopic_eff_table(self, myopic_index: MyopicIndex):
         """
         refresh all the sets used for filtering from the current contents

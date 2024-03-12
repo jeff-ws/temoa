@@ -37,6 +37,8 @@ import pyomo.opt
 from temoa.temoa_model.myopic.hybrid_loader import HybridLoader
 from temoa.temoa_model.myopic.myopic_sequencer import MyopicSequencer
 
+from temoa.extensions.myopic.myopic_sequencer import MyopicSequencer
+from temoa.temoa_model.hybrid_loader import HybridLoader
 from temoa.temoa_model.model_checking import source_check
 from temoa.temoa_model.model_checking.pricing_check import price_checker
 from temoa.temoa_model.model_checking.source_check import source_trace
@@ -153,7 +155,7 @@ class TemoaSequencer:
                 # data_portal: DataPortal = load_portal_from_dat(self.config.dat_file, silent=self.config.silent)
                 # TODO:  This connection should probably be made in the loader?
                 con = sqlite3.connect(self.config.input_file)
-                hybrid_loader = HybridLoader(db_connection=con)
+                hybrid_loader = HybridLoader(db_connection=con, config=None)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(data_portal, silent=self.config.silent)
                 con.close()
@@ -162,7 +164,7 @@ class TemoaSequencer:
             case TemoaMode.CHECK:
                 # TODO:  This connection should probably be made in the loader?
                 con = sqlite3.connect(self.config.input_file)
-                hybrid_loader = HybridLoader(db_connection=con)
+                hybrid_loader = HybridLoader(db_connection=con, config=None)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
 
                 instance = build_instance(
@@ -178,7 +180,7 @@ class TemoaSequencer:
 
             case TemoaMode.PERFECT_FORESIGHT:
                 con = sqlite3.connect(self.config.input_file)
-                hybrid_loader = HybridLoader(db_connection=con)
+                hybrid_loader = HybridLoader(db_connection=con, config=None)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(
                     data_portal,
