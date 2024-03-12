@@ -41,6 +41,26 @@ DROP TABLE Output_Emissions;
 ALTER TABLE Output_Emissions_dg_tmp
     RENAME TO Output_Emissions;
 
+CREATE TABLE IF NOT EXISTS Output_Costs_2
+(
+    scenario text,
+    region   text,
+    period   integer,
+    tech     text,
+    vintage  integer,
+    d_invest real,
+    d_fixed  real,
+    d_var    real,
+    invest   real,
+    fixed    real,
+    var      real,
+
+    FOREIGN KEY (vintage) REFERENCES time_periods (t_periods),
+    FOREIGN KEY (tech) REFERENCES technologies (tech),
+
+    PRIMARY KEY (scenario, region, period, tech, vintage)
+);
+
 -- turn on FK enforcement
 PRAGMA FOREIGN_KEYS = 1;
 

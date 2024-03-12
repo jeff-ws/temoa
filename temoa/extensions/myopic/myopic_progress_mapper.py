@@ -3,7 +3,7 @@ Simple visualizer to track the progress of myopic solve
 """
 from datetime import datetime, timedelta
 
-from temoa.temoa_model.myopic.myopic_index import MyopicIndex
+from temoa.extensions.myopic.myopic_index import MyopicIndex
 
 """
 Tools for Energy Model Optimization and Analysis (Temoa):

@@ -37,12 +37,12 @@ import deprecated
 from pyomo.core import value
 
 import definitions
+from temoa.extensions.myopic.myopic_index import MyopicIndex
+from temoa.extensions.myopic.myopic_progress_mapper import MyopicProgressMapper
 from temoa.temoa_model import run_actions
+from temoa.temoa_model.hybrid_loader import HybridLoader
 from temoa.temoa_model.model_checking.pricing_check import price_checker
 from temoa.temoa_model.model_checking.source_check import source_trace
-from temoa.temoa_model.myopic.hybrid_loader import HybridLoader
-from temoa.temoa_model.myopic.myopic_index import MyopicIndex
-from temoa.temoa_model.myopic.myopic_progress_mapper import MyopicProgressMapper
 from temoa.temoa_model.pformat_results import pformat_results
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -51,7 +51,7 @@ from temoa.temoa_model.temoa_model import TemoaModel
 logger = logging.getLogger(__name__)
 
 table_script_file = Path(
-    definitions.PROJECT_ROOT, 'temoa/temoa_model/myopic', 'make_myopic_tables.sql'
+    definitions.PROJECT_ROOT, 'temoa/extensions/myopic', 'make_myopic_tables.sql'
 )
 
 
@@ -62,7 +62,6 @@ class MyopicSequencer:
 
     # these are the tables that are incrementally built by the myopic instances
     tables_with_scenario_reference = [
-        'MyopicCost',
         'Output_CapacityByPeriodAndTech',
         'Output_Curtailment',
         'Output_Emissions',
@@ -78,7 +77,7 @@ class MyopicSequencer:
     ]
 
     # note:  below excludes MyopicEfficiency, which is managed separately
-    tables_with_period_reference = ['MyopicCost', 'Output_Costs_2']
+    tables_with_period_reference = [ 'Output_Costs_2',]
     tables_with_period_no_scneario_ref = [
         'MyopicNetCapacity',
     ]
@@ -176,7 +175,7 @@ class MyopicSequencer:
         self.initialize_myopic_efficiency_table()
 
         # make a data loader
-        data_loader = HybridLoader(self.output_con)
+        data_loader = HybridLoader(self.output_con, None)
 
         # start the fundamental control loop
         # 1.  get feedback from previous instance execution (optimal/infeasible/...)
