@@ -4,11 +4,11 @@ Several changes/features in the current restructured branch:
 
 1. The overall folder structure is slightly modified.  A new `temoa` folder contains all sourcecode for the main components
 2. A `requirements.txt` file has been included to allow for use of `pip` to populate a virtual environment.  In order to use that the steps are:
-- Ensure you have a copy of python 3.7 installed on your machine ([python.org](), I recommend version 3.7.9)
+- Ensure you have a copy of python 3.11 installed on your machine ([python.org]())
 - Make and activate a virtual environment using the `venv` package:
 
 ```
-$ python3.7 -m venv venv
+$ python3.11 -m venv venv
 $ source venv/bin/activate   # for linux/osx, windows may differ
 ```
 - After activating the venv, use `pip` within the venv to install everything
@@ -19,18 +19,22 @@ $ (venv) pip install -r requirements.txt
 3. The entry point for regular execution is now at the top level of the project so a "sample" run should be initiated as:
 
 ```
-$ python main.py --config=temoa/temoa_model/config_sample
+$ python main.py --config=data_files/my_configs/config_sample.toml
 ```
-4. Users are encouraged to place a copy of the target database in the `output_files` folder to catch all database outputs, which prevents VCS conflicts with the inputs folder contents
+4. Users are encouraged to either place a copy of the target database in the `output_files` folder to catch all database outputs, 
+which prevents VCS conflicts with the inputs folder contents or to make a copy of any database under source control
+
 5. Developers should be able to run tests by navigating to the tests folder and initiating `pytest` from within the venv
 ```
 $ cd tests
 $ python -m pytest . --disable-warnings
 ```
+
+### ~~~ Remainder Below This Line Under Revision ~~~
 # Overview
 
-The 'energysystem' branch is the current master branch of
-Temoa.  The four subdirectories are:
+
+The four subdirectories are:
 
 1. `temoa_model/`
 Contains the core Temoa model code.
