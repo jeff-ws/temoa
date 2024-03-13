@@ -52,7 +52,6 @@ class CommodityNetworkManager:
         self.orig_tech = {k: v.copy() for k, v in network_data.available_techs.items()}
         self.demand_orphans: dict[tuple[str, str], set[Tech]] = defaultdict(set)
         self.other_orphans: dict[tuple[str, str], set[Tech]] = defaultdict(set)
-        self.valid_synthetic_links: dict[tuple[str, str], set[Tech]] = defaultdict(set)
 
     def _analyze_region(self, region: str):
         """recursively whittle away at the region, within the window until no new invalid techs appear"""
@@ -78,10 +77,6 @@ class CommodityNetworkManager:
                 # add them to the collections for the "pass"
                 demand_orphans_this_pass |= new_demand_orphans
                 other_orphans_this_pass |= new_other_orphans
-
-                # we want to capture the synthetic links on the last pass, so do it each time
-                # and just capture it (don't add)
-                self.valid_synthetic_links[region, period] = cn.get_synthetic_links()
 
             # clean up the good tech listing and decide whether to go again...
             # dev note:  we could clean up the good techs in the loop, before processing next period, but
@@ -177,19 +172,13 @@ class CommodityNetworkManager:
                 ):
                     edge_colors[edge] = 'yellow'
                     edge_weights[edge] = 3
-                valid_synthetic_links = {
-                    (tech.ic, tech.name, tech.oc)
-                    for tech in self.valid_synthetic_links[region, period]
-                }
-                for edge in valid_synthetic_links:
-                    edge_colors[edge] = 'blue'
-                    edge_weights[edge] = 3
+
                 filename_label = f'{region}_{period}'
                 # we pass in "all" of the techs for this region/period and know that the above decorations are
                 # a subset of all available techs that we started with
                 all_links = {
                     (tech.ic, tech.name, tech.oc) for tech in self.orig_tech[region, period]
-                } | valid_synthetic_links
+                }
                 graph_connections(
                     all_links,
                     layers,

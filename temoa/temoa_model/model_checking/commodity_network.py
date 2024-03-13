@@ -72,6 +72,8 @@ class CommodityNetwork:
         self.connections: dict[str, set[tuple[str, str]]] = defaultdict(set)
         """All connections in the model {oc: {(ic, tech), ...}}"""
 
+        self.current_viable_links: set[tuple[str, str]] = set()
+
         self.orig_connex: set[tuple] = set()
 
         if not self.model_data.demand_commodities[self.region, self.period]:
@@ -92,7 +94,7 @@ class CommodityNetwork:
             self.tech_outputs[tech.name].add(tech.oc)
 
         # make synthetic connection between linked techs
-        self.connect_linked_techs()
+        self.prescreen_linked_tech()
 
         # TODO:  perhaps sockets later to account for inter-regional links, for now,
         #  we will just look at internal connex
@@ -100,6 +102,21 @@ class CommodityNetwork:
         # # {tech: set(output commodities)}
         # self.output_sockets: dict[str, set[str]] = dict()
         # self.input_sockets: ...
+
+    def remove_tech_by_name(self, tech_name: str) -> None:
+        self.tech_inputs.pop(tech_name, None)
+        self.tech_outputs.pop(tech_name, None)
+        removed = set()
+        for oc, s in self.connections.items():
+            removals = set()
+            for ic, name in s:
+                if name == tech_name:  # we found a reference
+                    removals.add((ic, name))
+                    removed.add((ic, tech_name, oc))
+            s -= removals  # take out all the removals from the connection
+        for r in removed:
+            self.other_orphans.add(r)
+            logger.debug('removed %s with a by-name removal', r)
 
     def reload(self, connections: set[Tech]):
         """
@@ -138,44 +155,24 @@ class CommodityNetwork:
             if (tech.ic, tech.name, tech.oc) in self.other_orphans
         }
 
-    def get_synthetic_links(self) -> set[Tech]:
-        """get the set of synthetic links that support the driven techs in the network"""
-        links = {
-            Tech(region=self.region, ic=ic, name=name, vintage=-1, oc=oc)
-            for ic, name, oc in self.good_connections
-            if name == '<<linked tech>>'
-        }
-        logger.debug('discovered %d synthetic links', len(links))
-        return links
-
-    def connect_linked_techs(self):
-        # add implicit connections from linked tech...  Meaning:  For the DRIVEN tech, we need to make an
-        # implicit connection back to the output of the driver (even though it is actually feeding off of
-        # the emission) so that the driven tech is not orphaned.
+    def prescreen_linked_tech(self):
+        """Screen the linked tech to ensure both members of the available link are available.  If not, remove strays"""
 
         for r, driver, emission, driven in self.model_data.available_linked_techs:
             if r == self.region:
-                # check that the driven tech only has 1 input....
-                # Dev Note:  It isn't clear how to link to a driven tech with multiple inputs as the linkage
-                # is via the emission of the driver, and establishing links to all inputs of the driven
-                # would likely supply false assurance that the multiple inputs were all viable
-                if len(self.tech_inputs[driven]) > 1:
-                    raise ValueError(
-                        'Multiple input commodities detected for a driven Linked Tech.  This is '
-                        'currently not supported because establishing the validity of the multiple '
-                        'input commodities is not possible with current linkage data.'
-                    )
                 # check that the driver & driven techs both exist...  we only check by NAME for LinkedTech
-                if driver in self.tech_outputs and driven in self.tech_inputs:  # we're gtg.
-                    for oc in self.tech_outputs[driver]:
-                        # we need to link the commodities via an implied link
-                        # so the oc from the driver needs to be linked to the ic for the driven by a 'fake' tech
-                        self.connections[oc].update(
-                            {(ic, '<<linked tech>>') for ic in self.tech_inputs[driven]}
-                        )
+                if driver in self.tech_outputs and driven in self.tech_outputs:  # we're gtg.
+                    logger.debug(
+                        'Both %s and %s are available in region %s, period %s to establish link',
+                        driver,
+                        driven,
+                        self.region,
+                        self.period,
+                    )
+                    self.current_viable_links.add((driver, driven))
 
                 # else, document errors in linkage...
-                elif driver not in self.tech_outputs and driven not in self.tech_inputs:
+                elif driver not in self.tech_outputs and driven not in self.tech_outputs:
                     # neither tech is present, not a problem
                     logger.debug(
                         'Note (no action reqd.):  Neither linked tech %s nor %s are active in region %s, period %s',
@@ -184,39 +181,55 @@ class CommodityNetwork:
                         self.region,
                         self.period,
                     )
-                elif driver in self.tech_outputs and driven not in self.tech_inputs:
+                elif driver in self.tech_outputs and driven not in self.tech_outputs:
                     logger.info(
                         'No driven linked tech available for driver %s in region %s, period %d.  '
-                        'Driver *may* function without it.',
+                        'Driver REMOVED.',
                         driver,
                         self.region,
                         self.period,
                     )
-                # the driver tech is not available, a problem because the driven
-                # could be allowed to run without constraint.
-                else:
+                    self.remove_tech_by_name(driver)
+                else:  # ... only the driven tech is present
                     logger.warning(
                         'Driven linked tech %s is not connected to an active or available '
-                        'driver in region %s, period %d',
+                        'driver in region %s, period %d.  Driven tech REMOVED.',
                         driven,
                         self.region,
                         self.period,
                     )
-                    raise ValueError(
-                        f'Driven linked tech {driven} is not connected to a driver.  See log file details. \n'
-                    )
+                    self.remove_tech_by_name(driven)
 
     def analyze_network(self):
-        # dev note:  send a copy of connections...
-        # it is consumed by the function.  (easier than managing it in the recursion)
-        discovered_sources, demand_side_connections = _visited_dfs(
-            self.model_data.demand_commodities[self.region, self.period],
-            self.model_data.source_commodities,
-            self.connections.copy(),
-        )
-        self.good_connections = _mark_good_connections(
-            good_ic=discovered_sources, connections=demand_side_connections.copy()
-        )
+        # Due to fact that each "scan" is static, we may discover that only 1 member of a linked tech
+        # is viable.  IF that happens, we need to remove the partner and go again.  In a bizarre situation,
+        # this may be an iterative process, so we might as well do it till done...
+        done = False
+        while not done:
+            done = True  # assume the best!
+            # dev note:  send a copy of connections...
+            # it is consumed by the function.  (easier than managing it in the recursion)
+            discovered_sources, demand_side_connections = _visited_dfs(
+                self.model_data.demand_commodities[self.region, self.period],
+                self.model_data.source_commodities,
+                self.connections.copy(),
+            )
+            self.good_connections = _mark_good_connections(
+                good_ic=discovered_sources, connections=demand_side_connections.copy()
+            )
+            observed_tech = {tech for (ic, tech, oc) in self.good_connections}
+            sour_links = set()
+            for link in self.current_viable_links:
+                if not all((link[0] in observed_tech, link[1] in observed_tech)):
+                    sour_links.add(link)
+                    self.remove_tech_by_name(link[0])
+                    self.remove_tech_by_name(link[1])
+                    done = False
+                    logger.warning(
+                        'Both members of link %s are not valid in the network.  Both members REMOVED',
+                        link,
+                    )
+            self.current_viable_links -= sour_links
 
         logger.info(
             'Got %d good technologies (possibly multi-vintage) from %d techs in region %s, period %d',
@@ -248,7 +261,8 @@ class CommodityNetwork:
         }
 
         self.demand_orphans = demand_connex - self.good_connections
-        self.other_orphans = self.orig_connex - demand_connex - self.good_connections
+        # we may already have some removed things in "other orphans" so add to it...
+        self.other_orphans |= self.orig_connex - demand_connex - self.good_connections
 
         if self.other_orphans:
             logger.info(
