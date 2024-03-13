@@ -406,7 +406,9 @@ class MyopicSequencer:
         new_unrestricted_cap_entries.update(
             {(r, p, t, v) for r, p, i, t, v, o in model.activeFlow_rpitvo if t in model.tech_uncap}
         )
+        count = 0
         for r, p, t, v in sorted(new_unrestricted_cap_entries):
+            count += 1
             lifetime = model.LifetimeProcess[r, t, v]
             # need to pull the sector...
             raw = self.cursor.execute(
@@ -427,13 +429,6 @@ class MyopicSequencer:
                         lifetime,
                     ),
                 )
-                logger.debug(
-                    'Added unrestricted cap tech %s to MyopicNetCapacity table for region %s at vintage %d, period %d',
-                    t,
-                    r,
-                    v,
-                    p,
-                )
             except sqlite3.IntegrityError:
                 SE.write(
                     f'choked updating MyopicNetCapacity on : {myopic_idx.base_year, r, p, t, v, None, lifetime}'
@@ -444,6 +439,7 @@ class MyopicSequencer:
                     v,
                 )
         self.output_con.commit()
+        logger.debug('Added %d unrestricted cap techs to MyopicNetCapacity table ', count)
 
     # below not currently used.  Preserved for not as an alternative example to output writing.
     # if used, probably needs a shift to named outputs vice (?, ?, ?, ...)

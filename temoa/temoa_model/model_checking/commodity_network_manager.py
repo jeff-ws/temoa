@@ -110,7 +110,7 @@ class CommodityNetworkManager:
         #        which would be a whole different level of difficulty to do.
         self.regions = {r for (r, p) in self.data.available_techs if '-' not in r}
         for region in self.regions:
-            logger.debug('starting network analysis for region %s', region)
+            logger.info('starting network analysis for region %s', region)
             self._analyze_region(region)
         self.analyzed = True
 
@@ -145,6 +145,16 @@ class CommodityNetworkManager:
         }
         return filts
 
+    def identify_driven_techs(self, region, period) -> set[Tech]:
+        """a convenience for plot colors"""
+        driven_tech_names = {linked_tech.driven for linked_tech in self.data.available_linked_techs}
+        driven_techs = {
+            tech
+            for tech in self.data.available_techs[region, period]
+            if tech.name in driven_tech_names
+        }
+        return driven_techs
+
     def make_commodity_plots(self, config: TemoaConfig):
         if not self.analyzed:
             raise RuntimeError('Trying to build graphs before network analysis.  Code error')
@@ -172,6 +182,12 @@ class CommodityNetworkManager:
                 ):
                     edge_colors[edge] = 'yellow'
                     edge_weights[edge] = 3
+                # we can ID all the possible driven techs and label them.  All of these may not be present in the
+                # edges plotted, but it is OK to have them represented in the color schema
+                driven_techs = self.identify_driven_techs(region, period)
+                for edge in ((tech.ic, tech.name, tech.oc) for tech in driven_techs):
+                    edge_colors[edge] = 'blue'
+                    edge_weights[edge] = 2
 
                 filename_label = f'{region}_{period}'
                 # we pass in "all" of the techs for this region/period and know that the above decorations are
