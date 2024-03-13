@@ -32,6 +32,7 @@ import pytest
 
 from temoa.temoa_model.model_checking import network_model_data
 from temoa.temoa_model.model_checking.commodity_network import CommodityNetwork
+from temoa.temoa_model.model_checking.network_model_data import Tech
 
 # a couple of test cases with diagrams in the flow...
 params = [
@@ -78,6 +79,7 @@ params = [
             'demand_orphans': 2,
             'other_orphans': 2,
             'unsupported_demands': {'d2'},
+'synthetic_links': set()
         },
     },
     #  p1 -> driven -> d2
@@ -113,6 +115,44 @@ params = [
             'demand_orphans': 1,  # the linked tech, which will be orphaned after t4 is removed
             'other_orphans': 1,  # t4
             'unsupported_demands': {'d2'},
+'synthetic_links': set()
+        },
+    },
+    {
+    # iteration with a "good linked tech"
+    #  s1 -> driven -> d2
+    #        |
+    #     - t4 -> d2
+    #   /
+    # s1 -> t1 -> d1
+    #
+    #
+        'name': 'good linked tech',
+        'data': [
+            [(t,) for t in ['s1', 'd1', 'd2']],  # all commodities
+            [
+                (t,)
+                for t in [
+                    's1',
+                ]
+            ],  # sources
+            [('R1', 2020, 'd1'), ('R1', 2020, 'd2')],  # demands
+            [
+                ('R1', 's1', 't4', 2000, 'd2', 100),
+                ('R1', 's1', 'driven', 1990, 'd2', 100),
+                ('R1', 's1', 't1', 2000, 'd1', 100),
+            ],  # techs
+            [(2020,)],  # periods
+            [('R1', 't4', 'nox', 'driven')],  # t4 drives 'driven' with 'nox' emission
+        ],
+        'res': {
+            'demands': 2,
+            'techs': 3,
+            'valid_techs': 3,
+            'demand_orphans': 0,
+            'other_orphans': 0,
+            'unsupported_demands': set(),
+            'synthetic_links' : {Tech('R1', 's1', '<<linked tech>>', -1, 'd2')}
         },
     },
 ]
@@ -133,7 +173,7 @@ def mock_db_connection(request):
 @pytest.mark.parametrize(
     'mock_db_connection', params, indirect=True, ids=[d['name'] for d in params]
 )
-def test__build_from_db(mock_db_connection):
+def test_build_from_db(mock_db_connection):
     """test a couple values in the load"""
     conn, expected = mock_db_connection
     network_data = network_model_data._build_from_db(conn)
@@ -158,3 +198,4 @@ def test_source_trace(mock_db_connection):
     assert len(cn.get_demand_side_orphans()) == expected['other_orphans'], 'demand orphans'
     assert len(cn.get_other_orphans()) == expected['other_orphans'], 'other orphans'
     assert cn.unsupported_demands() == expected['unsupported_demands'], 'unsupported demands'
+    assert cn.get_synthetic_links() == expected['synthetic_links'], 'synthetic links'

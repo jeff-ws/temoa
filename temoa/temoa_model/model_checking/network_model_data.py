@@ -32,10 +32,11 @@ from itertools import chain
 
 from pyomo.core import ConcreteModel
 
+from temoa.extensions.myopic.myopic_index import MyopicIndex
 from temoa.temoa_model.temoa_model import TemoaModel
 
-Tech = namedtuple('Tech', ['region', 'period', 'ic', 'tech_name', 'vintage', 'oc'])
-Linked_Tech = namedtuple('Linked_Tech', ['region', 'driver', 'emission', 'driven'])
+Tech = namedtuple('Tech', ['region', 'ic', 'name', 'vintage', 'oc'])
+LinkedTech = namedtuple('LinkedTech', ['region', 'driver', 'emission', 'driven'])
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +50,25 @@ class NetworkModelData:
         )
         self.source_commodities: set[str] = kwargs.get('source_commodities')
         self.all_commodities: set[str] = kwargs.get('all_commodities')
-        self.available_techs: dict[tuple[str, int | str], set[Tech]] = kwargs.get('available_techs')
-        self.available_linked_techs: set[Linked_Tech] = kwargs.get('available_linked_techs', set())
+        self._available_techs: dict[tuple[str, int | str], set[Tech]] = kwargs.get(
+            'available_techs'
+        )
+        self.available_linked_techs: set[LinkedTech] = kwargs.get('available_linked_techs', set())
+
+    @property
+    def available_techs(self) -> dict[tuple[str, int | str], set[Tech]]:
+        return self._available_techs
+
+    @available_techs.setter
+    def available_techs(self, available_techs: dict[tuple[str, int], set[Tech]]) -> None:
+        # check for region violations
+        for r, p in available_techs.keys():
+            for tech in available_techs[r, p]:
+                if tech.region != r:
+                    raise ValueError(
+                        f'Improperly constructed set of techs for region {r}, tech: {tech}'
+                    )
+        self._available_techs = available_techs
 
     def __str__(self):
         return (
@@ -61,12 +79,12 @@ class NetworkModelData:
         )
 
 
-def build(data) -> NetworkModelData:
+def build(data, *args, **kwargs) -> NetworkModelData:
     builder = _get_builder(data)
-    return builder(data)
+    return builder(data, *args, **kwargs)
 
 
-def _get_builder(data):
+def _get_builder(data) -> NetworkModelData:
     if isinstance(data, TemoaModel | ConcreteModel):
         # dev note:  The built instance will be a ConcreteModel
         builder = _build_from_model
@@ -90,20 +108,22 @@ def _build_from_model(M: TemoaModel) -> NetworkModelData:
     techs = defaultdict(set)
     # scan non-annual techs...
     for r, p, s, d, ic, tech, v, oc in M.activeFlow_rpsditvo:
-        techs[r, p].add(Tech(r, p, ic, tech, v, oc))
+        techs[r, p].add(Tech(r, ic, tech, v, oc))
     # scan annual techs...
     for r, p, ic, tech, v, oc in M.activeFlow_rpitvo:
-        techs[r, p].add(Tech(r, p, ic, tech, v, oc))
+        techs[r, p].add(Tech(r, ic, tech, v, oc))
     res.available_techs = techs
     linked_techs = set()
     for r, driver, emission, driven in M.LinkedTechs:
-        linked_techs.add(Linked_Tech(r, driver, emission, driven))
+        linked_techs.add(LinkedTech(r, driver, emission, driven))
     res.available_linked_techs = linked_techs
     logger.debug('built network data: %s', res.__str__())
     return res
 
 
-def _build_from_db(con: sqlite3.Connection) -> NetworkModelData:
+def _build_from_db(
+    con: sqlite3.Connection, myopic_index: MyopicIndex | None = None
+) -> NetworkModelData:
     """Build NetworkModelData object from a sqlite database."""
     # dev note:  sadly, this will duplicate some code, I think.  Perhaps a later refactoring can
     #            re-use some of the hybrid loader code in a clear way.  Not too much overlap, though
@@ -121,40 +141,64 @@ def _build_from_db(con: sqlite3.Connection) -> NetworkModelData:
     res.demand_commodities = demand_dict
     # need lifetime to screen techs... :/
     default_lifetime = TemoaModel.default_lifetime_tech
-    query = (
-        '  SELECT main.Efficiency.regions, input_comm, Efficiency.tech, Efficiency.vintage, output_comm,  '
-        f'  coalesce(main.LifetimeProcess.life_process, main.LifetimeTech.life, {default_lifetime}) AS lifetime '
-        '   FROM main.Efficiency '
-        '    LEFT JOIN main.LifetimeProcess '
-        '       ON main.Efficiency.tech = LifetimeProcess.tech '
-        '       AND main.Efficiency.vintage = LifetimeProcess.vintage '
-        '       AND main.Efficiency.regions = LifetimeProcess.regions '
-        '    LEFT JOIN main.LifetimeTech '
-        '       ON main.Efficiency.tech = main.LifetimeTech.tech '
-        '     AND main.Efficiency.regions = main.LifeTimeTech.regions '
-        '   JOIN time_periods '
-        '   ON Efficiency.vintage = time_periods.t_periods '
-    )
+    if not myopic_index:
+        query = (
+            '  SELECT main.Efficiency.regions, input_comm, Efficiency.tech, Efficiency.vintage, output_comm,  '
+            f'  coalesce(main.LifetimeProcess.life_process, main.LifetimeTech.life, {default_lifetime}) AS lifetime '
+            '   FROM main.Efficiency '
+            '    LEFT JOIN main.LifetimeProcess '
+            '       ON main.Efficiency.tech = LifetimeProcess.tech '
+            '       AND main.Efficiency.vintage = LifetimeProcess.vintage '
+            '       AND main.Efficiency.regions = LifetimeProcess.regions '
+            '    LEFT JOIN main.LifetimeTech '
+            '       ON main.Efficiency.tech = main.LifetimeTech.tech '
+            '     AND main.Efficiency.regions = main.LifeTimeTech.regions '
+            '   JOIN time_periods '
+            '   ON Efficiency.vintage = time_periods.t_periods '
+        )
+    else:  # we need to pull from the MyopicEfficiency Table
+        query = (
+            '  SELECT main.MyopicEfficiency.region, input_comm, MyopicEfficiency.tech, MyopicEfficiency.vintage, output_comm,  '
+            f'  coalesce(main.LifetimeProcess.life_process, main.LifetimeTech.life, {default_lifetime}) AS lifetime '
+            '   FROM main.MyopicEfficiency '
+            '    LEFT JOIN main.LifetimeProcess '
+            '       ON main.MyopicEfficiency.tech = LifetimeProcess.tech '
+            '       AND main.MyopicEfficiency.vintage = LifetimeProcess.vintage '
+            '       AND main.MyopicEfficiency.region = LifetimeProcess.regions '
+            '    LEFT JOIN main.LifetimeTech '
+            '       ON main.MyopicEfficiency.tech = main.LifetimeTech.tech '
+            '     AND main.MyopicEfficiency.region = main.LifeTimeTech.regions '
+            '   JOIN time_periods '
+            '   ON MyopicEfficiency.vintage = time_periods.t_periods '
+            # f'   WHERE main.MyopicEfficiency.vintage <= {myopic_index.last_demand_year}'
+        )
     raw = cur.execute(query).fetchall()
     periods = cur.execute('SELECT t_periods FROM time_periods').fetchall()
     periods = {t[0] for t in periods}
+    # filter further if myopic
+    if myopic_index:
+        periods = {
+            p for p in periods if myopic_index.base_year <= p <= myopic_index.last_demand_year
+        }
     techs = defaultdict(set)
+    living_techs = set()  # for screening the linked techs below
+    # filter out the dead ones...
     for element in raw:
         for p in periods:
             (r, ic, tech, v, oc, lifetime) = element
             if v <= p < v + lifetime:
-                techs[r, p].add(Tech(r, p, ic, tech, v, oc))
+                techs[r, p].add(Tech(r, ic, tech, v, oc))
+                living_techs.add(tech)
     res.available_techs = techs
 
     # pick up the linked techs...
     raw = cur.execute(
-        'SELECT primary_region, primary_tech, emis_comm, linked_tech from main.LinkedTechs'
+        'SELECT primary_region, primary_tech, emis_comm, linked_tech FROM main.LinkedTechs'
     ).fetchall()
     res.available_linked_techs = {
-        Linked_Tech(region=r, driver=driver, emission=emiss, driven=driven)
+        LinkedTech(region=r, driver=driver, emission=emiss, driven=driven)
         for (r, driver, emiss, driven) in raw
+        if driver in living_techs and driven in living_techs
     }
-
-    res.available_linked_techs = []
     logger.debug('built network data: %s', res.__str__())
     return res

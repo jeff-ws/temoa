@@ -172,7 +172,7 @@ def solve_instance(
                 optimizer.options['barrier convergetol'] = 1.0e-5
                 optimizer.options['feasopt tolerance'] = 1.0e-6
 
-            elif solver_name == 'highs':
+            elif solver_name == 'appsi_highs':
                 optimizer = SolverFactory('appsi_highs')
 
             # TODO: still need to add gurobi parameters?
