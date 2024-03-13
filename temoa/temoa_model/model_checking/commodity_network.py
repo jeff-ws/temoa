@@ -72,7 +72,7 @@ class CommodityNetwork:
         self.connections: dict[str, set[tuple[str, str]]] = defaultdict(set)
         """All connections in the model {oc: {(ic, tech), ...}}"""
 
-        self.current_viable_links: set[tuple[str, str]] = set()
+        self.viable_linked_tech: set[tuple[str, str]] = set()  # name-name pairings
 
         self.orig_connex: set[tuple] = set()
 
@@ -169,7 +169,7 @@ class CommodityNetwork:
                         self.region,
                         self.period,
                     )
-                    self.current_viable_links.add((driver, driven))
+                    self.viable_linked_tech.add((driver, driven))
 
                 # else, document errors in linkage...
                 elif driver not in self.tech_outputs and driven not in self.tech_outputs:
@@ -205,6 +205,7 @@ class CommodityNetwork:
         # is viable.  IF that happens, we need to remove the partner and go again.  In a bizarre situation,
         # this may be an iterative process, so we might as well do it till done...
         done = False
+        demand_side_connections = set()
         while not done:
             done = True  # assume the best!
             # dev note:  send a copy of connections...
@@ -219,19 +220,21 @@ class CommodityNetwork:
             )
             observed_tech = {tech for (ic, tech, oc) in self.good_connections}
             sour_links = set()
-            for link in self.current_viable_links:
+            for link in self.viable_linked_tech:
                 if not all((link[0] in observed_tech, link[1] in observed_tech)):
                     sour_links.add(link)
                     self.remove_tech_by_name(link[0])
                     self.remove_tech_by_name(link[1])
                     done = False
                     logger.warning(
-                        'Both members of link %s are not valid in the network.  Both members REMOVED',
+                        'Both members of link %s are not valid in the network.  Both members REMOVED in region %s, period %s',
                         link,
+                        self.region,
+                        self.period,
                     )
-            self.current_viable_links -= sour_links
+            self.viable_linked_tech -= sour_links
 
-        logger.info(
+        logger.debug(
             'Got %d good technologies (possibly multi-vintage) from %d techs in region %s, period %d',
             len(self.good_connections),
             len(tuple(chain(*self.connections.values()))),
@@ -274,14 +277,13 @@ class CommodityNetwork:
             )
         for orphan in sorted(self.other_orphans, key=lambda x: x[1]):
             logger.debug(
-                'Bad (orphan/disconnected) process should be investigated/removed: \n'
-                '   %s in region %s, period %d',
+                'Discovered orphaned process: ' '   %s in region %s, period %d',
                 orphan,
                 self.region,
                 self.period,
             )
         for orphan in sorted(self.demand_orphans, key=lambda x: x[1]):
-            logger.error(
+            logger.info(
                 'Orphan process on demand side may cause erroneous results: %s in region %s, period %d',
                 orphan,
                 self.region,
@@ -297,9 +299,6 @@ class CommodityNetwork:
             layers[c] = 1
         # here we want to use this particular region-period to ID demands, as some commodities
         # may be producible, but *may* not be a demand in a particular region-period
-        # if self.demand_commodities < self.M.commodity_demand:
-        #     print(f'short commodities in period {self.period}/{self.region}')
-        #     print(self.M.commodity_demand - self.demand_commodities)
         for c in self.model_data.demand_commodities[self.region, self.period]:
             layers[c] = 3
         edge_colors = {}
@@ -310,10 +309,6 @@ class CommodityNetwork:
         for edge in self.other_orphans:
             edge_colors[edge] = 'yellow'
             edge_weights[edge] = 3
-        for edge in self.orig_connex:
-            if edge[1] == '<<linked tech>>':
-                edge_colors[edge] = 'blue'
-                edge_weights[edge] = 3
         filename_label = f'{self.region}_{self.period}'
         graph_connections(
             self.orig_connex,

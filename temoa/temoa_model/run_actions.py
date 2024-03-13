@@ -196,7 +196,7 @@ def solve_instance(
             #     result = None
 
             logger.info('Solve process complete')
-            logger.debug('Solver results: \n %s', result)
+            logger.debug('Solver results: \n %s', result.solver)
 
         if not silent:
             SE.write('\r[%8.2f] Model solved.\n' % (time() - hack))
