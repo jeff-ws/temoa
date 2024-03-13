@@ -69,8 +69,9 @@ class CommodityNetwork:
         # the cataloguing of inputs/outputs by tech is needed for implicit links like via emissions in LinkedTech
         self.tech_inputs: dict[str, set[str]] = defaultdict(set)
         self.tech_outputs: dict[str, set[str]] = defaultdict(set)
-        self.connections: dict[str, set[tuple]] = defaultdict(set)
+        self.connections: dict[str, set[tuple[str, str]]] = defaultdict(set)
         """All connections in the model {oc: {(ic, tech), ...}}"""
+
         self.orig_connex: set[tuple] = set()
 
         if not self.model_data.demand_commodities[self.region, self.period]:
@@ -86,9 +87,9 @@ class CommodityNetwork:
 
         # scan techs for this r, p
         for tech in self.model_data.available_techs[self.region, self.period]:
-            self.connections[tech.oc].add((tech.ic, tech.tech_name))
-            self.tech_inputs[tech.tech_name].add(tech.ic)
-            self.tech_outputs[tech.tech_name].add(tech.oc)
+            self.connections[tech.oc].add((tech.ic, tech.name))
+            self.tech_inputs[tech.name].add(tech.ic)
+            self.tech_outputs[tech.name].add(tech.oc)
 
         # make synthetic connection between linked techs
         self.connect_linked_techs()
@@ -100,31 +101,58 @@ class CommodityNetwork:
         # self.output_sockets: dict[str, set[str]] = dict()
         # self.input_sockets: ...
 
+    def reload(self, connections: set[Tech]):
+        """
+        reload the network model with a new set of connections and clear existing ones
+        :param connections: a set of connections (Techs) to evaluate
+        :return: None
+        """
+        self.tech_inputs.clear()
+        self.tech_outputs.clear()
+        self.connections.clear()
+        self.orig_connex.clear()
+        # reload 'em
+        for tech in connections:
+            self.connections[tech.oc].add((tech.ic, tech.name))
+            self.tech_inputs[tech.name].add(tech.ic)
+            self.tech_outputs[tech.name].add(tech.oc)
+
     def get_valid_tech(self) -> set[Tech]:
         return {
             tech
             for tech in self.model_data.available_techs[self.region, self.period]
-            if (tech.ic, tech.tech_name, tech.oc) in self.good_connections
+            if (tech.ic, tech.name, tech.oc) in self.good_connections
         }
 
     def get_demand_side_orphans(self) -> set[Tech]:
         return {
             tech
             for tech in self.model_data.available_techs[self.region, self.period]
-            if (tech.ic, tech.tech_name, tech.oc) in self.demand_orphans
+            if (tech.ic, tech.name, tech.oc) in self.demand_orphans
         }
 
     def get_other_orphans(self) -> set[Tech]:
         return {
             tech
             for tech in self.model_data.available_techs[self.region, self.period]
-            if (tech.ic, tech.tech_name, tech.oc) in self.other_orphans
+            if (tech.ic, tech.name, tech.oc) in self.other_orphans
         }
+
+    def get_synthetic_links(self) -> set[Tech]:
+        """get the set of synthetic links that support the driven techs in the network"""
+        links = {
+            Tech(region=self.region, ic=ic, name=name, vintage=-1, oc=oc)
+            for ic, name, oc in self.good_connections
+            if name == '<<linked tech>>'
+        }
+        logger.debug('discovered %d synthetic links', len(links))
+        return links
 
     def connect_linked_techs(self):
         # add implicit connections from linked tech...  Meaning:  For the DRIVEN tech, we need to make an
         # implicit connection back to the output of the driver (even though it is actually feeding off of
         # the emission) so that the driven tech is not orphaned.
+
         for r, driver, emission, driven in self.model_data.available_linked_techs:
             if r == self.region:
                 # check that the driven tech only has 1 input....
@@ -137,8 +165,8 @@ class CommodityNetwork:
                         'currently not supported because establishing the validity of the multiple '
                         'input commodities is not possible with current linkage data.'
                     )
-                # check that the driver & driven techs both exist
-                if driver in self.tech_outputs and driven in self.tech_outputs:  # we're gtg.
+                # check that the driver & driven techs both exist...  we only check by NAME for LinkedTech
+                if driver in self.tech_outputs and driven in self.tech_inputs:  # we're gtg.
                     for oc in self.tech_outputs[driver]:
                         # we need to link the commodities via an implied link
                         # so the oc from the driver needs to be linked to the ic for the driven by a 'fake' tech
@@ -147,7 +175,7 @@ class CommodityNetwork:
                         )
 
                 # else, document errors in linkage...
-                elif driver not in self.tech_outputs and driven not in self.tech_outputs:
+                elif driver not in self.tech_outputs and driven not in self.tech_inputs:
                     # neither tech is present, not a problem
                     logger.debug(
                         'Note (no action reqd.):  Neither linked tech %s nor %s are active in region %s, period %s',
@@ -156,10 +184,10 @@ class CommodityNetwork:
                         self.region,
                         self.period,
                     )
-                elif driver in self.tech_outputs and driven not in self.tech_outputs:
+                elif driver in self.tech_outputs and driven not in self.tech_inputs:
                     logger.info(
-                        'No driven linked tech available for driver %s in regions %s, period %d.  '
-                        'Driver may function without it.',
+                        'No driven linked tech available for driver %s in region %s, period %d.  '
+                        'Driver *may* function without it.',
                         driver,
                         self.region,
                         self.period,
@@ -175,7 +203,7 @@ class CommodityNetwork:
                         self.period,
                     )
                     raise ValueError(
-                        'Driven linked tech %s is not connected to a driver.  See log file details. \n'
+                        f'Driven linked tech {driven} is not connected to a driver.  See log file details. \n'
                     )
 
     def analyze_network(self):
@@ -225,7 +253,7 @@ class CommodityNetwork:
         if self.other_orphans:
             logger.info(
                 'Source tracing revealed %d orphaned processes in region %s, period %d.  '
-                'Enable DEBUG level logging with "-d" to have them logged',
+                'Enable DEBUG level logging with "-d" to have them logged in this module',
                 len(self.other_orphans),
                 self.region,
                 self.period,

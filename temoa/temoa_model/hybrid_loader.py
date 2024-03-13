@@ -14,7 +14,7 @@ from pyomo.dataportal import DataPortal
 
 from temoa.extensions.myopic.myopic_index import MyopicIndex
 from temoa.temoa_model.model_checking import network_model_data
-from temoa.temoa_model.model_checking.commodity_network import CommodityNetwork
+from temoa.temoa_model.model_checking.commodity_network_manager import CommodityNetworkManager
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
 
@@ -79,41 +79,46 @@ class HybridLoader:
         self.viable_input_comms: set[str] = set()
         self.viable_output_comms: set[str] = set()
         self.viable_vintages: set[int] = set()
+        self.viable_ritvo = set()
         self.viable_rtv: set[tuple[str, str, int]] = set()
         self.viable_rt: set[tuple[str, str]] = set()
+        self.viable_rtt = set()  # to support scanning LinkedTech
         self.efficiency_values: list[tuple] = []
 
-    def _build_eff_table(self, myopic_index: MyopicIndex | None):
+    def _build_eff_table2(self, myopic_index: MyopicIndex | None):
         """Build efficiency data by using the source_check functionality on the data
         to analyze the network and deterimine good/bad techs before loading anything else.  Use this to
         load the filters..."""
         cur = self.con.cursor()
         self._clear_filters()
-        network_data = network_model_data.build(self.con)
+        network_data = network_model_data.build(self.con, myopic_index)
 
         # need regions and periods to execute the source check by [r, p].  At this point, we can only pull from DB
-        regions = {region for region, _ in cur.execute('SELECT regions FROM regions').fetchall()}
-        periods = {period for period, _ in cur.execute("SELECT t_periods FROM time_periods WHERE flag = 'f'")}
-        good_tech = set()
-        # we need to work through all region-period pairs and:
-        # (1) run the source trace
-        # (2) pull the "good connections" (techs) out and add them to efficiency data
-        # (3) make a plot, if requested
-        # (4) log the orphans
-        for region in regions:
-            for period in periods:
-                network = CommodityNetwork(region=region, period=period, model_data=network_data)
-                network.analyze_network()
-                good_tech.update(network.get_valid_tech())
-                if self.config and self.config.plot_commodity_network:
-                    network.graph_network(self.config)
+        z = cur.execute('SELECT regions FROM regions').fetchall()
+        regions = {region for (region, *_) in cur.execute('SELECT regions FROM regions').fetchall()}
+        periods = {period for (period, *_) in cur.execute("SELECT t_periods FROM time_periods WHERE flag = 'f'")}
 
-                for tech in network.get_demand_side_orphans():
-                    logger.warning('tech %s is a demand-side orphan and has been removed', tech)
-                for tech in network.get_other_orphans():
-                    logger.warning('tech %s is an "other orphan" and has been removed', tech)
+        if myopic_index:
+            periods = {p for p in periods if myopic_index.base_year <= p <= myopic_index.last_demand_year}
 
-        # pull the elements "for real" and filter them...
+        manager = CommodityNetworkManager(periods=periods, network_data=network_data)
+        manager.analyze_network()
+
+        # make plots if selected
+        if self.config.plot_commodity_network:
+            manager.make_commodity_plots(config=self.config)
+
+        # load the filters
+        filts = manager.build_filters()
+        self.viable_ritvo = filts['ritvo']
+        self.viable_rtv = filts['rtv']
+        self.viable_rt = filts['rt']
+        self.viable_techs = filts['t']
+        self.viable_input_comms = filts['ic']
+        self.viable_vintages = filts['v']
+        self.viable_output_comms = filts['oc']
+        self.viable_comms = self.viable_input_comms | self.viable_output_comms
+        self.viable_rtt = {(r, t1, t2) for r, t1 in self.viable_rt for t2 in self.viable_techs}
 
         contents = cur.execute(
             'SELECT region, input_comm, tech, vintage, output_comm, efficiency, lifetime  '
@@ -123,8 +128,13 @@ class HybridLoader:
             ).fetchall()
         logger.debug('polled %d elements from MyopicEfficiency table', len(contents))
         efficiency_entries = {
-            (r, i, t, v, o, eff, lifetime) for r, i, t, v, o, eff, lifetime in contents
+            (r, i, t, v, o, eff) for r, i, t, v, o, eff, lifetime in contents
+            if (r, i, t, v, o) in self.viable_ritvo
         }
+        # book the EfficiencyTable
+        # we should sort here for deterministic results after pulling from set
+        self.efficiency_values = sorted(efficiency_entries)
+
     def _build_myopic_eff_table(self, myopic_index: MyopicIndex):
         """
         refresh all the sets used for filtering from the current contents
@@ -261,7 +271,7 @@ class HybridLoader:
     def _build_eff_table(self):
         """
         Build the Efficiency Table data without regard for filtering that is done with the myopic build.  This is
-        intended for use in Perfect Foresight and other modes.
+        intended for use in Perfect Foresight and other modes?
         :return:
         """
         cur = self.con.cursor()
@@ -367,7 +377,7 @@ class HybridLoader:
             raise ValueError(f'received an illegal entry for the myopic index: {myopic_index}')
         elif myopic_index:
             mi = myopic_index  # abbreviated name
-            self._build_myopic_eff_table(myopic_index=mi)
+            self._build_eff_table2(myopic_index=mi)
         else:
             mi = None
             self._build_eff_table()
@@ -1142,9 +1152,7 @@ class HybridLoader:
                 filtered = [
                     (r, e, i, t, v, o, val)
                     for r, e, i, t, v, o, val in raw
-                    if (r, t, v) in self.viable_rtv
-                    and i in self.viable_input_comms
-                    and o in self.viable_comms
+                    if (r, i, t, v, o) in self.viable_ritvo
                 ]
                 load_element(M.EmissionActivity, filtered)
             else:
@@ -1161,7 +1169,7 @@ class HybridLoader:
             raw = cur.execute(
                 'SELECT primary_region, primary_tech, emis_comm, linked_tech FROM main.LinkedTechs'
             ).fetchall()
-            load_element(M.LinkedTechs, raw, self.viable_rt, (0, 1))
+            load_element(M.LinkedTechs, raw, self.viable_rtt, (0, 1, 3))
 
         # RampUp
         if self.table_exists('RampUp'):
