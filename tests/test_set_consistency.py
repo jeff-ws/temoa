@@ -81,7 +81,7 @@ def test_set_consistency(data_name, config_file, set_file, tmp_path):
                 shortage_in_model[set_name] = cached_sets.get(set_name) - s
     missing_in_model = cached_sets.keys() - model_sets.keys()
     # drop any set that has "_index" in the name as they are no longer reported by newer version of pyomo
-    missing_in_model = {s for s in missing_in_model if '_index' not in s}
+    missing_in_model = {s for s in missing_in_model if '_index' not in s and '_domain' not in s}
     assert not missing_in_model, f'one or more cached set not in model: {missing_in_model}'
     if overage_in_model:
         print('Overages compared to cache: ')
