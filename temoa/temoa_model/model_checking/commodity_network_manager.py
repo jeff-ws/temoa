@@ -29,7 +29,7 @@ from collections import defaultdict
 from logging import getLogger
 from typing import Iterable
 
-from temoa.temoa_model.model_checking.commodity_graph import graph_connections
+from temoa.temoa_model.model_checking.commodity_graph import generate_graph
 from temoa.temoa_model.model_checking.commodity_network import CommodityNetwork
 from temoa.temoa_model.model_checking.network_model_data import NetworkModelData, Tech
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -44,7 +44,8 @@ class CommodityNetworkManager:
         self.regions = None
         self.analyzed = False
         self.periods = sorted(periods)
-        self.data = network_data
+        self.orig_data = network_data
+        self.filtered_data: NetworkModelData | None = None
 
         # outputs / saves for graphing networks
         # orig_tech is saved copy of the links for graphing purposes
@@ -53,7 +54,7 @@ class CommodityNetworkManager:
         self.demand_orphans: dict[tuple[str, str], set[Tech]] = defaultdict(set)
         self.other_orphans: dict[tuple[str, str], set[Tech]] = defaultdict(set)
 
-    def _analyze_region(self, region: str):
+    def _analyze_region(self, region: str, data: NetworkModelData):
         """recursively whittle away at the region, within the window until no new invalid techs appear"""
         done = False
         iter_count = 0
@@ -63,7 +64,7 @@ class CommodityNetworkManager:
             demand_orphans_this_pass: set[Tech] = set()
             other_orphans_this_pass: set[Tech] = set()
             for period in self.periods:
-                cn = CommodityNetwork(region=region, period=period, model_data=self.data)
+                cn = CommodityNetwork(region=region, period=period, model_data=data)
                 cn.analyze_network()
 
                 # gather orphans...
@@ -84,8 +85,8 @@ class CommodityNetworkManager:
             #            for later use
             for period in self.periods:
                 # any orphans need to be removed from all periods where they exist
-                self.data.available_techs[region, period] -= demand_orphans_this_pass
-                self.data.available_techs[region, period] -= other_orphans_this_pass
+                data.available_techs[region, period] -= demand_orphans_this_pass
+                data.available_techs[region, period] -= other_orphans_this_pass
 
             done = not demand_orphans_this_pass and not other_orphans_this_pass
             logger.debug(
@@ -108,10 +109,11 @@ class CommodityNetworkManager:
         """
         # NOTE:  by excluding '-' regions, we are deciding NOT to screen any regional exchange techs,
         #        which would be a whole different level of difficulty to do.
-        self.regions = {r for (r, p) in self.data.available_techs if '-' not in r}
+        self.filtered_data = self.orig_data.clone()
+        self.regions = {r for (r, p) in self.orig_data.available_techs if '-' not in r}
         for region in self.regions:
             logger.info('starting network analysis for region %s', region)
-            self._analyze_region(region)
+            self._analyze_region(region, data = self.filtered_data)
         self.analyzed = True
 
     def build_filters(self) -> dict:
@@ -125,8 +127,8 @@ class CommodityNetworkManager:
         valid_input_commodities = set()
         valid_output_commodities = set()
         valid_vintages = set()
-        for r, p in self.data.available_techs:
-            for tech in self.data.available_techs[r, p]:
+        for r, p in self.filtered_data.available_techs:
+            for tech in self.filtered_data.available_techs[r, p]:
                 valid_ritvo.add((tech.region, tech.ic, tech.name, tech.vintage, tech.oc))
                 valid_rtv.add((tech.region, tech.name, tech.vintage))
                 valid_rt.add((tech.region, tech.name))
@@ -146,11 +148,11 @@ class CommodityNetworkManager:
         return filts
 
     def identify_driven_techs(self, region, period) -> set[Tech]:
-        """a convenience for plot colors"""
-        driven_tech_names = {linked_tech.driven for linked_tech in self.data.available_linked_techs}
+        """a convenience for plot colors...  identifies all ORIGINAL linked techs before filtering"""
+        driven_tech_names = {linked_tech.driven for linked_tech in self.orig_data.available_linked_techs}
         driven_techs = {
             tech
-            for tech in self.data.available_techs[region, period]
+            for tech in self.orig_data.available_techs[region, period]
             if tech.name in driven_tech_names
         }
         return driven_techs
@@ -160,46 +162,13 @@ class CommodityNetworkManager:
             raise RuntimeError('Trying to build graphs before network analysis.  Code error')
         for region in self.regions:
             for period in self.periods:
-                layers = {}
-                for c in self.data.all_commodities:
-                    layers[c] = 2  # physical
-                for c in self.data.source_commodities:
-                    layers[c] = 1
-                for c in self.data.demand_commodities[region, period]:
-                    layers[c] = 3
-
-                edge_colors = {}
-                edge_weights = {}
-                # dev note:  the generators below do 2 things:  put the data in the format expected by the
-                #            graphing code and reduce redundant vintages to 1 representation
-                for edge in (
-                    (tech.ic, tech.name, tech.oc) for tech in self.demand_orphans[region, period]
-                ):
-                    edge_colors[edge] = 'red'
-                    edge_weights[edge] = 5
-                for edge in (
-                    (tech.ic, tech.name, tech.oc) for tech in self.other_orphans[region, period]
-                ):
-                    edge_colors[edge] = 'yellow'
-                    edge_weights[edge] = 3
-                # we can ID all the possible driven techs and label them.  All of these may not be present in the
-                # edges plotted, but it is OK to have them represented in the color schema
-                driven_techs = self.identify_driven_techs(region, period)
-                for edge in ((tech.ic, tech.name, tech.oc) for tech in driven_techs):
-                    edge_colors[edge] = 'blue'
-                    edge_weights[edge] = 2
-
-                filename_label = f'{region}_{period}'
-                # we pass in "all" of the techs for this region/period and know that the above decorations are
-                # a subset of all available techs that we started with
-                all_links = {
-                    (tech.ic, tech.name, tech.oc) for tech in self.orig_tech[region, period]
-                }
-                graph_connections(
-                    all_links,
-                    layers,
-                    edge_colors,
-                    edge_weights,
-                    file_label=filename_label,
-                    output_path=config.output_path,
+                generate_graph(
+                    region,
+                    period,
+                    network_data=self.orig_data,
+                    demand_orphans=self.demand_orphans[region, period],
+                    other_orphans=self.other_orphans[region, period],
+                    driven_techs=self.identify_driven_techs(region, period),
+                    config=config
                 )
+

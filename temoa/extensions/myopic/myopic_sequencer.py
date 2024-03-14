@@ -33,7 +33,6 @@ from pathlib import Path
 from sqlite3 import Connection
 from sys import stderr as SE
 
-import deprecated
 from pyomo.core import value
 from temoa.temoa_model.myopic.hybrid_loader import HybridLoader
 from temoa.temoa_model.myopic.myopic_index import MyopicIndex
@@ -178,17 +177,14 @@ class MyopicSequencer:
         # Capacity accounted for)
         self.initialize_myopic_efficiency_table()
 
-        # make a data loader
-        data_loader = HybridLoader(self.output_con, self.config)
-
         # start the fundamental control loop
         # 1.  get feedback from previous instance execution (optimal/infeasible/...)
         # 2.  decide what to do about it
         # 3.  pull the next instance from the queue (if !empty & if needed)
-        # 4.  Add to the MyopicEfficiency table, needed before pulling the rest of the data
-        # 5.  pull data for next run, adjust as necessary
+        # 4.  Add to the MyopicEfficiency table from what was last built:  needed before pulling the rest of the data
+        # 5.  pull data for next run and filter it with source tracing
         # 6.  build instance
-        # 7.  run checks (price check and source trace) on the model, if selected
+        # 7.  run checks (price check) on the model, if selected
         # 8.  run the model and assess
         # 9.  commit or back out any data as necessary
         # 10.  report findings
@@ -232,6 +228,12 @@ class MyopicSequencer:
             self.update_myopic_efficiency_table(myopic_index=idx, prev_base=last_base_year)
 
             # 5. pull the data
+            # make a data loader
+            data_loader = HybridLoader(self.output_con, self.config)
+            # we MUST source trace when using myopic mode
+            data_loader.source_trace(make_plots=self.config.plot_commodity_network)
+            # load the efficiency table dataset
+            data_loader.build_efficiency_dataset(use_raw_data=False)
             data_portal = data_loader.load_data_portal(
                 myopic_index=idx
             )  # just make a new data portal...they are untrustworthy during re-use...
@@ -443,47 +445,6 @@ class MyopicSequencer:
                 )
         self.output_con.commit()
         logger.debug('Added %d unrestricted cap techs to MyopicNetCapacity table ', count)
-
-    # below not currently used.  Preserved for not as an alternative example to output writing.
-    # if used, probably needs a shift to named outputs vice (?, ?, ?, ...)
-    @deprecated.deprecated('currently using p_format results to capture this')
-    def update_flow_out_table(self, myopic_idx: MyopicIndex, model: TemoaModel) -> None:
-        """
-        Update the MyopicFlowOut table with flows from the current period
-        :param myopic_idx: the current MyopicIndex
-        :param model: the solved model for this period
-        :return: None
-        """
-        # erase in case we are over-writing
-        self.cursor.execute(
-            f'DELETE FROM main.MyopicFlowOut WHERE period >= {myopic_idx.base_year}'
-        )
-        self.output_con.commit()
-
-        # write it...
-        for (r, p, s, d, i, t, v, o), flow in model.V_FlowOut.items():
-            flow = value(flow)
-            if flow < self.capacity_epsilon:
-                continue
-            raw = self.cursor.execute(
-                'SELECT sector FROM main.technologies WHERE tech = ?', (t,)
-            ).fetchall()
-            sector = raw[0][0]
-            try:
-                self.cursor.execute(
-                    'INSERT INTO MyopicFlowOut VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    (self.config.scenario, r, sector, p, s, d, i, t, v, o, flow),
-                )
-            except sqlite3.IntegrityError:
-                print(
-                    f'choked updating MyopicFlowOut on : { self.config.scenario, r, sector, p, s, d, i, t, v, o, flow}'
-                )
-            except sqlite3.ProgrammingError:
-                print(
-                    f'choked updating MyopicFlowOut on : { self.config.scenario, r, sector, p, s, d, i, t, v, o, flow}'
-                )
-                logger.error('Failed to add flow for tech %s to MyopicFlowOut in period %d', t, p)
-        self.output_con.commit()
 
     def update_myopic_efficiency_table(self, myopic_index: MyopicIndex, prev_base: int):
         """

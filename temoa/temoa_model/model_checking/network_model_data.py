@@ -29,6 +29,7 @@ import logging
 import sqlite3
 from collections import namedtuple, defaultdict
 from itertools import chain
+from typing import Self
 
 from pyomo.core import ConcreteModel
 
@@ -55,6 +56,13 @@ class NetworkModelData:
         )
         self.available_linked_techs: set[LinkedTech] = kwargs.get('available_linked_techs', set())
 
+    def clone(self) -> Self:
+        """create a copy of the current"""
+        return NetworkModelData(demand_commodities=self.demand_commodities.copy(),
+                                source_commodities=self.source_commodities.copy(),
+                                all_commodities=self.all_commodities.copy(),
+                                available_techs=self.available_techs.copy(),
+                                available_linked_techs=self.available_linked_techs.copy())
     @property
     def available_techs(self) -> dict[tuple[str, int | str], set[Tech]]:
         return self._available_techs

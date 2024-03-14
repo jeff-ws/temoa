@@ -2,6 +2,8 @@
 A quick & dirty graph of the commodity network for troubleshooting purposes.  Future
 development may enhance this quite a bit.... lots of opportunity!
 """
+from temoa.temoa_model.model_checking.network_model_data import NetworkModelData, Tech
+from temoa.temoa_model.temoa_config import TemoaConfig
 
 """
 Tools for Energy Model Optimization and Analysis (Temoa):
@@ -36,8 +38,72 @@ from typing import Iterable
 import gravis as gv
 import networkx as nx
 
+def generate_graph(region,
+                   period,
+                   network_data: NetworkModelData,
+                   demand_orphans: Iterable[Tech],
+                   other_orphans: Iterable[Tech],
+                   driven_techs: Iterable[Tech],
+                   config: TemoaConfig
+                   ):
+    """
+    generate graph for region/period from network data
+    :param region: region of interest
+    :param period: period of interest
+    :param network_data: the data showing all edges to be graphed.  "orphans" will be added, if they aren't included
+    :param demand_orphans: container of orphans [orphanage ;)]
+    :param other_orphans: container of orphans
+    :param driven_techs: the "driven" techs in LinkedTech pairs
+    :param config:
+    :return:
+    """
+    layers = {}
+    for c in network_data.all_commodities:
+        layers[c] = 2  # physical
+    for c in network_data.source_commodities:
+        layers[c] = 1
+    for c in network_data.demand_commodities[region, period]:
+        layers[c] = 3
+    all_edges = set()
+    edge_colors = {}
+    edge_weights = {}
+    # dev note:  the generators below do 2 things:  put the data in the format expected by the
+    #            graphing code and reduce redundant vintages to 1 representation
+    # we can ID all the possible driven techs and label them.  Note that if some of these are
+    # orphans they will be overridden by those segments that follow
 
-def graph_connections(
+    for edge in ((tech.ic, tech.name, tech.oc) for tech in driven_techs):
+        edge_colors[edge] = 'blue'
+        edge_weights[edge] = 2
+        all_edges.add(edge)
+    for edge in (
+        (tech.ic, tech.name, tech.oc) for tech in demand_orphans
+    ):
+        edge_colors[edge] = 'red'
+        edge_weights[edge] = 5
+        all_edges.add(edge)
+    for edge in (
+        (tech.ic, tech.name, tech.oc) for tech in other_orphans
+    ):
+        edge_colors[edge] = 'yellow'
+        edge_weights[edge] = 3
+        all_edges.add(edge)
+
+    filename_label = f'{region}_{period}'
+    # we pass in "all" of the techs for this region/period
+    all_edges |= {
+        (tech.ic, tech.name, tech.oc) for tech in network_data.available_techs[region, period]
+    }
+    _graph_connections(
+        all_edges,
+        layers,
+        edge_colors,
+        edge_weights,
+        file_label=filename_label,
+        output_path=config.output_path,
+    )
+
+def _graph_connections(
     connections: Iterable[tuple],
     layer_map,
     edge_colors,
@@ -106,7 +172,7 @@ def graph_connections(
 if __name__ == '__main__':
     connex = [('ethos', 'tech_1', 2), (2, 'tech_2', 3)]
     layers = {'ethos': 1, 2: 2, 3: 3}
-    graph_connections(
+    _graph_connections(
         connex,
         layers,
         edge_colors={},
