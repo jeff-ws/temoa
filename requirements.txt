@@ -4,7 +4,7 @@
 # to use pip to install (in a venv, if desired):
 # $: pip install -r requirements.txt
 
-pyomo==6.7
+pyomo>=6.7.1
 #  pyomo.extras  <-- not avaialable on PyPi.  Does not appear to be used in project
 # xlwt  # not used
 ipython~=8.17.2
