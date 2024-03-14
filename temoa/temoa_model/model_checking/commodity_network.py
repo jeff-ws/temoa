@@ -29,7 +29,7 @@ from collections import defaultdict
 from itertools import chain
 from logging import getLogger
 
-from temoa.temoa_model.model_checking.commodity_graph import graph_connections
+from temoa.temoa_model.model_checking.commodity_graph import _graph_connections
 from temoa.temoa_model.model_checking.network_model_data import NetworkModelData, Tech
 from temoa.temoa_model.temoa_config import TemoaConfig
 
@@ -310,7 +310,7 @@ class CommodityNetwork:
             edge_colors[edge] = 'yellow'
             edge_weights[edge] = 3
         filename_label = f'{self.region}_{self.period}'
-        graph_connections(
+        _graph_connections(
             self.orig_connex,
             layers,
             edge_colors,

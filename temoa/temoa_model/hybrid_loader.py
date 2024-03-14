@@ -68,10 +68,20 @@ class HybridLoader:
     An instance of the HybridLoader
     """
 
-    def __init__(self, db_connection: Connection, config: TemoaConfig):
+    def __init__(
+        self, db_connection: Connection, config: TemoaConfig, myopic_index: MyopicIndex | None
+    ):
+        """
+        build a loader for an instance.
+        :param db_connection: a Connection to the database
+        :param config: the config
+        :param myopic_index: a myopic index if running myopic.  Passing "None" will load all data
+        """
         self.debugging = False  # for T/S, will print to screen the data load values
         self.con = db_connection
         self.config = config
+        self.myopic_index = myopic_index
+        self.manager: CommodityNetworkManager | None = None
 
         # filters for myopic ops
         self.viable_techs: set[str] = set()
@@ -85,31 +95,38 @@ class HybridLoader:
         self.viable_rtt = set()  # to support scanning LinkedTech
         self.efficiency_values: list[tuple] = []
 
-    def _build_eff_table2(self, myopic_index: MyopicIndex | None):
-        """Build efficiency data by using the source_check functionality on the data
-        to analyze the network and deterimine good/bad techs before loading anything else.  Use this to
-        load the filters..."""
+    def source_trace(self, make_plots):
+        network_data = network_model_data.build(self.con, self.myopic_index)
         cur = self.con.cursor()
-        self._clear_filters()
-        network_data = network_model_data.build(self.con, myopic_index)
-
-        # need regions and periods to execute the source check by [r, p].  At this point, we can only pull from DB
-        z = cur.execute('SELECT regions FROM regions').fetchall()
-        regions = {region for (region, *_) in cur.execute('SELECT regions FROM regions').fetchall()}
-        periods = {period for (period, *_) in cur.execute("SELECT t_periods FROM time_periods WHERE flag = 'f'")}
-
-        if myopic_index:
-            periods = {p for p in periods if myopic_index.base_year <= p <= myopic_index.last_demand_year}
-
+        # need periods to execute the source check by [r, p].  At this point, we can only pull from DB
+        periods = {
+            period
+            for (period, *_) in cur.execute("SELECT t_periods FROM time_periods WHERE flag = 'f'")
+        }
+        if self.myopic_index:
+            periods = {
+                p
+                for p in periods
+                if self.myopic_index.base_year <= p <= self.myopic_index.last_demand_year
+            }
         manager = CommodityNetworkManager(periods=periods, network_data=network_data)
         manager.analyze_network()
+        if make_plots:
+            manager.make_commodity_plots(self.config)
 
-        # make plots if selected
-        if self.config.plot_commodity_network:
-            manager.make_commodity_plots(config=self.config)
+    def build_efficiency_dataset(self, use_raw_data=False):
+        """Build efficiency data by using the source_check functionality on the data
+        to analyze the network and deterimine good/bad techs before loading anything else.  Use this to
+        load the filters...
+        """
+        cur = self.con.cursor()
 
-        # load the filters
-        filts = manager.build_filters()
+        self._clear_filters()
+        filts = {}
+        if self.manager:
+            filts = self.manager.build_filters()
+        else:
+            raise RuntimeError('trying to filter, but manager has not analyzed network yet.')
         self.viable_ritvo = filts['ritvo']
         self.viable_rtv = filts['rtv']
         self.viable_rt = filts['rt']
@@ -119,22 +136,30 @@ class HybridLoader:
         self.viable_output_comms = filts['oc']
         self.viable_comms = self.viable_input_comms | self.viable_output_comms
         self.viable_rtt = {(r, t1, t2) for r, t1 in self.viable_rt for t2 in self.viable_techs}
-
-        contents = cur.execute(
-            'SELECT region, input_comm, tech, vintage, output_comm, efficiency, lifetime  '
-            'FROM MyopicEfficiency '
-            'WHERE vintage + lifetime > ?',
-            (myopic_index.base_year,),
+        if use_raw_data:
+            contents = cur.execute(
+                'SELECT regions, input_comm, tech, vintage, output_comm, efficiency FROM main.Efficiency'
             ).fetchall()
-        logger.debug('polled %d elements from MyopicEfficiency table', len(contents))
-        efficiency_entries = {
-            (r, i, t, v, o, eff) for r, i, t, v, o, eff, lifetime in contents
-            if (r, i, t, v, o) in self.viable_ritvo
-        }
+            logger.debug('polled %d rows from Efficiency table data', len(contents))
+            efficiency_entries = [row[0] for row in contents]
+        else:
+            contents = cur.execute(
+                'SELECT region, input_comm, tech, vintage, output_comm, efficiency, lifetime  '
+                'FROM MyopicEfficiency '
+                'WHERE vintage + lifetime > ?',
+                (self.myopic_index.base_year,),
+            ).fetchall()
+            efficiency_entries = {
+                (r, i, t, v, o, eff)
+                for r, i, t, v, o, eff, lifetime in contents
+                if (r, i, t, v, o) in self.viable_ritvo
+            }
+        logger.debug('polled %d elements from MyopicEfficiency table', len(efficiency_entries))
         # book the EfficiencyTable
         # we should sort here for deterministic results after pulling from set
         self.efficiency_values = sorted(efficiency_entries)
 
+    @deprecated.deprecated('outdated...use source tracing approach')
     def _build_myopic_eff_table(self, myopic_index: MyopicIndex):
         """
         refresh all the sets used for filtering from the current contents
@@ -268,21 +293,6 @@ class HybridLoader:
         # we should sort here for deterministic results after pulling from set
         self.efficiency_values = sorted(ok_techs | existing_techs)
 
-    def _build_eff_table(self):
-        """
-        Build the Efficiency Table data without regard for filtering that is done with the myopic build.  This is
-        intended for use in Perfect Foresight and other modes?
-        :return:
-        """
-        cur = self.con.cursor()
-        self._clear_filters()  # needed?
-
-        contents = cur.execute(
-            'SELECT regions, input_comm, tech, vintage, output_comm, efficiency FROM main.Efficiency'
-        ).fetchall()
-        logger.debug('polled %d rows from Efficiency table data', len(contents))
-        self.efficiency_values = [row[0] for row in contents]
-
     def _clear_filters(self):
         self.viable_techs.clear()
         self.viable_input_comms.clear()
@@ -309,62 +319,6 @@ class HybridLoader:
         logger.info('Did not find existing table for (optional) table:  %s', table_name)
         return False
 
-    @staticmethod
-    @deprecated.deprecated('no longer needed')
-    def _efficiency_table_cleanup(
-        raw_data: list[tuple], physical_commodities: Sequence
-    ) -> list[tuple]:
-        """
-        A cleanup for the data going in to the efficiency table.  Needed to ensure that there
-        are no cases where a commodity can be an input before it is available as an output
-        or vice-versa.  Filtering only occurs after the base year passed in, so anything
-        "existing" is ignored
-        :param raw_data: the query result
-        :param physical_commodities: the first year to apply the filtering on
-        :return: filtered data set for Efficiency, reduced list of physical commodities
-        """
-
-        if len(physical_commodities) == 0:
-            raise ValueError('No production commodities provided to efficiency filter')
-        if not isinstance(physical_commodities, set):
-            physical_commodities = set(physical_commodities)
-
-        visible_inputs = {
-            input_comm for region, input_comm, tech, vintage, output_comm, efficiency in raw_data
-        }
-        visible_outputs = {
-            output_comm for region, input_comm, tech, vintage, output_comm, efficiency in raw_data
-        }
-
-        filtered_data = []
-        for row in raw_data:
-            region, input_comm, tech, vintage, output_comm, efficiency = row
-            if output_comm in physical_commodities and output_comm not in visible_inputs:
-                logger.warning(
-                    'For Efficiency table entry: \n'
-                    '    %s\n'
-                    '    There are no sources to accept the physical commodity output: '
-                    '%s\n'
-                    '    Either the commodity is mislabeled as physical or this tech is '
-                    'ahead of need.  This Efficiency entry is SUPPRESSED.',
-                    row,
-                    output_comm,
-                )
-            else:
-                filtered_data.append(row)
-            if input_comm not in visible_outputs:
-                logger.warning(
-                    'For Efficiency table entry: \n'
-                    '    %s\n'
-                    '    There are no sources to supply the input commodity: '
-                    '%s\n'
-                    '    Advisory only, no action taken.',
-                    row,
-                    input_comm,
-                )
-
-        return filtered_data
-
     def load_data_portal(self, myopic_index: MyopicIndex | None = None) -> DataPortal:
         # the general plan:
         # 1. iterate through the model elements that are directly read from data
@@ -375,13 +329,11 @@ class HybridLoader:
 
         if myopic_index is not None and not isinstance(myopic_index, MyopicIndex):
             raise ValueError(f'received an illegal entry for the myopic index: {myopic_index}')
-        elif myopic_index:
-            mi = myopic_index  # abbreviated name
-            self._build_eff_table2(myopic_index=mi)
-        else:
-            mi = None
-            self._build_eff_table()
 
+        if not self.efficiency_values:
+            raise RuntimeError('attempting to proceed with loading process before the Efficiency dataset'
+                               'has been loaded.  Code error.')
+        mi = self.myopic_index  # convenience
         # housekeeping
         data: dict[str, list | dict] = dict()
 
