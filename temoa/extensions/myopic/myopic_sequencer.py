@@ -229,7 +229,7 @@ class MyopicSequencer:
 
             # 5. pull the data
             # make a data loader
-            data_loader = HybridLoader(self.output_con, self.config)
+            data_loader = HybridLoader(self.output_con, self.config, myopic_index=idx)
             # we MUST source trace when using myopic mode
             data_loader.source_trace(make_plots=self.config.plot_commodity_network)
             # load the efficiency table dataset

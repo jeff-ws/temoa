@@ -41,7 +41,6 @@ from temoa.extensions.myopic.myopic_sequencer import MyopicSequencer
 from temoa.temoa_model.hybrid_loader import HybridLoader
 from temoa.temoa_model.model_checking import source_check
 from temoa.temoa_model.model_checking.pricing_check import price_checker
-from temoa.temoa_model.model_checking.source_check import source_trace
 from temoa.temoa_model.run_actions import (
     build_instance,
     solve_instance,
@@ -120,13 +119,15 @@ class TemoaSequencer:
         if self.mode_override and self.mode_override != self.config.scenario_mode:
             # capture and log the override...
             self.temoa_mode = self.mode_override
+            if self.config:
+                self.config.scenario_mode = self.mode_override
             logger.info('Temoa Mode overridden to be:  %s', self.temoa_mode)
         else:
             self.temoa_mode = self.config.scenario_mode
         # check it...
         if not isinstance(self.temoa_mode, TemoaMode):
             logger.error(
-                'Temoa Mode not set properly.  Override: %d, Config File: %d',
+                'Temoa Mode not set properly.  Override: %s, Config File: %s',
                 self.mode_override,
                 self.config.scenario_mode,
             )
@@ -146,16 +147,9 @@ class TemoaSequencer:
         # Select execution path based on mode
         match self.temoa_mode:
             case TemoaMode.BUILD_ONLY:
-                # convert the input file from .sqlite -> .dat if needed
-                # if self.config.input_file.suffix == '.sqlite':
-                #     dat_file = self.config.input_file.with_suffix('.dat')
-                #     db_2_dat(self.config.input_file, dat_file, self.config)
-                #     # update the config to point to the .dat file newly created
-                #     self.config.dat_file = dat_file
-                # data_portal: DataPortal = load_portal_from_dat(self.config.dat_file, silent=self.config.silent)
-                # TODO:  This connection should probably be made in the loader?
                 con = sqlite3.connect(self.config.input_file)
                 hybrid_loader = HybridLoader(db_connection=con, config=None)
+                hybrid_loader.build_efficiency_dataset(use_raw_data=True)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(data_portal, silent=self.config.silent)
                 con.close()
@@ -164,7 +158,9 @@ class TemoaSequencer:
             case TemoaMode.CHECK:
                 # TODO:  This connection should probably be made in the loader?
                 con = sqlite3.connect(self.config.input_file)
-                hybrid_loader = HybridLoader(db_connection=con, config=None)
+                hybrid_loader = HybridLoader(db_connection=con, config=self.config)
+                hybrid_loader.source_trace(make_plots=self.config.plot_commodity_network)
+                hybrid_loader.build_efficiency_dataset()
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
 
                 instance = build_instance(
@@ -175,12 +171,14 @@ class TemoaSequencer:
                 )
                 # disregard what the config says about price_check and source_check and just do it...
                 price_checker(instance)
-                source_trace(instance, temoa_config=self.config)
                 con.close()
 
             case TemoaMode.PERFECT_FORESIGHT:
                 con = sqlite3.connect(self.config.input_file)
-                hybrid_loader = HybridLoader(db_connection=con, config=None)
+                hybrid_loader = HybridLoader(db_connection=con, config=self.config)
+                if self.config.source_check:
+                    hybrid_loader.source_trace(make_plots=self.config.plot_commodity_network)
+                hybrid_loader.build_efficiency_dataset(use_raw_data= not self.config.source_check)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(
                     data_portal,

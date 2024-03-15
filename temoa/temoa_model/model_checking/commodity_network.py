@@ -38,7 +38,7 @@ logger = getLogger(__name__)
 
 class CommodityNetwork:
     """
-    class to hold the data and the network for a particular region/period
+    class to hold the network for a particular region/period
     """
 
     def __init__(self, region, period: int, model_data: NetworkModelData):
