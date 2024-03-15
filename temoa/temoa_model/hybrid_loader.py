@@ -120,7 +120,7 @@ class HybridLoader:
             self.manager.make_commodity_plots(self.config)
 
     def build_efficiency_dataset(self, use_raw_data=False):
-        """Build efficiency data by using the source_check functionality on the data
+        """Build efficiency data by using the source_trace functionality on the data
         to analyze the network and deterimine good/bad techs before loading anything else.  Use this to
         load the filters...
         """

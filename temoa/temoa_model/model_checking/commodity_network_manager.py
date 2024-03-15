@@ -147,18 +147,6 @@ class CommodityNetworkManager:
         }
         return filts
 
-    def identify_driven_techs(self, region, period) -> set[Tech]:
-        """a convenience for plot colors...  identifies all ORIGINAL linked techs before filtering"""
-        driven_tech_names = {
-            linked_tech.driven for linked_tech in self.orig_data.available_linked_techs
-        }
-        driven_techs = {
-            tech
-            for tech in self.orig_data.available_techs[region, period]
-            if tech.name in driven_tech_names
-        }
-        return driven_techs
-
     def make_commodity_plots(self, config: TemoaConfig):
         if not self.analyzed:
             raise RuntimeError('Trying to build graphs before network analysis.  Code error')
@@ -170,6 +158,6 @@ class CommodityNetworkManager:
                     network_data=self.orig_data,
                     demand_orphans=self.demand_orphans[region, period],
                     other_orphans=self.other_orphans[region, period],
-                    driven_techs=self.identify_driven_techs(region, period),
+                    driven_techs=self.orig_data.get_driven_techs(region, period),
                     config=config,
                 )

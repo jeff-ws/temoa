@@ -29,9 +29,7 @@ from collections import defaultdict
 from itertools import chain
 from logging import getLogger
 
-from temoa.temoa_model.model_checking.commodity_graph import _graph_connections
 from temoa.temoa_model.model_checking.network_model_data import NetworkModelData, Tech
-from temoa.temoa_model.temoa_config import TemoaConfig
 
 logger = getLogger(__name__)
 
@@ -289,35 +287,6 @@ class CommodityNetwork:
                 self.region,
                 self.period,
             )
-
-    def graph_network(self, temoa_config: TemoaConfig):
-        # trial graphing...
-        layers = {}
-        for c in self.model_data.all_commodities:
-            layers[c] = 2  # physical
-        for c in self.model_data.source_commodities:
-            layers[c] = 1
-        # here we want to use this particular region-period to ID demands, as some commodities
-        # may be producible, but *may* not be a demand in a particular region-period
-        for c in self.model_data.demand_commodities[self.region, self.period]:
-            layers[c] = 3
-        edge_colors = {}
-        edge_weights = {}
-        for edge in self.demand_orphans:
-            edge_colors[edge] = 'red'
-            edge_weights[edge] = 5
-        for edge in self.other_orphans:
-            edge_colors[edge] = 'yellow'
-            edge_weights[edge] = 3
-        filename_label = f'{self.region}_{self.period}'
-        _graph_connections(
-            self.orig_connex,
-            layers,
-            edge_colors,
-            edge_weights,
-            file_label=filename_label,
-            output_path=temoa_config.output_path,
-        )
 
     def unsupported_demands(self) -> set[str]:
         """

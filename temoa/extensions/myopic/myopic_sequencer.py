@@ -248,25 +248,11 @@ class MyopicSequencer:
                 / ''.join(('LP', str(idx.base_year))),  # base year folder
             )
 
-            # 7.  Run checks... check the commodity network
+            # 7.  Run checks...
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'check')
             if self.config.price_check:
                 price_checker(instance)
-            # if self.config.source_check:
-            #     good_network = source_trace(instance, self.config)
-            #     if not good_network:
-            #         SE.write(
-            #             'Source Trace of the Commodity Network failed for some demands.  '
-            #             'See log file ERRORs for failed demands.\n'
-            #         )
-            #         logger.warning('Myopic iteration has bad source trace')
-            #         # Dev Note:  The lines below can be un-commented to cause this type of failure to
-            #         #            fail the iteration and roll back.  Data is not "tight" enough to enforce
-            #         #            this right now, maybe soon...?
-            #         # last_instance_status = 'roll_back'
-            #         # # skip the rest of the loop
-            #         # continue
 
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'solve')

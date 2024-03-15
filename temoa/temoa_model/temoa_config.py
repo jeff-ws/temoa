@@ -51,7 +51,7 @@ class TemoaConfig:
         silent: bool = False,
         stream_output: bool = False,
         price_check: bool = True,
-        source_check: bool = False,
+        source_trace: bool = False,
         plot_commodity_network: bool = False,
     ):
         self.scenario = scenario
@@ -117,8 +117,8 @@ class TemoaConfig:
         self.silent = silent
         self.stream_output = stream_output
         self.price_check = price_check
-        self.source_check = source_check
-        self.plot_commodity_network = plot_commodity_network & self.source_check
+        self.source_trace = source_trace
+        self.plot_commodity_network = plot_commodity_network & self.source_trace
         logger.warning(
             'Commodity Network plotting was selected, but Source Check was not selected.  '
             'Both are required to produce plots.'
@@ -159,7 +159,7 @@ class TemoaConfig:
                 'myopic': {'myopic_view': int(), 'keep_myopic_databases': bool()},
                 'stream_output': bool(),
                 'price_check': bool(),
-                'source_check': bool(),
+                'source_trace': bool(),
                 'plot_commodity_network': bool(),
             }:
                 # full schema OK
@@ -217,14 +217,14 @@ class TemoaConfig:
         msg += '{:>{}s}: {}\n'.format('Path for outputs and log', width, self.output_path)
         msg += spacer
         msg += '{:>{}s}: {}\n'.format('Price check', width, self.price_check)
-        msg += '{:>{}s}: {}\n'.format('Source check', width, self.source_check)
+        msg += '{:>{}s}: {}\n'.format('Source check', width, self.source_trace)
         msg += '{:>{}s}: {}\n'.format('Commodity network plots', width, self.plot_commodity_network)
 
         msg += spacer
         msg += '{:>{}s}: {}\n'.format('Selected solver', width, self.solver_name)
         msg += '{:>{}s}: {}\n'.format('NEOS status', width, self.neos)
         msg += '{:>{}s}: {}\n'.format('Price Check', width, self.price_check)
-        msg += '{:>{}s}: {}\n'.format('Source Check', width, self.source_check)
+        msg += '{:>{}s}: {}\n'.format('Source Check', width, self.source_trace)
         msg += spacer
         msg += '{:>{}s}: {}\n'.format('Spreadsheet output', width, self.save_excel)
         msg += '{:>{}s}: {}\n'.format('Pyomo LP write status', width, self.save_lp_file)
