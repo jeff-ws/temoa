@@ -113,7 +113,7 @@ class CommodityNetworkManager:
         self.regions = {r for (r, p) in self.orig_data.available_techs if '-' not in r}
         for region in self.regions:
             logger.info('starting network analysis for region %s', region)
-            self._analyze_region(region, data = self.filtered_data)
+            self._analyze_region(region, data=self.filtered_data)
         self.analyzed = True
 
     def build_filters(self) -> dict:
@@ -149,7 +149,9 @@ class CommodityNetworkManager:
 
     def identify_driven_techs(self, region, period) -> set[Tech]:
         """a convenience for plot colors...  identifies all ORIGINAL linked techs before filtering"""
-        driven_tech_names = {linked_tech.driven for linked_tech in self.orig_data.available_linked_techs}
+        driven_tech_names = {
+            linked_tech.driven for linked_tech in self.orig_data.available_linked_techs
+        }
         driven_techs = {
             tech
             for tech in self.orig_data.available_techs[region, period]
@@ -169,6 +171,5 @@ class CommodityNetworkManager:
                     demand_orphans=self.demand_orphans[region, period],
                     other_orphans=self.other_orphans[region, period],
                     driven_techs=self.identify_driven_techs(region, period),
-                    config=config
+                    config=config,
                 )
-

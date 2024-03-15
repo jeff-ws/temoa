@@ -38,14 +38,16 @@ from typing import Iterable
 import gravis as gv
 import networkx as nx
 
-def generate_graph(region,
-                   period,
-                   network_data: NetworkModelData,
-                   demand_orphans: Iterable[Tech],
-                   other_orphans: Iterable[Tech],
-                   driven_techs: Iterable[Tech],
-                   config: TemoaConfig
-                   ):
+
+def generate_graph(
+    region,
+    period,
+    network_data: NetworkModelData,
+    demand_orphans: Iterable[Tech],
+    other_orphans: Iterable[Tech],
+    driven_techs: Iterable[Tech],
+    config: TemoaConfig,
+):
     """
     generate graph for region/period from network data
     :param region: region of interest
@@ -76,15 +78,11 @@ def generate_graph(region,
         edge_colors[edge] = 'blue'
         edge_weights[edge] = 2
         all_edges.add(edge)
-    for edge in (
-        (tech.ic, tech.name, tech.oc) for tech in demand_orphans
-    ):
+    for edge in ((tech.ic, tech.name, tech.oc) for tech in demand_orphans):
         edge_colors[edge] = 'red'
         edge_weights[edge] = 5
         all_edges.add(edge)
-    for edge in (
-        (tech.ic, tech.name, tech.oc) for tech in other_orphans
-    ):
+    for edge in ((tech.ic, tech.name, tech.oc) for tech in other_orphans):
         edge_colors[edge] = 'yellow'
         edge_weights[edge] = 3
         all_edges.add(edge)
@@ -102,6 +100,7 @@ def generate_graph(region,
         file_label=filename_label,
         output_path=config.output_path,
     )
+
 
 def _graph_connections(
     connections: Iterable[tuple],

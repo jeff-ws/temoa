@@ -16,6 +16,7 @@ from temoa.extensions.myopic.myopic_index import MyopicIndex
 from temoa.temoa_model.model_checking import network_model_data
 from temoa.temoa_model.model_checking.commodity_network_manager import CommodityNetworkManager
 from temoa.temoa_model.temoa_config import TemoaConfig
+from temoa.temoa_model.temoa_mode import TemoaMode
 from temoa.temoa_model.temoa_model import TemoaModel
 
 """
@@ -69,18 +70,20 @@ class HybridLoader:
     """
 
     def __init__(
-        self, db_connection: Connection, config: TemoaConfig, myopic_index: MyopicIndex | None
+        self, db_connection: Connection, config: TemoaConfig | None, myopic_index: MyopicIndex | None = None
     ):
         """
         build a loader for an instance.
         :param db_connection: a Connection to the database
-        :param config: the config
+        :param config: the config (or None), which limits functionality
         :param myopic_index: a myopic index if running myopic.  Passing "None" will load all data
         """
         self.debugging = False  # for T/S, will print to screen the data load values
         self.con = db_connection
         self.config = config
         self.myopic_index = myopic_index
+        if self.config and not myopic_index and self.config.scenario_mode == TemoaMode.MYOPIC:
+            raise RuntimeError('Making a loader in Myopic Mode without an index will lead to errors.')
         self.manager: CommodityNetworkManager | None = None
 
         # filters for myopic ops
@@ -103,16 +106,18 @@ class HybridLoader:
             period
             for (period, *_) in cur.execute("SELECT t_periods FROM time_periods WHERE flag = 'f'")
         }
+        periods = sorted(periods)[:-1]  # we need to exclude the last period, it is a non-demand year
+
         if self.myopic_index:
             periods = {
                 p
                 for p in periods
                 if self.myopic_index.base_year <= p <= self.myopic_index.last_demand_year
             }
-        manager = CommodityNetworkManager(periods=periods, network_data=network_data)
-        manager.analyze_network()
+        self.manager = CommodityNetworkManager(periods=periods, network_data=network_data)
+        self.manager.analyze_network()
         if make_plots:
-            manager.make_commodity_plots(self.config)
+            self.manager.make_commodity_plots(self.config)
 
     def build_efficiency_dataset(self, use_raw_data=False):
         """Build efficiency data by using the source_check functionality on the data
@@ -121,40 +126,47 @@ class HybridLoader:
         """
         cur = self.con.cursor()
 
-        self._clear_filters()
-        filts = {}
-        if self.manager:
-            filts = self.manager.build_filters()
-        else:
-            raise RuntimeError('trying to filter, but manager has not analyzed network yet.')
-        self.viable_ritvo = filts['ritvo']
-        self.viable_rtv = filts['rtv']
-        self.viable_rt = filts['rt']
-        self.viable_techs = filts['t']
-        self.viable_input_comms = filts['ic']
-        self.viable_vintages = filts['v']
-        self.viable_output_comms = filts['oc']
-        self.viable_comms = self.viable_input_comms | self.viable_output_comms
-        self.viable_rtt = {(r, t1, t2) for r, t1 in self.viable_rt for t2 in self.viable_techs}
-        if use_raw_data:
-            contents = cur.execute(
-                'SELECT regions, input_comm, tech, vintage, output_comm, efficiency FROM main.Efficiency'
-            ).fetchall()
-            logger.debug('polled %d rows from Efficiency table data', len(contents))
-            efficiency_entries = [row[0] for row in contents]
-        else:
+        # pull the data based on whether myopic/not
+        if self.myopic_index:
+            # pull from MyopicEfficiency, and filter by myopic index years
             contents = cur.execute(
                 'SELECT region, input_comm, tech, vintage, output_comm, efficiency, lifetime  '
                 'FROM MyopicEfficiency '
                 'WHERE vintage + lifetime > ?',
                 (self.myopic_index.base_year,),
             ).fetchall()
+        else:
+            # pull from regular Efficiency table
+            contents = cur.execute(
+                'SELECT regions, input_comm, tech, vintage, output_comm, efficiency, NULL FROM main.Efficiency'
+            ).fetchall()
+
+        # filter/don't filter.  (always must when myopic)
+        if use_raw_data:
+            efficiency_entries = [row[0] for row in contents]
+        else:
+            self._clear_filters()
+            filts = {}
+            if self.manager:
+                filts = self.manager.build_filters()
+            else:
+                raise RuntimeError('trying to filter, but manager has not analyzed network yet.')
+            self.viable_ritvo = filts['ritvo']
+            self.viable_rtv = filts['rtv']
+            self.viable_rt = filts['rt']
+            self.viable_techs = filts['t']
+            self.viable_input_comms = filts['ic']
+            self.viable_vintages = filts['v']
+            self.viable_output_comms = filts['oc']
+            self.viable_comms = self.viable_input_comms | self.viable_output_comms
+            self.viable_rtt = {(r, t1, t2) for r, t1 in self.viable_rt for t2 in self.viable_techs}
             efficiency_entries = {
                 (r, i, t, v, o, eff)
                 for r, i, t, v, o, eff, lifetime in contents
                 if (r, i, t, v, o) in self.viable_ritvo
             }
         logger.debug('polled %d elements from MyopicEfficiency table', len(efficiency_entries))
+
         # book the EfficiencyTable
         # we should sort here for deterministic results after pulling from set
         self.efficiency_values = sorted(efficiency_entries)

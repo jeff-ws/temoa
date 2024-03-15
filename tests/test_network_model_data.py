@@ -54,8 +54,8 @@ params = [
             [
                 (t,)
                 for t in [
-                's1',
-            ]
+                    's1',
+                ]
             ],  # sources
             [('R1', 2020, 'd1'), ('R1', 2020, 'd2')],  # demands
             [
@@ -92,8 +92,8 @@ params = [
             [
                 (t,)
                 for t in [
-                's1',
-            ]
+                    's1',
+                ]
             ],  # sources
             [('R1', 2020, 'd1'), ('R1', 2020, 'd2')],  # demands
             [
@@ -168,10 +168,10 @@ def test_build_from_db(mock_db_connection):
     conn, expected = mock_db_connection
     network_data = network_model_data._build_from_db(conn)
     assert (
-            len(tuple(chain(*network_data.demand_commodities.values()))) == expected['demands']
+        len(tuple(chain(*network_data.demand_commodities.values()))) == expected['demands']
     ), 'demand count failed'
     assert (
-            len(network_data.available_techs['R1', 2020]) == expected['techs']
+        len(network_data.available_techs['R1', 2020]) == expected['techs']
     ), '6 techs are available'
 
 
@@ -192,7 +192,13 @@ def test_source_trace(mock_db_connection):
     assert cn.unsupported_demands() == expected['unsupported_demands'], 'unsupported demands'
 
 
-@pytest.mark.parametrize('mock_db_connection', [params[0], ], indirect=True)
+@pytest.mark.parametrize(
+    'mock_db_connection',
+    [
+        params[0],
+    ],
+    indirect=True,
+)
 def test_clone(mock_db_connection):
     """quick test to ensure cloning is working OK"""
     conn, expected = mock_db_connection
