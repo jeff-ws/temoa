@@ -38,9 +38,9 @@ price_check = true
 # Check the network connectivity for processes in the model.  Strongly
 # recommended to ensure proper performance.  Results are reported in log file
 # temp note:  This requires that source commodities be marked with 's'
-source_check = true
+source_trace = true
 
-# Produce HTML files for Commodity Networks.  Requires source_check above
+# Produce HTML files for Commodity Networks.  Requires source_trace above
 plot_commodity_network = false
 
 # ------------------------------------

@@ -81,6 +81,14 @@ class NetworkModelData:
                     )
         self._available_techs = available_techs
 
+    def get_driven_techs(self, region, period) -> set[Tech]:
+        """identifies all linked techs by name from the linked tech names"""
+        driven_tech_names = {linked_tech.driven for linked_tech in self.available_linked_techs}
+        driven_techs = {
+            tech for tech in self.available_techs[region, period] if tech.name in driven_tech_names
+        }
+        return driven_techs
+
     def __str__(self):
         return (
             f'all commodities: {len(self.all_commodities)}, demand commodities: {len(self.demand_commodities)}, '

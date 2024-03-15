@@ -101,7 +101,7 @@ current optimization window.  Network tracing from demands down and sources up r
 These `techs` and any unused commodities, etc. are removed with log entries and the remaining "good" data is
 used to filter the ingestion of the full model data to support the build.
 
-### Basic rules for Tech Suppression
+### Basic rules for `tech` Suppression
 - All demand side orphans (and chains of orphans) are suppressed
 - All supply-side orphans (and chains of orpahns) are suppressed
 - For technologies that have multiple inputs or outputs, EACH commodity is treated separately (as it is
@@ -109,6 +109,9 @@ represented in the `Efficiency` table.)  The modeler is advised to screen the lo
 particular commodity is essential (a catalyst for example?) to a particular operation.
 - For linked technologies, an "all or nothing" logic is implemented such that both the driver and driven
 technologies must prove independently viable (without regard for the emission linkage) or the pair will be suppressed.
+- Currently, exchange technologies are not checked during source tracing.  Any `tech` with a region link 
+(denoted with a dash `R1-R2`) provided for the region name is assumed good.  It behooves the modeler to 
+ensure that both ends of each link are well-connected in the model and to review their performance in output.
 
 ### Views across modeling periods
 

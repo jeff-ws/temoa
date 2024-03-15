@@ -40,7 +40,7 @@ params = [
     {'name': 'myopic', 'mode': TemoaMode.MYOPIC},
 ]
 # using the myopic config file for now below, becuase (a) it is most current db, (b) it is self-referencing
-# for the dabase, which is needed for myopic, and (c) the mode is overriden anyhow!
+# for the database, which is needed for myopic, and (c) the mode is overriden anyhow!
 config_file = Path(PROJECT_ROOT, 'tests', 'testing_configs', 'config_utopia_myopic.toml')
 
 

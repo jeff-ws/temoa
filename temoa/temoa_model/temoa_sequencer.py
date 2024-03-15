@@ -37,7 +37,6 @@ import pyomo.opt
 
 from temoa.extensions.myopic.myopic_sequencer import MyopicSequencer
 from temoa.temoa_model.hybrid_loader import HybridLoader
-from temoa.temoa_model.model_checking import source_check
 from temoa.temoa_model.model_checking.pricing_check import price_checker
 from temoa.temoa_model.run_actions import (
     build_instance,
@@ -167,16 +166,16 @@ class TemoaSequencer:
                     keep_lp_file=self.config.save_lp_file,
                     lp_path=self.config.output_path,
                 )
-                # disregard what the config says about price_check and source_check and just do it...
+                # disregard what the config says about price_check and source_trace and just do it...
                 price_checker(instance)
                 con.close()
 
             case TemoaMode.PERFECT_FORESIGHT:
                 con = sqlite3.connect(self.config.input_file)
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
-                if self.config.source_check:
+                if self.config.source_trace:
                     hybrid_loader.source_trace(make_plots=self.config.plot_commodity_network)
-                hybrid_loader.build_efficiency_dataset(use_raw_data= not self.config.source_check)
+                hybrid_loader.build_efficiency_dataset(use_raw_data=not self.config.source_trace)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(
                     data_portal,
@@ -186,8 +185,6 @@ class TemoaSequencer:
                 )
                 if self.config.price_check:
                     price_checker(instance)
-                if self.config.source_check:
-                    source_check.source_trace(instance, temoa_config=self.config)
                 self.pf_solved_instance, self.pf_results = solve_instance(
                     instance,
                     self.config.solver_name,

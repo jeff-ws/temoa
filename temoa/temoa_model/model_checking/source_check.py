@@ -4,6 +4,7 @@ source technologies
 """
 
 from temoa.temoa_model.model_checking import network_model_data
+from temoa.temoa_model.model_checking.commodity_graph import generate_graph
 from temoa.temoa_model.model_checking.commodity_network import logger, CommodityNetwork
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
@@ -52,7 +53,15 @@ def source_trace(M: 'TemoaModel', temoa_config: TemoaConfig) -> bool:
             commodity_network = CommodityNetwork(region=region, period=p, model_data=data)
             commodity_network.analyze_network()
             if temoa_config.plot_commodity_network:
-                commodity_network.graph_network(temoa_config)
+                generate_graph(
+                    region,
+                    p,
+                    network_data=data,
+                    demand_orphans=commodity_network.get_demand_side_orphans(),
+                    other_orphans=commodity_network.get_other_orphans(),
+                    driven_techs=data.get_driven_techs(region, p),
+                    config=temoa_config,
+                )
             unsupported_demands = commodity_network.unsupported_demands()
             if unsupported_demands:
                 demands_traceable = False
