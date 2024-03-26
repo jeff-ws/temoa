@@ -148,12 +148,12 @@ def _build_from_db(
     #            re-use some of the hybrid loader code in a clear way.  Not too much overlap, though
     res = NetworkModelData()
     cur = con.cursor()
-    raw = cur.execute('SELECT commodities.comm_name FROM commodities').fetchall()
+    raw = cur.execute('SELECT Commodity.name FROM Commodity').fetchall()
     res.all_commodities = {t[0] for t in raw}
-    raw = cur.execute("SELECT commodities.comm_name FROM commodities WHERE flag = 's'").fetchall()
+    raw = cur.execute("SELECT Commodity.name FROM Commodity WHERE flag = 's'").fetchall()
     res.source_commodities = {t[0] for t in raw}
     # use Demand to get the region, period specific demand comms
-    raw = cur.execute('SELECT regions, periods, demand_comm FROM main.Demand').fetchall()
+    raw = cur.execute('SELECT region, period, commodity FROM main.Demand').fetchall()
     demand_dict = defaultdict(set)
     for r, p, d in raw:
         demand_dict[r, p].add(d)
@@ -168,11 +168,11 @@ def _build_from_db(
             '    LEFT JOIN main.LifetimeProcess '
             '       ON main.Efficiency.tech = LifetimeProcess.tech '
             '       AND main.Efficiency.vintage = LifetimeProcess.vintage '
-            '       AND main.Efficiency.regions = LifetimeProcess.regions '
+            '       AND main.Efficiency.regions = LifetimeProcess.region '
             '    LEFT JOIN main.LifetimeTech '
             '       ON main.Efficiency.tech = main.LifetimeTech.tech '
-            '     AND main.Efficiency.regions = main.LifeTimeTech.regions '
-            '   JOIN time_periods '
+            '     AND main.Efficiency.regions = main.LifeTimeTech.region '
+            '   JOIN TimePeriod '
             '   ON Efficiency.vintage = time_periods.t_periods '
         )
     else:  # we need to pull from the MyopicEfficiency Table
@@ -183,16 +183,16 @@ def _build_from_db(
             '    LEFT JOIN main.LifetimeProcess '
             '       ON main.MyopicEfficiency.tech = LifetimeProcess.tech '
             '       AND main.MyopicEfficiency.vintage = LifetimeProcess.vintage '
-            '       AND main.MyopicEfficiency.region = LifetimeProcess.regions '
+            '       AND main.MyopicEfficiency.region = LifetimeProcess.region '
             '    LEFT JOIN main.LifetimeTech '
             '       ON main.MyopicEfficiency.tech = main.LifetimeTech.tech '
-            '     AND main.MyopicEfficiency.region = main.LifeTimeTech.regions '
-            '   JOIN time_periods '
+            '     AND main.MyopicEfficiency.region = main.LifeTimeTech.region '
+            '   JOIN TimePeriod '
             '   ON MyopicEfficiency.vintage = time_periods.t_periods '
             # f'   WHERE main.MyopicEfficiency.vintage <= {myopic_index.last_demand_year}'
         )
     raw = cur.execute(query).fetchall()
-    periods = cur.execute('SELECT t_periods FROM time_periods').fetchall()
+    periods = cur.execute('SELECT period FROM TimePeriod').fetchall()
     periods = {t[0] for t in periods}
     # filter further if myopic
     if myopic_index:
@@ -212,7 +212,7 @@ def _build_from_db(
 
     # pick up the linked techs...
     raw = cur.execute(
-        'SELECT primary_region, primary_tech, emis_comm, linked_tech FROM main.LinkedTechs'
+        'SELECT primary_region, primary_tech, emis_comm, driven_tech FROM main.LinkedTech'
     ).fetchall()
     res.available_linked_techs = {
         LinkedTech(region=r, driver=driver, emission=emiss, driven=driven)

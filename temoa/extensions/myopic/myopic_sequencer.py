@@ -61,37 +61,38 @@ class MyopicSequencer:
     A sequencer for solving myopic problems
     """
 
-    # these are the tables that are incrementally built by the myopic instances
+    # Tables that are cleaned of (scenario) data before run
     tables_with_scenario_reference = [
-        'Output_CapacityByPeriodAndTech',
-        'Output_Curtailment',
-        'Output_Emissions',
-        'Output_V_Capacity',
-        'Output_V_RetiredCapacity',
-        'Output_VFlow_In',
-        'Output_VFlow_Out',
-        'Output_Duals',
+        'OutputBuiltCapacity',
+        'OutputCost',
+        'OutputCurtailment',
+        'OutputDualVariable',
+        'OutputEmission',
+        'OutputFlowIn',
+        'OutputFlowOut',
+        'OutputNetCapacity',
+        'OutputObjective',
+        'OutputRetiredCapacity'
     ]
     tables_without_scenario_reference = [
         'MyopicNetCapacity',
         'MyopicEfficiency',
     ]
 
+    # Tables that may be cleaned by period during myopic run
     # note:  below excludes MyopicEfficiency, which is managed separately
-    tables_with_period_reference = [
-        'Output_Costs_2',
-    ]
+
     tables_with_period_no_scneario_ref = [
         'MyopicNetCapacity',
     ]
-    legacy_tables_with_period_reference = [
-        'Output_CapacityByPeriodAndTech',
-        'Output_Curtailment',
-        'Output_Emissions',
-        'Output_V_Capacity',
-        'Output_V_RetiredCapacity',
-        'Output_VFlow_In',
-        'Output_VFlow_Out',
+    tables_with_period = [
+        'OutputCost',
+        'OutputCurtailment',
+        'OutputEmission',
+        'OutputFlowIn',
+        'OutputFlowOut',
+        'OutputNetCapacity',
+        'OutputRetiredCapacity'
     ]
 
     def __init__(self, config: TemoaConfig | None):
@@ -289,7 +290,7 @@ class MyopicSequencer:
             last_base_year = idx.base_year  # update
 
             # delete anything in the Output_Objective table, it is nonsensical...
-            self.output_con.execute('DELETE FROM Output_Objective WHERE 1')
+            self.output_con.execute('DELETE FROM OutputObjective WHERE 1')
             self.output_con.commit()
 
             # 11.  Compact the db...  lots of writes/deletes leads to bloat
@@ -306,8 +307,7 @@ class MyopicSequencer:
         # the "coalesce" is an if-else structure to pluck out the correct lifetime value, precedence left->right
         default_lifetime = TemoaModel.default_lifetime_tech
         query = (
-            'INSERT INTO MyopicEfficiency '
-            '  SELECT -1, main.Efficiency.regions, input_comm, Efficiency.tech, Efficiency.vintage, output_comm, efficiency, '
+            '  SELECT -1, main.Efficiency.region, input_comm, Efficiency.tech, Efficiency.vintage, output_comm, efficiency, '
             f'  coalesce(main.LifetimeProcess.life_process, main.LifetimeTech.life, {default_lifetime}) AS lifetime '
             '   FROM main.Efficiency '
             '    LEFT JOIN main.LifetimeProcess '
@@ -319,8 +319,8 @@ class MyopicSequencer:
             '     AND main.Efficiency.regions = main.LifeTimeTech.regions '
             '   JOIN time_periods '
             '   ON Efficiency.vintage = time_periods.t_periods '
-            "   WHERE flag = 'e'"
-        )
+            "   WHERE flag = 'e'")
+
 
         if self.debugging:
             print(query)
@@ -329,10 +329,10 @@ class MyopicSequencer:
 
         if self.debugging:
             q2 = (
-                "SELECT '-1', regions, input_comm, tech, vintage, output_comm, efficiency "
+                "SELECT '-1', region, input_comm, tech, vintage, output_comm, efficiency "
                 'FROM Efficiency '
-                '   JOIN time_periods '
-                '   ON Efficiency.vintage = time_periods.t_periods '
+                '   JOIN TimePeriod '
+                '   ON Efficiency.vintage = TimePeriod.period '
                 "   WHERE flag = 'e'"
             )
             res = self.cursor.execute(q2).fetchall()
@@ -365,7 +365,7 @@ class MyopicSequencer:
             lifetime = model.LifetimeProcess[r, t, v]
             # need to pull the sector...
             raw = self.cursor.execute(
-                'SELECT sector FROM main.technologies WHERE tech = ?', (t,)
+                'SELECT sector FROM main.Technology WHERE tech = ?', (t,)
             ).fetchall()
             sector = raw[0][0]
             try:
@@ -403,7 +403,7 @@ class MyopicSequencer:
             lifetime = model.LifetimeProcess[r, t, v]
             # need to pull the sector...
             raw = self.cursor.execute(
-                'SELECT sector FROM main.technologies WHERE tech = ?', (t,)
+                'SELECT sector FROM main.Technology WHERE tech = ?', (t,)
             ).fetchall()
             sector = raw[0][0]
             try:
@@ -502,10 +502,10 @@ class MyopicSequencer:
             '    LEFT JOIN main.LifetimeProcess '
             '       ON main.Efficiency.tech = LifetimeProcess.tech '
             '       AND main.Efficiency.vintage = LifetimeProcess.vintage '
-            '       AND main.Efficiency.regions = LifetimeProcess.regions '
+            '       AND main.Efficiency.regions = LifetimeProcess.region '
             '    LEFT JOIN main.LifetimeTech '
             '       ON main.Efficiency.tech = main.LifetimeTech.tech '
-            '     AND main.Efficiency.regions = main.LifeTimeTech.regions '
+            '     AND main.Efficiency.regions = main.LifeTimeTech.region '
             f'  WHERE Efficiency.vintage >= {base}'
             f'  AND Efficiency.vintage <= {last_demand_year}'
         )
@@ -532,7 +532,7 @@ class MyopicSequencer:
         """
         if not future_periods:
             future_periods = self.cursor.execute(
-                "SELECT t_periods FROM main.time_periods WHERE flag = 'f'"
+                "SELECT period FROM main.TimePeriod WHERE flag = 'f'"
             ).fetchall()
             future_periods = sorted(t[0] for t in future_periods)
 
@@ -611,16 +611,8 @@ class MyopicSequencer:
             )
             raise ValueError(f'Trying to clear a year {period} that is not in the optimize periods')
         logger.debug('Clearing periods %s+ from output tables', period)
-        for table in self.tables_with_period_reference:
-            try:
-                self.cursor.execute(
-                    f'DELETE FROM {table} WHERE period >= (?) and scenario = (?)',
-                    (period, self.config.scenario),
-                )
-            except sqlite3.OperationalError:
-                SE.write(f'Failed trying to clear periods from table {table}\n')
-                raise sqlite3.OperationalError
-        for table in self.legacy_tables_with_period_reference:
+
+        for table in self.tables_with_period:
             try:
                 self.cursor.execute(
                     f'DELETE FROM {table} WHERE t_periods >= (?) and scenario = (?)',
@@ -641,7 +633,7 @@ class MyopicSequencer:
 
         # special case... new capacity has vintage only...
         self.cursor.execute(
-            'DELETE FROM main.Output_V_NewCapacity WHERE main.Output_V_NewCapacity.vintage >= (?) AND scenario = (?)',
+            'DELETE FROM main.OutputBuiltCapacity WHERE main.OutputBuiltCapacity.vintage >= (?) AND scenario = (?)',
             (period, self.config.scenario),
         )
         self.output_con.commit()

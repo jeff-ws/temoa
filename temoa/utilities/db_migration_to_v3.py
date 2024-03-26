@@ -37,7 +37,6 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from definitions import PROJECT_ROOT
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -49,17 +48,15 @@ parser.add_argument(
 )
 parser.add_argument(
     '--schema',
-    help='Path to schema file (default=<project root>/data_files/temoa_schema_v3.sql)',
+    help='Path to schema file (default=../../data_files/temoa_schema_v3.sql)',
     required=False,
     dest='schema',
-    default=None,
+    default='../../data_files/temoa_schema_v3.sql',
 )
 options = parser.parse_args()
 legacy_db: Path = Path(options.source_db)
-if options.schema:
-    schema_file = Path(options.schema)
-else:
-    schema_file: Path = Path(PROJECT_ROOT, 'data_files/temoa_schema_v3.sql')
+schema_file = Path(options.schema)
+
 
 new_db_name = legacy_db.stem + '_v3.sqlite'
 new_db_path = Path(legacy_db.parent, new_db_name)

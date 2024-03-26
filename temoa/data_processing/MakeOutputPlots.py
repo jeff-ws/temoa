@@ -1,11 +1,11 @@
-import sqlite3, sys
+import sqlite3
+import sys
+
 import matplotlib
+
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt, cm as cmx, colors
-from IPython import embed as IP
-import numpy as np
 import random
-import time
 import os
 import argparse
 
@@ -29,19 +29,19 @@ class OutputPlotGenerator:
 		con = sqlite3.connect(self.db_path)
 		cur = con.cursor()
 		if (type == 1):
-			cur.execute("SELECT sector, t_periods, tech, capacity FROM Output_CapacityByPeriodAndTech WHERE scenario == '"+self.scenario+"' AND regions LIKE '"+self.region+"'")
+			cur.execute("SELECT sector, period, tech, capacity FROM OutputNetCapacity WHERE scenario == '"+self.scenario+"' AND region LIKE '"+self.region+"'")
 			self.capacity_output = cur.fetchall()
 			self.capacity_output = [list(elem) for elem in self.capacity_output]
 		elif (type == 2):
-			cur.execute("SELECT sector, t_periods, tech, SUM(vflow_out) FROM Output_VFlow_Out WHERE scenario == '"+self.scenario+"' AND regions LIKE '"+self.region+"' GROUP BY sector, t_periods, tech")	
+			cur.execute("SELECT sector, period, tech, SUM(flow) FROM OutputFlowOut WHERE scenario == '"+self.scenario+"' AND region LIKE '"+self.region+"' GROUP BY sector, period, tech")
 			self.output_vflow = cur.fetchall()
 			self.output_vflow = [list(elem) for elem in self.output_vflow]
 		elif (type == 3):
-			cur.execute("SELECT sector, t_periods, emissions_comm, SUM(emissions) FROM Output_Emissions WHERE scenario == '"+self.scenario+"' AND regions LIKE '"+self.region+"' GROUP BY sector, t_periods, emissions_comm")
+			cur.execute("SELECT sector, period, emis_comm, SUM(emission) FROM OutputEmission WHERE scenario == '"+self.scenario+"' AND region LIKE '"+self.region+"' GROUP BY sector, period, emis_comm")
 			self.output_emissions = cur.fetchall()
 			self.output_emissions = [list(elem) for elem in self.output_emissions]
 
-		cur.execute("SELECT tech, tech_category FROM technologies")
+		cur.execute("SELECT tech, category FROM Technology")
 		self.tech_categories = cur.fetchall()
 		self.tech_categories = [[str(word) for word in tuple] for tuple in self.tech_categories]
 		con.close()

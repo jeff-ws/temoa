@@ -1,6 +1,5 @@
 # from __future__ import division
 import sys
-from IPython import embed as IP
 import time
 start_time = time.time()
 from joblib import Parallel, delayed
@@ -13,10 +12,7 @@ from numpy import array
 import csv
 from pyDOE import *
 
-
-from SALib.analyze import morris
-from SALib.sample.morris import sample
-from SALib.util import read_param_file, compute_groups_matrix
+from SALib.util import read_param_file
 import numpy as np
 
 def evaluate(param_values,k):
@@ -531,43 +527,43 @@ def evaluate(param_values,k):
 	Newdbpath=sys.path[0]+'/data_files/1st/Method_of_Morris'+str(k)+'.db'
 	con=sqlite3.connect(Newdbpath)
 	cur = con.cursor()
-	cur.execute("SELECT * FROM Output_Objective")
+	cur.execute("SELECT * FROM OutputObjective")
 	output_query = cur.fetchall()
 	MonteCarlo_Objectives.append(output_query[-1][-1])
 	
-	cur.execute("SELECT emissions_comm, SUM(emissions) FROM Output_Emissions WHERE emissions_comm='co2'")
+	cur.execute("SELECT emis_comm, SUM(emission) FROM OutputEmission WHERE emis_comm='co2'")
 	output_query = cur.fetchall()
 	MonteCarlo_Objectives.append(output_query[-1][-1])
 		
-	cur.execute("SELECT emissions_comm, SUM(emissions) FROM Output_Emissions WHERE emissions_comm='co2' and t_periods=2015 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
+	cur.execute("SELECT emis_comm, SUM(emission) FROM OutputEmission WHERE emis_comm='co2' and period=2015 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
 	output_query = cur.fetchall()
 	MonteCarlo_Objectives.append(output_query[-1][-1])
 	
-	cur.execute("SELECT emissions_comm, SUM(emissions) FROM Output_Emissions WHERE emissions_comm='co2' and t_periods=2020 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
+	cur.execute("SELECT emis_comm, SUM(emission) FROM OutputEmission WHERE emis_comm='co2' and period=2020 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
 	output_query = cur.fetchall()
 	MonteCarlo_Objectives.append(output_query[-1][-1])
 	
-	cur.execute("SELECT emissions_comm, SUM(emissions) FROM Output_Emissions WHERE emissions_comm='co2' and t_periods=2025 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
+	cur.execute("SELECT emis_comm, SUM(emission) FROM OutputEmission WHERE emis_comm='co2' and period=2025 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
 	output_query = cur.fetchall()
 	MonteCarlo_Objectives.append(output_query[-1][-1])
 	
-	cur.execute("SELECT emissions_comm, SUM(emissions) FROM Output_Emissions WHERE emissions_comm='co2' and t_periods=2030 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
+	cur.execute("SELECT emis_comm, SUM(emission) FROM OutputEmission WHERE emis_comm='co2' and period=2030 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
 	output_query = cur.fetchall()
 	MonteCarlo_Objectives.append(output_query[-1][-1])
 	
-	cur.execute("SELECT emissions_comm, SUM(emissions) FROM Output_Emissions WHERE emissions_comm='co2' and t_periods=2035 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
+	cur.execute("SELECT emis_comm, SUM(emission) FROM OutputEmission WHERE emis_comm='co2' and period=2035 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
 	output_query = cur.fetchall()
 	MonteCarlo_Objectives.append(output_query[-1][-1])
 	
-	cur.execute("SELECT emissions_comm, SUM(emissions) FROM Output_Emissions WHERE emissions_comm='co2' and t_periods=2040 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
+	cur.execute("SELECT emis_comm, SUM(emission) FROM OutputEmission WHERE emis_comm='co2' and period=2040 and (sector<>'supply' OR tech='IMPTRNE85' OR tech='IMPTRNBIODSL')")
 	output_query = cur.fetchall()
 	MonteCarlo_Objectives.append(output_query[-1][-1])	
 
-	cur.execute("SELECT emissions_comm, SUM(emissions) FROM Output_Emissions WHERE emissions_comm='co2' and tech='IMPELCNGA'")
+	cur.execute("SELECT emis_comm, SUM(emission) FROM OutputEmission WHERE emis_comm='co2' and tech='IMPELCNGA'")
 	output_query = cur.fetchall()
 	MonteCarlo_Objectives.append(output_query[-1][-1])	
 
-	cur.execute("SELECT emissions_comm, SUM(emissions) FROM Output_Emissions WHERE emissions_comm='co2' and tech LIKE 'IMPELCCOA%'")
+	cur.execute("SELECT emis_comm, SUM(emission) FROM OutputEmission WHERE emis_comm='co2' and tech LIKE 'IMPELCCOA%'")
 	output_query = cur.fetchall()
 	MonteCarlo_Objectives.append(output_query[-1][-1])
 	
