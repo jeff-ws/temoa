@@ -11,9 +11,9 @@ CREATE TABLE IF NOT EXISTS MyopicNetCapacity
     capacity   real,
     lifetime   integer,
 
-    FOREIGN KEY (sector) REFERENCES sector_labels (sector),
-    FOREIGN KEY (vintage) REFERENCES time_periods (t_periods),
-    FOREIGN KEY (tech) REFERENCES technologies (tech),
+    FOREIGN KEY (sector) REFERENCES SectorLabel (sector),
+    FOREIGN KEY (vintage) REFERENCES TimePeriod (period),
+    FOREIGN KEY (tech) REFERENCES Technology (tech),
 
     PRIMARY KEY (region, period, tech, vintage),
     CHECK ( capacity >= 0 )
@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS MyopicEfficiency
     efficiency  real,
     lifetime    integer,
 
-    FOREIGN KEY (tech) REFERENCES technologies (tech),
-    FOREIGN KEY (region) REFERENCES regions (regions),
+    FOREIGN KEY (tech) REFERENCES Technology (tech),
+    FOREIGN KEY (region) REFERENCES Region (region),
 
     PRIMARY KEY (region, input_comm, tech, vintage, output_comm)
 );

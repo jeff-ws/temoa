@@ -1,7 +1,7 @@
-import sqlite3
 import os
-import sys
 import re
+import sqlite3
+
 import pandas as pd
 
 
@@ -77,10 +77,10 @@ class DatabaseUtil(object):
 			raise ValueError("Invalid Operation For dat file")
 		query = ''
 		if (flags is None) or (not flags):
-			query = "SELECT t_periods FROM time_periods"
+			query = "SELECT period FROM TimePeriod"
 		else:
 			flag = flags[0]
-			query = "SELECT t_periods FROM time_periods WHERE flag is '"+flag+"'"
+			query = "SELECT period FROM TimePeriod WHERE flag is '"+flag+"'"
 			for i in range(1, len(flags)):
 				query += " OR flag is '"+flags[i]+"'"
 
@@ -96,10 +96,10 @@ class DatabaseUtil(object):
 			raise ValueError("Invalid Operation For dat file")
 		query = ''
 		if (flags is None) or (not flags):
-			query = "SELECT tech FROM technologies"
+			query = "SELECT tech FROM Technology"
 		else:
 			flag = flags[0]
-			query = "SELECT tech FROM technologies WHERE flag='"+flag+"'"
+			query = "SELECT tech FROM Technology WHERE flag='"+flag+"'"
 			for i in range(1, len(flags)):
 				query += " OR flag='"+flags[i]+"'"
 
@@ -153,10 +153,10 @@ class DatabaseUtil(object):
 			raise ValueError("Invalid Operation For dat file")
 		query = ''
 		if (flags is None) or (not flags):
-			query = "SELECT comm_name FROM commodities"
+			query = "SELECT name FROM Commodity"
 		else:
 			flag = flags[0]
-			query = "SELECT comm_name FROM commodities WHERE flag is '"+flag+"'"
+			query = "SELECT name FROM Commodity WHERE flag is '"+flag+"'"
 			for i in range(1, len(flags)):
 				query += " OR flag is '"+flags[i]+"'"
 
@@ -275,7 +275,7 @@ class DatabaseUtil(object):
 			raise ValueError("Invalid Operation For dat file")
 		if self.scenario is None or self.scenario == '':
 			raise ValueError('For Output related queries, please set a scenario first')
-		query = "SELECT E.emis_comm, E.tech, SUM(E.emis_act*O.vflow_out) FROM EmissionActivity E, Output_VFlow_Out O " + \
+		query = "SELECT E.emis_comm, E.tech, SUM(E.activity*O.flow) FROM EmissionActivity E, OutputFlowOut O " + \
 		"WHERE E.input_comm == O.input_comm AND E.tech == O.tech AND E.vintage  == O.vintage AND E.output_comm == O.output_comm AND O.scenario == '"+ self.scenario +"' " + \
 		"and O.t_periods == '"+str(period) + "'"
 		if (region):
@@ -291,29 +291,29 @@ class DatabaseUtil(object):
 		if self.scenario is None or self.scenario == '':
 			raise ValueError('For Output related queries, please set a scenario first')
 
-		query = "SELECT OF.input_comm, OF.output_comm, OF.vintage, OF.regions,\
+		query = "SELECT OF.input_comm, OF.output_comm, OF.vintage, OF.region,\
 	SUM(OF.vflow_in) vflow_in, SUM(OFO.vflow_out) vflow_out, OC.capacity \
-FROM (SELECT regions, scenario, sector, t_periods, input_comm, tech, vintage, output_comm, sum(vflow_in) AS vflow_in \
- FROM Output_VFlow_In GROUP BY regions, scenario, sector, t_periods, input_comm, tech, vintage, output_comm) AS OF \
-INNER JOIN (SELECT regions, scenario, sector, t_periods, input_comm, tech, vintage, output_comm, sum(vflow_out) AS vflow_out \
- FROM Output_VFlow_Out GROUP BY regions, scenario, sector, t_periods, input_comm, tech, vintage, output_comm) AS OFO \
+FROM (SELECT region, scenario, sector, period, input_comm, tech, vintage, output_comm, sum(flow) AS vflow_in \
+ FROM OutputFlowIn GROUP BY region, scenario, sector, period, input_comm, tech, vintage, output_comm) AS OF \
+INNER JOIN (SELECT region, scenario, sector, period, input_comm, tech, vintage, output_comm, sum(flow) AS vflow_out \
+ FROM OutputFlowOut GROUP BY region, scenario, sector, period, input_comm, tech, vintage, output_comm) AS OFO \
 ON  \
-    OF.regions = OFO.regions AND \
+    OF.region = OFO.region AND \
 	OF.scenario = OFO.scenario AND \
-	OF.t_periods = OFO.t_periods AND \
+	OF.period = OFO.period AND \
 	OF.tech = OFO.tech AND \
 	OF.input_comm = OFO.input_comm AND \
 	OF.vintage = OFO.vintage AND \
 	OF.output_comm = OFO.output_comm \
 INNER JOIN \
-	Output_V_Capacity OC \
+	OutputNetCapacity OC \
 ON \
-	OF.regions = OC.regions AND \
+	OF.region = OC.region AND \
 	OF.scenario = OC.scenario AND \
 	OF.tech = OC.tech AND \
 	OF.vintage = OC.vintage \
 WHERE \
-	OF.t_periods ='"+ str(period) + "' AND \
+	OF.period ='"+ str(period) + "' AND \
 	OF.tech is '" + tech+ "' AND \
 	OF.scenario is '" + self.scenario + "'"
 

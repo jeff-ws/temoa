@@ -3,12 +3,9 @@ Utility to convert sqlite database file to a pyomo-friendly .dat file.
 
 The original contents below were originally located in the temoa_config file
 """
-import logging
+import re
 # Adapted from DB_to_DAT.py
 import sqlite3
-import sys
-import re
-import getopt
 from logging import getLogger
 
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -57,7 +54,7 @@ def db_2_dat(ifile, ofile, options: TemoaConfig):
         logger.debug('Located total of %d entries for RegionalGlobalIndices', count)
 
     def write_tech_mga(f):
-        cur.execute("SELECT tech FROM technologies")
+        cur.execute("SELECT tech FROM Technology")
         f.write("set tech_mga :=\n")
         for row in cur:
             f.write(row[0] + '\n')
@@ -65,11 +62,11 @@ def db_2_dat(ifile, ofile, options: TemoaConfig):
 
     def write_tech_sector(f):
         sectors = set()
-        cur.execute("SELECT sector FROM technologies")
+        cur.execute("SELECT sector FROM Technology")
         for row in cur:
             sectors.add(row[0])
         for s in sectors:
-            cur.execute("SELECT tech FROM technologies WHERE sector == '" + s + "'")
+            cur.execute("SELECT tech FROM Technology WHERE sector == '" + s + "'")
             f.write("set tech_" + s + " :=\n")
             for row in cur:
                 f.write(row[0] + '\n')
@@ -235,17 +232,17 @@ def db_2_dat(ifile, ofile, options: TemoaConfig):
         # Making sure the database is empty from the begining for a myopic solve
         if options.scenario_mode == TemoaMode.MYOPIC:
             cur.execute(
-                "DELETE FROM Output_CapacityByPeriodAndTech WHERE scenario=" + "'" + str(options.scenario) + "'")
-            cur.execute("DELETE FROM Output_Emissions WHERE scenario=" + "'" + str(options.scenario) + "'")
-            cur.execute("DELETE FROM Output_Costs WHERE scenario=" + "'" + str(options.scenario) + "'")
-            cur.execute("DELETE FROM Output_Objective WHERE scenario=" + "'" + str(options.scenario) + "'")
-            cur.execute("DELETE FROM Output_VFlow_In WHERE scenario=" + "'" + str(options.scenario) + "'")
-            cur.execute("DELETE FROM Output_VFlow_Out WHERE scenario=" + "'" + str(options.scenario) + "'")
-            cur.execute("DELETE FROM Output_V_Capacity WHERE scenario=" + "'" + str(options.scenario) + "'")
-            cur.execute("DELETE FROM Output_V_NewCapacity WHERE scenario=" + "'" + str(options.scenario) + "'")
-            cur.execute("DELETE FROM Output_V_RetiredCapacity WHERE scenario=" + "'" + str(options.scenario) + "'")
-            cur.execute("DELETE FROM Output_Curtailment WHERE scenario=" + "'" + str(options.scenario) + "'")
-            cur.execute("DELETE FROM Output_Duals WHERE scenario=" + "'" + str(options.scenario) + "'")
+                "DELETE FROM OutputNetCapacity WHERE scenario=" + "'" + str(options.scenario) + "'")
+            cur.execute("DELETE FROM OutputEmission WHERE scenario=" + "'" + str(options.scenario) + "'")
+            cur.execute("DELETE FROM OutputCost WHERE scenario=" + "'" + str(options.scenario) + "'")
+            cur.execute("DELETE FROM OutputObjective WHERE scenario=" + "'" + str(options.scenario) + "'")
+            cur.execute("DELETE FROM OutputFlowIn WHERE scenario=" + "'" + str(options.scenario) + "'")
+            cur.execute("DELETE FROM OutputFlowOut WHERE scenario=" + "'" + str(options.scenario) + "'")
+            cur.execute("DELETE FROM OutputNetCapacity WHERE scenario=" + "'" + str(options.scenario) + "'")
+            cur.execute("DELETE FROM OutputBuiltCapacity WHERE scenario=" + "'" + str(options.scenario) + "'")
+            cur.execute("DELETE FROM OutputRetiredCapacity WHERE scenario=" + "'" + str(options.scenario) + "'")
+            cur.execute("DELETE FROM OutputCurtailment WHERE scenario=" + "'" + str(options.scenario) + "'")
+            cur.execute("DELETE FROM OutputDualVariable WHERE scenario=" + "'" + str(options.scenario) + "'")
             cur.execute("VACUUM")
             con.commit()
 

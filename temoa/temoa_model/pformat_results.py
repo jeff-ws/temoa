@@ -573,7 +573,7 @@ def pformat_results(pyomo_instance: 'TemoaModel', results: SolverResults, config
         # Copy tables from Input File to DB file.
         # IF output file is empty database.
 
-        cur.execute("SELECT * FROM technologies")
+        cur.execute("SELECT * FROM Technology")
         db_has_inputs = False  # False for empty db file
         for elem in cur:
             db_has_inputs = True  # True for non-empty db file
@@ -674,7 +674,7 @@ def pformat_results(pyomo_instance: 'TemoaModel', results: SolverResults, config
 
         # always erase any dual records for this scenario to either (a) start clean or (b) remove stale results
 
-        cur.execute("DELETE FROM main.Output_Duals WHERE main.Output_Duals.scenario = ?", (config.scenario,))
+        cur.execute("DELETE FROM main.OutputDualVariable WHERE main.OutputDualVariable.scenario = ?", (config.scenario,))
         if config.save_duals:
             if (len(duals) != 0):
                 duals.to_sql('Output_Duals', con, if_exists='append')
