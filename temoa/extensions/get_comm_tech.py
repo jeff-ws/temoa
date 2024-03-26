@@ -1,9 +1,10 @@
-import sqlite3
-import os
-import sys
 import getopt
+import os
 import re
+import sqlite3
+import sys
 from collections import OrderedDict
+
 
 def get_tperiods(inp_f):
 	file_ty = re.search(r"(\w+)\.(\w+)\b", inp_f) # Extract the input filename and extension
@@ -23,12 +24,12 @@ def get_tperiods(inp_f):
 	con.text_factory = str  # this ensures data is explored with the correct UTF-8 encoding
 
 	print(inp_f)
-	cur.execute("SELECT DISTINCT scenario FROM Output_VFlow_Out")
+	cur.execute("SELECT DISTINCT scenario FROM OutputFlowOut")
 	x = []
 	for row in cur:
 		x.append(row[0])
 	for y in x:
-		cur.execute("SELECT DISTINCT t_periods FROM Output_VFlow_Out WHERE scenario is '"+str(y)+"'")
+		cur.execute("SELECT DISTINCT period FROM OutputFlowOut WHERE scenario is '"+str(y)+"'")
 		periods_list[y] = []
 		for per in cur:
 			z = per[0]
@@ -56,7 +57,7 @@ def get_scenario(inp_f):
 	con.text_factory = str #this ensures data is explored with the correct UTF-8 encoding
 
 	print(inp_f)
-	cur.execute("SELECT DISTINCT scenario FROM Output_VFlow_Out")
+	cur.execute("SELECT DISTINCT scenario FROM OutputFlowOut")
 	for row in cur:
 		x = row[0]
 		scene_list[x] = x
@@ -78,7 +79,7 @@ def get_comm(inp_f, db_dat):
 		con.text_factory = str #this ensures data is explored with the correct UTF-8 encoding
 
 		print(inp_f)
-		cur.execute("SELECT DISTINCT comm_name FROM commodities")
+		cur.execute("SELECT DISTINCT name FROM Commodity")
 				
 		for row in cur:
 			is_query_empty = True
@@ -87,7 +88,7 @@ def get_comm(inp_f, db_dat):
 				comm_list[x] = x
 		
 		if not is_query_empty:
-			cur.execute("SELECT input_comm FROM Output_VFlow_Out UNION SELECT output_comm FROM Output_VFlow_Out")
+			cur.execute("SELECT input_comm FROM OutputFlowOut UNION SELECT output_comm FROM OutputFlowOut")
 
 		for row in cur:
 			if row[0] != 'ethos':
@@ -138,7 +139,7 @@ def get_tech(inp_f, db_dat):
 		con.text_factory = str #this ensures data is explored with the correct UTF-8 encoding
 
 		print(inp_f)
-		cur.execute("SELECT DISTINCT tech FROM technologies")				
+		cur.execute("SELECT DISTINCT tech FROM Technology")
 		
 		for row in cur:
 			is_query_empty = True
@@ -146,7 +147,7 @@ def get_tech(inp_f, db_dat):
 			tech_list[x] = x
 		
 		if not is_query_empty:
-			cur.execute("SELECT DISTINCT tech FROM Output_VFlow_Out")
+			cur.execute("SELECT DISTINCT tech FROM OutputFlowOut")
 
 		for row in cur:
 			x= row[0]
@@ -196,7 +197,7 @@ def is_db_overwritten(db_file, inp_dat_file):
 
 	# Copy tables from Input File to DB file.
 	# IF output file is empty database.
-	cur.execute("SELECT * FROM technologies")
+	cur.execute("SELECT * FROM Technology")
 	is_db_empty = False  # False for empty db file
 	for elem in cur:
 		is_db_empty = True  # True for non-empty db file

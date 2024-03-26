@@ -1,14 +1,15 @@
-import sqlite3
-import sys, itertools
-import re
 import getopt
+import itertools
+import re
+import sqlite3
+import sys
 from pathlib import Path
 
 import pandas as pd
-import xlsxwriter
 # TODO:  Something with this import is causing logging problems inside of testing modules...
 #        Can we swap over to pandas?
 from pyam import IamDataFrame
+
 
 def make_excel(ifile, ofile: Path, scenario):
 
@@ -37,11 +38,11 @@ def make_excel(ifile, ofile: Path, scenario):
 
 	header_format = workbook.add_format({'bold': True,'text_wrap': True,'align': 'left',})
 
-	query = "SELECT DISTINCT Efficiency.regions, Efficiency.tech, technologies.sector FROM Efficiency \
-	INNER JOIN technologies ON Efficiency.tech=technologies.tech"
+	query = "SELECT DISTINCT Efficiency.region, Efficiency.tech, Technology.sector FROM Efficiency \
+	INNER JOIN Technology ON Efficiency.tech=Technology.tech"
 	all_techs = pd.read_sql_query(query, con)
 
-	query = "SELECT regions, tech, sector, t_periods, capacity FROM Output_CapacityByPeriodAndTech WHERE scenario='" + scenario + "'"
+	query = "SELECT region, tech, sector, period, capacity FROM OutputNetCapacity WHERE scenario='" + scenario + "'"
 	df_capacity = pd.read_sql_query(query, con)
 	for sector in sorted(df_capacity['sector'].unique()):
 		df_capacity_sector = df_capacity[df_capacity['sector']==sector]
@@ -57,8 +58,8 @@ def make_excel(ifile, ofile: Path, scenario):
 		for col, val in enumerate(df_capacity_sector.columns.values):
 			worksheet.write(0, col, val, header_format)
 
-	query = "SELECT regions, tech, sector, t_periods, sum(vflow_out) as vflow_out FROM Output_VFlow_Out WHERE scenario='" + scenario + "' GROUP BY \
-	regions, tech, sector, t_periods"
+	query = "SELECT region, tech, sector, period, sum(flow) as vflow_out FROM OutputFlowOut WHERE scenario='" + scenario + "' GROUP BY \
+	region, tech, sector, period"
 	df_activity = pd.read_sql_query(query, con)
 	for sector in sorted(df_activity['sector'].unique()):
 		df_activity_sector = df_activity[df_activity['sector']==sector]
@@ -74,12 +75,12 @@ def make_excel(ifile, ofile: Path, scenario):
 		for col, val in enumerate(df_activity_sector.columns.values):
 			worksheet.write(0, col, val, header_format)
 
-	query = "SELECT DISTINCT EmissionActivity.regions, EmissionActivity.tech, EmissionActivity.emis_comm as emissions_comm, technologies.sector FROM EmissionActivity \
-	INNER JOIN technologies ON EmissionActivity.tech=technologies.tech"
+	query = "SELECT DISTINCT EmissionActivity.region, EmissionActivity.tech, EmissionActivity.emis_comm as emissions_comm, Technology.sector FROM EmissionActivity \
+	INNER JOIN Technology ON EmissionActivity.tech=Technology.tech"
 	all_emis_techs = pd.read_sql_query(query, con)
 
-	query = "SELECT regions, tech, sector, t_periods, emissions_comm, sum(emissions) as emissions FROM Output_Emissions WHERE scenario='" + scenario + "' GROUP BY \
-	regions, tech, sector, t_periods, emissions_comm"
+	query = "SELECT region, tech, sector, period, emis_comm, sum(emission) as emissions FROM OutputEmission WHERE scenario='" + scenario + "' GROUP BY \
+	region, tech, sector, period, emis_comm"
 	df_emissions_raw = pd.read_sql_query(query, con)
 	if not df_emissions_raw.empty:
 		df_emissions = df_emissions_raw.pivot_table(values='emissions', index=['regions', 'tech', 'sector','emissions_comm'], columns='t_periods')
@@ -95,7 +96,9 @@ def make_excel(ifile, ofile: Path, scenario):
 		for col, val in enumerate(df_emissions.columns.values):
 			worksheet.write(0, col, val, header_format)
 
-	query = "SELECT regions, tech, sector, output_name,  vintage, output_cost FROM Output_Costs WHERE output_name LIKE '%V_Discounted%' AND scenario='" + scenario + "'"
+	query = ("SELECT region, OutputCost.tech, Technology.sector, vintage, sum(d_invest, d_var, d_fixed, d_emiss) FROM OutputCost "
+			 " JOIN main.Technology ON OutputCost.tech = main.Technology.tech "
+			 " WHERE scenario = 'scenario'")
 	df_costs = pd.read_sql_query(query, con)
 	df_costs.columns = ['Region', 'Technology', 'Sector','Output Name', 'Vintage', 'Cost']
 	df_costs.to_excel(writer, sheet_name='Costs', index=False,  startrow=1, header=False)

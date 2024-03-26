@@ -3,18 +3,16 @@ import time
 start_time = time.time()
 from joblib import Parallel, delayed
 import multiprocessing
-import sys
 import os
 from shutil import copyfile
 import sqlite3
 from numpy import array
-from IPython import embed as IP
 from SALib.analyze import morris
 from SALib.sample.morris import sample
 from SALib.util import read_param_file, compute_groups_matrix
-import numpy as np
 
-def evaluate(param_names, param_values,k): 
+
+def evaluate(param_names, param_values,k):
 
 	m=len(param_values)
 	for j in range(0,m):
@@ -61,11 +59,11 @@ def evaluate(param_names, param_values,k):
 	Newdbpath=os.getcwd()+'/data_files/Method_of_Morris'+str(k)+'.db'
 	con=sqlite3.connect(Newdbpath)
 	cur = con.cursor()
-	cur.execute("SELECT * FROM Output_Objective")
+	cur.execute("SELECT * FROM OutputObjective")
 	output_query = cur.fetchall()
 	for row in output_query:
 		Y_OF=row[-1]
-	cur.execute("SELECT emissions_comm, SUM(emissions) FROM Output_Emissions WHERE emissions_comm='co2'")
+	cur.execute("SELECT emis_comm, SUM(emission) FROM OutputEmission WHERE emis_comm='co2'")
 	output_query = cur.fetchall()
 	for row in output_query:
 		Y_CumulativeCO2=row[-1]
