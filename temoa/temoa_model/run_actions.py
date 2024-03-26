@@ -76,7 +76,7 @@ def check_database_version(config: TemoaConfig) -> bool:
     # check for db migration #1:  indicator: unlim_cap field in technologies
     for conn, name in conns:
         try:
-            conn.execute('SELECT unlim_cap FROM technologies').fetchone()
+            conn.execute('SELECT unlim_cap FROM Technology').fetchone()
         except sqlite3.OperationalError:
             logger.error('Database did not pass screening for db migration #1')
             SE.write(f'Database {name} did not pass screening for db migration #1 which adds "unlim_cap" field\n'
