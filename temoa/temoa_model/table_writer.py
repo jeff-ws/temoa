@@ -51,7 +51,7 @@ Note:  This file borrows heavily from the legacy pformat_results.py, and is some
 logger = getLogger(__name__)
 
 scenario_based_tables = [
-    'Output_Costs_2',
+    'OutputCost',
 ]
 
 
@@ -200,7 +200,7 @@ class TableWriter:
 
     @staticmethod
     def loan_costs(
-        loan_rate,  # this is referred to as DiscountRate in parameters
+        loan_rate,  # this is referred to as LoanRate in parameters
         loan_life,
         capacity,
         invest_cost,
@@ -215,7 +215,7 @@ class TableWriter:
         Calculate Loan costs by calling the loan annualize and loan cost functions in temoa_rules
         :return: tuple of [model-view discounted cost, un-discounted annuity]
         """
-        loan_ar = temoa_rules.loan_annualization_rate(discount_rate=loan_rate, loan_life=loan_life)
+        loan_ar = temoa_rules.loan_annualization_rate(loan_rate=loan_rate, loan_life=loan_life)
         model_ic = temoa_rules.loan_cost(
             capacity,
             invest_cost,
@@ -272,10 +272,10 @@ class TableWriter:
             if abs(cap) < self.epsilon:
                 continue
             loan_life = value(LLN[r, t, v])
-            loan_rate = value(M.DiscountRate[r, t, v])
+            loan_rate = value(M.LoanRate[r, t, v])
 
             model_loan_cost, undiscounted_cost = self.loan_costs(
-                loan_rate=value(M.DiscountRate[r, t, v]),
+                loan_rate=value(M.LoanRate[r, t, v]),
                 loan_life=loan_life,
                 capacity=cap,
                 invest_cost=value(M.CostInvest[r, t, v]),
@@ -404,6 +404,6 @@ class TableWriter:
         rows.sort(key=lambda r: (r[1], r[4], r[3], r[2]))
         # TODO:  maybe extract this to a pure writing function...we shall see
         cur = self.con.cursor()
-        qry = 'INSERT INTO Output_Costs_2 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        qry = 'INSERT INTO OutputCost VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL)'
         cur.executemany(qry, rows)
         self.con.commit()

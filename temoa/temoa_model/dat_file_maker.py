@@ -158,7 +158,7 @@ def db_2_dat(ifile, ofile, options: TemoaConfig):
         ['param','PlanningReserveMargin',     '',                    '',             1],
         ['param','GlobalDiscountRate',        '',                    '',             0],
         ['param','MyopicBaseyear',            '',                    '',             0],
-        ['param','DiscountRate',              '',                    '',             3],
+        ['param','LoanRate',              '',                    '',             3],
         ['param','EmissionActivity',          '',                    '',             6],
         ['param','EmissionLimit',             '',                    '',             3],
         ['param','Demand',                    '',                    '',             3],

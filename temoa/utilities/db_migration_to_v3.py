@@ -97,7 +97,7 @@ direct_transfer_tables = [
     ('',                    'LifetimeTech'),
     ('LinkedTechs',         'LinkedTech'),
     ('LifetimeLoanTech',    'LoanLifetimeTech'),
-    ('DiscountRate',        'LoanRate'),
+    ('LoanRate',            'LoanRate'),
     ('',                    'MaxActivity'),
     ('',                    'MaxActivityShare'),
     ('',                    'MaxAnnualCapacityFactor'),
@@ -214,62 +214,71 @@ print(
 groups = defaultdict(set)
 
 # let's ensure all the non-global entries are consistent (same techs in each region)
-entries = con_old.execute('SELECT * FROM tech_rps').fetchall()
-for region, tech, notes in entries:
-    groups[region].add(tech)
+skip_rps = False
+try:
+    entries = con_old.execute('SELECT * FROM tech_rps').fetchall()
+except sqlite3.OperationalError:
+    print(f'source does not appear to include RPS techs...skipping')
+    skip_rps = True
+if not skip_rps:
+    for region, tech, notes in entries:
+        groups[region].add(tech)
 
-common = set()
-for group, entries in groups.items():
-    if group != 'global':
-        common |= set(entries)
+    common = set()
+    for group, entries in groups.items():
+        if group != 'global':
+            common |= set(entries)
 
-techs_common = True
-for group, techs in groups.items():
-    print(f'group: {group} mismatches: {common ^ techs}')
-    if group != 'global':
-        techs_common &= not common ^ techs
-        if not techs_common:
-            print('combining RPS techs failed.  Some regions are not same.  Must be done manually.')
+    techs_common = True
+    for group, techs in groups.items():
+        print(f'group: {group} mismatches: {common ^ techs}')
+        if group != 'global':
+            techs_common &= not common ^ techs
+            if not techs_common:
+                print(
+                    'combining RPS techs failed.  Some regions are not same.  Must be done manually.'
+                )
 
-if techs_common:
-    print('\n --- Adjusting tech_group names ---')
+    if techs_common:
+        print('\n --- Adjusting tech_group names ---')
 
-    # put the tables into TechGroup table listing...
-    cur.execute(
-        'INSERT OR REPLACE INTO TechGroup VALUES (:name, :notes)',
-        {'name': 'RPS_global', 'notes': ''},
-    )
-    cur.execute(
-        'INSERT OR REPLACE INTO TechGroup VALUES (:name, :notes)',
-        {'name': 'RPS_common', 'notes': ''},
-    )
-
-    # put the members into members tables
-    for member in common:
-        cur.execute('INSERT INTO TechGroupMember VALUES (?, ?)', ('RPS_common', member))
-
-    for member in groups.get('global', set()):
-        cur.execute('INSERT INTO TechGroupMember VALUES (?, ?)', ('RPS_global', member))
-
-    # move things into the RPSRequirement table
-    count = 0
-    for entry in con_old.execute('SELECT * FROM main.RenewablePortfolioStandard').fetchall():
-        r, p, rps, notes = entry
-        if r not in groups.keys():
-            raise ValueError(f'unusual region : {r}')
-        elif r == 'global':
-            tech_group = 'RPS_global'
-        else:
-            tech_group = 'RPS_common'
+        # put the tables into TechGroup table listing...
         cur.execute(
-            'INSERT INTO RPSRequirement VALUES (?, ?, ?, ?, ?)', (r, p, tech_group, rps, notes)
+            'INSERT OR REPLACE INTO TechGroup VALUES (:name, :notes)',
+            {'name': 'RPS_global', 'notes': ''},
         )
-        count += 1
-    print(f'moved {count} items into RPSRequirement table')
+        cur.execute(
+            'INSERT OR REPLACE INTO TechGroup VALUES (:name, :notes)',
+            {'name': 'RPS_common', 'notes': ''},
+        )
 
-    # ------- TRANSITION THE OLD tech_groups ------------
-    print('\n --- Adjusting tables that used tech_groups ---')
+        # put the members into members tables
+        for member in common:
+            cur.execute('INSERT INTO TechGroupMember VALUES (?, ?)', ('RPS_common', member))
 
+        for member in groups.get('global', set()):
+            cur.execute('INSERT INTO TechGroupMember VALUES (?, ?)', ('RPS_global', member))
+
+        # move things into the RPSRequirement table
+        count = 0
+        for entry in con_old.execute('SELECT * FROM main.RenewablePortfolioStandard').fetchall():
+            r, p, rps, notes = entry
+            if r not in groups.keys():
+                raise ValueError(f'unusual region : {r}')
+            elif r == 'global':
+                tech_group = 'RPS_global'
+            else:
+                tech_group = 'RPS_common'
+            cur.execute(
+                'INSERT INTO RPSRequirement VALUES (?, ?, ?, ?, ?)', (r, p, tech_group, rps, notes)
+            )
+            count += 1
+        print(f'moved {count} items into RPSRequirement table')
+
+# ------- TRANSITION THE OLD tech_groups ------------
+print('\n --- Adjusting tables that used tech_groups ---')
+skip_tech_groups = False
+try:
     # pull the entries from tech_groups, smash names and move 'em
     for entry in con_old.execute('SELECT * FROM main.tech_groups').fetchall():
         region, group_name, tech, notes = entry
@@ -278,7 +287,10 @@ if techs_common:
             'INSERT OR REPLACE INTO TechGroup VALUES (?, ?)', (new_name, 'converted from old db')
         )
         cur.execute('INSERT OR REPLACE INTO TechGroupMember VALUES (?, ?)', (new_name, tech))
-
+except sqlite3.OperationalError:
+    print(f'souce does not appear to employ tech_groups...skipping.')
+    skip_tech_groups = True
+if not skip_tech_groups:
     # ------- FIX TABLES THAT USED TO USE tech_groups -----------
     # We'll do this by modifying the group names similar to above (smashing the region-name together to match
     # the newly renamed groups
@@ -325,12 +337,22 @@ except sqlite3.OperationalError:
 
 if unlim_cap_present:
     read_qry = 'SELECT tech, flag, sector, tech_category, unlim_cap, tech_desc FROM technologies'
-    write_qry = "INSERT INTO Technology VALUES (?, ?, ?, ?, '', ?, '', '', '', '', '', '', '', ?)"
+    write_qry = "INSERT INTO Technology VALUES (?, ?, ?, ?, '', ?, 0, 0, 0, 0, 0, 0, 0, ?)"
 else:
     read_qry = 'SELECT tech, flag, sector, tech_desc, tech_category FROM technologies'
-    write_qry = "INSERT INTO Technology VALUES (?, ?, ?, ?, '', '', '', '', '', '', '', '', '', ?)"
+    write_qry = "INSERT INTO Technology VALUES (?, ?, ?, ?, '', 0, 0, 0, 0, 0, 0, 0, 0, ?)"
 
 data = con_old.execute(read_qry).fetchall()
+if unlim_cap_present:
+    # need to convert null -> 0 for unlim_cap to match new schema that does not allow null
+    new_data = []
+    for row in data:
+        new_row = [t for t in row]
+        if new_row[4] is None:
+            new_row[4] = 0
+        new_data.append(tuple(new_row))
+    data = new_data
+
 cur.executemany(write_qry, data)
 
 # gather supporting sets
@@ -359,20 +381,28 @@ print(f'updating {len(data)} flex technologies')
 for row in data:
     tech = row[0]
     cur.execute('UPDATE Technology SET flex = 1 WHERE tech = ?', (tech,))
-data = con_old.execute('SELECT tech from tech_variable').fetchall()
+try:
+    data = con_old.execute('SELECT tech from tech_variable').fetchall()
+except sqlite3.OperationalError:
+    data = []
 print(f'updating {len(data)} variable technologies')
 for row in data:
     tech = row[0]
     cur.execute('UPDATE Technology SET variable = 1 WHERE tech = ?', (tech,))
-data = con_old.execute('SELECT tech from tech_exchange').fetchall()
+try:
+    data = con_old.execute('SELECT tech from tech_exchange').fetchall()
+except sqlite3.OperationalError:
+    data = []
 print(f'updating {len(data)} exchange technologies')
 for row in data:
     tech = row[0]
     cur.execute('UPDATE Technology SET exchange = 1 WHERE tech = ?', (tech,))
 
 print('\n --- Moving scalar data elements ---')
-
-data = con_old.execute('SELECT * FROM MyopicBaseyear').fetchone()
+try:
+    data = con_old.execute('SELECT * FROM MyopicBaseyear').fetchone()
+except sqlite3.OperationalError:
+    data = None
 if data:
     mby = data[0]
     cur.execute("INSERT OR REPLACE INTO MetaData VALUES ('myopic_base_year', ? , '')", (mby,))
@@ -380,7 +410,10 @@ if data:
 else:
     print('no myopic base year discovered')
 
-data = con_old.execute('SELECT * FROM GlobalDiscountRate').fetchone()
+try:
+    data = con_old.execute('SELECT * FROM GlobalDiscountRate').fetchone()
+except sqlite3.OperationalError:
+    data = None
 if data:
     rate = data[0]
     cur.execute(

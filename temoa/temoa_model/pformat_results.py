@@ -128,7 +128,7 @@ def gather_variable_data(m: 'TemoaModel', epsilon: float, capacity_epsilon: floa
         val_in = value(m.V_FlowIn[r, p, s, d, i, t, v, o])
         if abs(val_in) < epsilon: continue
 
-        svars['V_FlowIn'][r, p, s, d, i, t, v, o] = val_in
+        svars['OutputFlowIn'][r, p, s, d, i, t, v, o] = val_in
 
     # we need to pre-identify the keys for emissions to pluck them out in the course of
     # inspecting the flows below...
@@ -140,11 +140,11 @@ def gather_variable_data(m: 'TemoaModel', epsilon: float, capacity_epsilon: floa
         val_out = value(m.V_FlowOut[r, p, s, d, i, t, v, o])
         if abs(val_out) < epsilon: continue
 
-        svars['V_FlowOut'][r, p, s, d, i, t, v, o] = val_out
+        svars['OutputFlowOut'][r, p, s, d, i, t, v, o] = val_out
 
         if t not in m.tech_storage:
             val_in = value(m.V_FlowOut[r, p, s, d, i, t, v, o]) / value(m.Efficiency[r, i, t, v, o])
-            svars['V_FlowIn'][r, p, s, d, i, t, v, o] = val_in
+            svars['OutputFlowIn'][r, p, s, d, i, t, v, o] = val_in
 
         if (r, i, t, v, o) not in emission_keys: continue
 
@@ -158,8 +158,8 @@ def gather_variable_data(m: 'TemoaModel', epsilon: float, capacity_epsilon: floa
             for d in m.time_of_day:
                 val_out = value(m.V_FlowOutAnnual[r, p, i, t, v, o]) * value(m.SegFrac[s, d])
                 if abs(val_out) < epsilon: continue
-                svars['V_FlowOut'][r, p, s, d, i, t, v, o] = val_out
-                svars['V_FlowIn'][r, p, s, d, i, t, v, o] = val_out / value(
+                svars['OutputFlowOut'][r, p, s, d, i, t, v, o] = val_out
+                svars['OutputFlowIn'][r, p, s, d, i, t, v, o] = val_out / value(
                     m.Efficiency[r, i, t, v, o])
                 if (r, i, t, v, o) not in emission_keys: continue
                 emissions = emission_keys[r, i, t, v, o]
@@ -170,7 +170,7 @@ def gather_variable_data(m: 'TemoaModel', epsilon: float, capacity_epsilon: floa
     for r, p, s, d, i, t, v, o in m.V_Curtailment:
         val = value(m.V_Curtailment[r, p, s, d, i, t, v, o])
         if abs(val) < epsilon: continue
-        svars['V_Curtailment'][r, p, s, d, i, t, v, o] = val
+        svars['OutputCurtailment'][r, p, s, d, i, t, v, o] = val
         svars['V_FlowIn'][r, p, s, d, i, t, v, o] = (val + value(
             m.V_FlowOut[r, p, s, d, i, t, v, o])) / value(
             m.Efficiency[r, i, t, v, o])
@@ -187,51 +187,51 @@ def gather_variable_data(m: 'TemoaModel', epsilon: float, capacity_epsilon: floa
             for d in m.time_of_day:
                 val_out = value(m.V_FlexAnnual[r, p, i, t, v, o]) * value(m.SegFrac[s, d])
                 if abs(val_out) < epsilon: continue
-                svars['V_Curtailment'][r, p, s, d, i, t, v, o] = val_out
-                svars['V_FlowOut'][r, p, s, d, i, t, v, o] -= val_out
+                svars['OutputCurtailment'][r, p, s, d, i, t, v, o] = val_out
+                svars['OutputFlowOut'][r, p, s, d, i, t, v, o] -= val_out
 
     for r, p, s, d, i, t, v, o in m.V_Flex:
         val_out = value(m.V_Flex[r, p, s, d, i, t, v, o])
         if abs(val_out) < epsilon: continue
-        svars['V_Curtailment'][r, p, s, d, i, t, v, o] = val_out
-        svars['V_FlowOut'][r, p, s, d, i, t, v, o] -= val_out
+        svars['OutputCurtailment'][r, p, s, d, i, t, v, o] = val_out
+        svars['OutputFlowOut'][r, p, s, d, i, t, v, o] -= val_out
 
     # Extract optimal decision variable values related to capacity:
     if not myopic_iteration:
         for r, p, t, v in m.V_Capacity:
             val = value(m.V_Capacity[r, p, t, v])
             if abs(val) < capacity_epsilon: continue
-            svars['V_Capacity'][r, p, t, v] = val
+            svars['OutputNetCapacity'][r, p, t, v] = val
     else:
         for r, p, t, v in m.V_Capacity:
             if p in m.time_optimize:
                 val = value(m.V_Capacity[r, p, t, v])
                 if abs(val) < capacity_epsilon: continue
-                svars['V_Capacity'][r, p, t, v] = val
+                svars['OutputNetCapacity'][r, p, t, v] = val
 
     if not myopic_iteration:
         for r, t, v in m.V_NewCapacity:
             val = value(m.V_NewCapacity[r, t, v])
             if abs(val) < capacity_epsilon: continue
-            svars['V_NewCapacity'][r, t, v] = val
+            svars['OutputBuiltCapacity'][r, t, v] = val
     else:
         for r, t, v in m.V_NewCapacity:
             if v in m.time_optimize:
                 val = value(m.V_NewCapacity[r, t, v])
                 if abs(val) < capacity_epsilon: continue
-                svars['V_NewCapacity'][r, t, v] = val
+                svars['OutputBuiltCapacity'][r, t, v] = val
 
     if not myopic_iteration:
         for r, p, t, v in m.V_RetiredCapacity:
             val = value(m.V_RetiredCapacity[r, p, t, v])
             if abs(val) < capacity_epsilon: continue
-            svars['V_RetiredCapacity'][r, p, t, v] = val
+            svars['OutputRetiredCapacity'][r, p, t, v] = val
     else:
         for r, p, t, v in m.V_RetiredCapacity:
             if p in m.time_optimize:
                 val = value(m.V_RetiredCapacity[r, p, t, v])
                 if abs(val) < capacity_epsilon: continue
-                svars['V_RetiredCapacity'][r, p, t, v] = val
+                svars['OutputRetiredCapacity'][r, p, t, v] = val
 
     for r, p, t in m.V_CapacityAvailableByPeriodAndTech:
         val = value(m.V_CapacityAvailableByPeriodAndTech[r, p, t])
@@ -536,13 +536,16 @@ def pformat_results(pyomo_instance: 'TemoaModel', results: SolverResults, config
     # -----------------------------------------------------------------
 
     # Table dictionary below maps variable names to database table names
-    tables = {"V_FlowIn": "Output_VFlow_In", "V_FlowOut": "Output_VFlow_Out",
-              "V_Curtailment": "Output_Curtailment", "V_Capacity": "Output_V_Capacity",
-              "V_NewCapacity": "Output_V_NewCapacity",
-              "V_RetiredCapacity": "Output_V_RetiredCapacity",
-              "V_CapacityAvailableByPeriodAndTech": "Output_CapacityByPeriodAndTech",
-              "V_EmissionActivityByPeriodAndProcess": "Output_Emissions",
-              "Objective": "Output_Objective", "Costs": "Output_Costs"
+    tables = {"OutputFlowIn": "OutputFlowIn",
+              "OutputFlowOut": "OutputFlowOut",
+              "OutputCurtailment": "OutputCurtailment",
+              "OutputNetCapacity": "OutputNetCapacity",
+              "OutputBuiltCapacity": "OutputBuiltCapacity",
+              "OutputRetiredCapacity": "OutputRetiredCapacity",
+              #"V_CapacityAvailableByPeriodAndTech": "Output_CapacityByPeriodAndTech",
+              "OutputEmission": "OutputEmission",
+              "OutputObjective": "OutputObjective",
+              #"Costs": "OutputCost"
               }
 
     db_tables = ['time_periods', 'time_season', 'time_of_day', 'technologies', 'commodities', \
@@ -667,8 +670,8 @@ def pformat_results(pyomo_instance: 'TemoaModel', results: SolverResults, config
                                         " VALUES('" + str(var_idx[1]) + "', '" + config.scenario + "','NULL', \
 										" + key_str + "," + str(svars[var_name][var_idx]) + ");")
                     cur.execute("UPDATE " + tables[var_name] + " SET sector = \
-								(SELECT technologies.sector FROM technologies \
-								WHERE " + tables[var_name] + ".tech = technologies.tech);")
+								(SELECT Technology.sector FROM Technology \
+								WHERE " + tables[var_name] + ".tech = Technology.tech);")
 
         # Write the duals...
 

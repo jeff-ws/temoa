@@ -106,7 +106,7 @@ def test_myopic_utopia(system_test_run):
     _, _, _, sequencer = system_test_run
     con = sqlite3.connect(sequencer.config.output_database)
     cur = con.cursor()
-    res = cur.execute('SELECT SUM(d_invest) FROM main.Output_Costs_2').fetchone()
+    res = cur.execute('SELECT SUM(d_invest) FROM main.OutputCost').fetchone()
     invest_sum = res[0]
     assert invest_sum == pytest.approx(11907.94), 'sum of investment costs did not match expected'
     con.close()

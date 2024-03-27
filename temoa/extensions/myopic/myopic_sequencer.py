@@ -305,17 +305,17 @@ class MyopicSequencer:
         default_lifetime = TemoaModel.default_lifetime_tech
         query = (
             '  SELECT -1, main.Efficiency.region, input_comm, Efficiency.tech, Efficiency.vintage, output_comm, efficiency, '
-            f'  coalesce(main.LifetimeProcess.life_process, main.LifetimeTech.life, {default_lifetime}) AS lifetime '
+            f'  coalesce(main.LifetimeProcess.lifetime, main.LifetimeTech.lifetime, {default_lifetime}) AS lifetime '
             '   FROM main.Efficiency '
             '    LEFT JOIN main.LifetimeProcess '
             '       ON main.Efficiency.tech = LifetimeProcess.tech '
             '       AND main.Efficiency.vintage = LifetimeProcess.vintage '
-            '       AND main.Efficiency.regions = LifetimeProcess.regions '
+            '       AND main.Efficiency.region = LifetimeProcess.region '
             '    LEFT JOIN main.LifetimeTech '
             '       ON main.Efficiency.tech = main.LifetimeTech.tech '
-            '     AND main.Efficiency.regions = main.LifeTimeTech.regions '
-            '   JOIN time_periods '
-            '   ON Efficiency.vintage = time_periods.t_periods '
+            '     AND main.Efficiency.region = main.LifeTimeTech.region '
+            '   JOIN TimePeriod '
+            '   ON Efficiency.vintage = TimePeriod.period '
             "   WHERE flag = 'e'")
 
 
@@ -491,25 +491,25 @@ class MyopicSequencer:
         lifetime = TemoaModel.default_lifetime_tech
         query = (
             'INSERT INTO MyopicEfficiency '
-            f'SELECT {base}, Efficiency.regions, input_comm, '
+            f'SELECT {base}, Efficiency.region, input_comm, '
             '      Efficiency.tech, Efficiency.vintage, output_comm, efficiency, '
-            f'     coalesce(main.LifetimeProcess.life_process, main.LifetimeTech.life, {lifetime}) '
+            f'     coalesce(main.LifetimeProcess.lifetime, main.LifetimeTech.lifetime, {lifetime}) '
             f'     AS lifetime '
             ' FROM main.Efficiency '
             '    LEFT JOIN main.LifetimeProcess '
             '       ON main.Efficiency.tech = LifetimeProcess.tech '
             '       AND main.Efficiency.vintage = LifetimeProcess.vintage '
-            '       AND main.Efficiency.regions = LifetimeProcess.region '
+            '       AND main.Efficiency.region = LifetimeProcess.region '
             '    LEFT JOIN main.LifetimeTech '
             '       ON main.Efficiency.tech = main.LifetimeTech.tech '
-            '     AND main.Efficiency.regions = main.LifeTimeTech.region '
+            '     AND main.Efficiency.region = main.LifeTimeTech.region '
             f'  WHERE Efficiency.vintage >= {base}'
             f'  AND Efficiency.vintage <= {last_demand_year}'
         )
         if self.debugging:
             # note:  the debug query below omits the lifetime computation for brevity, but is very useful without...
             raw = self.cursor.execute(
-                f'SELECT {base}, regions, input_comm, tech, vintage, output_comm, efficiency '
+                f'SELECT {base}, region, input_comm, tech, vintage, output_comm, efficiency '
                 'FROM Efficiency '
                 f'  WHERE Efficiency.vintage >= {base}'
                 f'  AND Efficiency.vintage <= {last_demand_year}'
@@ -612,7 +612,7 @@ class MyopicSequencer:
         for table in self.tables_with_period:
             try:
                 self.cursor.execute(
-                    f'DELETE FROM {table} WHERE t_periods >= (?) and scenario = (?)',
+                    f'DELETE FROM {table} WHERE period >= (?) and scenario = (?)',
                     (period, self.config.scenario),
                 )
             except sqlite3.OperationalError:

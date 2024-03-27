@@ -30,11 +30,11 @@ from collections import defaultdict
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+import deprecated
 from pyomo.environ import NonNegativeReals
 
 if TYPE_CHECKING:
     from temoa.temoa_model.temoa_model import TemoaModel
-
 
 logger = getLogger(__name__)
 
@@ -134,7 +134,7 @@ def linked_region_check(M: 'TemoaModel', region_pair) -> bool:
         r1 = linked_regions.group(1)
         r2 = linked_regions.group(2)
         if (
-            all(r in M.regions for r in (r1, r2)) and r1 != r2
+                all(r in M.regions for r in (r1, r2)) and r1 != r2
         ):  # both captured regions are in the set of M.R
             return True
     return False
@@ -152,7 +152,7 @@ def region_group_check(M: 'TemoaModel', rg) -> bool:
             # break up the group
             contained_regions = rg.strip().split('+')
             if all(t in M.regions for t in contained_regions) and len(
-                set(contained_regions)
+                    set(contained_regions)
             ) == len(contained_regions):  # no dupes
                 return True
         else:  # it is a singleton
@@ -160,6 +160,7 @@ def region_group_check(M: 'TemoaModel', rg) -> bool:
     return False
 
 
+@deprecated.deprecated('needs to be updated if re-instated to accommodate group restructuring')
 def tech_groups_set_check(M: 'TemoaModel', rg, g, t) -> bool:
     """
     Validate this entry to the tech_groups set
@@ -169,7 +170,7 @@ def tech_groups_set_check(M: 'TemoaModel', rg, g, t) -> bool:
     :param t: tech
     :return: True if valid entry, else False
     """
-    return all((region_group_check(M, rg), g in M.groups, t in M.tech_all))
+    return all((region_group_check(M, rg), g in M.tech_group_names, t in M.tech_all))
 
 
 # TODO:  Several of these param checkers below are not in use because the params cannot
@@ -231,7 +232,7 @@ def activity_group_param_check(M: 'TemoaModel', val, rg, p, g) -> bool:
     :return: True if all OK
     """
     return all(
-        (val in NonNegativeReals, region_group_check(M, rg), p in M.time_optimize, g in M.groups)
+        (val in NonNegativeReals, region_group_check(M, rg), p in M.time_optimize, g in M.tech_group_names)
     )
 
 
@@ -271,24 +272,25 @@ def validate_CapacityFactorProcess(M: 'TemoaModel', val, r, s, d, t, v) -> bool:
         )
     )
 
+
 def validate_Efficiency(M: 'TemoaModel', val, r, si, t, v, so) -> bool:
     """Handy for troubleshooting problematic entries"""
 
     if all(
-        (
-            isinstance(val, float),
-            val > 0,
-            r in M.RegionalIndices,
-            si in M.commodity_physical,
-            t in M.tech_all,
-            so in M.commodity_carrier,
-            v in M.vintage_all,
-        )
+            (
+                    isinstance(val, float),
+                    val > 0,
+                    r in M.RegionalIndices,
+                    si in M.commodity_physical,
+                    t in M.tech_all,
+                    so in M.commodity_carrier,
+                    v in M.vintage_all,
+            )
     ):
         return True
-    print ('r', r in M.RegionalIndices)
-    print( 'si', si in M.commodity_physical )
-    print( 't', t in M.tech_all)
-    print( 'v', v in M.vintage_all)
-    print( 'so', so in M.commodity_carrier )
+    print('r', r in M.RegionalIndices)
+    print('si', si in M.commodity_physical)
+    print('t', t in M.tech_all)
+    print('v', v in M.vintage_all)
+    print('so', so in M.commodity_carrier)
     return False
