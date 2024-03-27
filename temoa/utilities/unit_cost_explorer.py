@@ -2,6 +2,7 @@
 This file is intended as a QA tool for calculating costs associated with unit-sized purchases
 of storage capacity
 """
+
 from temoa.temoa_model.temoa_rules import *
 
 # Written by:  J. F. Hyink
@@ -24,7 +25,7 @@ factors that are used in calculation
 
 
 # indices
-rtv = ('A', 'battery', 2020)         # rtv
+rtv = ('A', 'battery', 2020)  # rtv
 rptv = ('A', 2020, 'battery', 2020)  # rptv
 
 # make SETS
@@ -34,10 +35,10 @@ M.CostInvest_rtv.construct(data=rtv)
 M.CostFixed_rptv.construct(data=rptv)
 M.LifetimeLoanProcess_rtv.construct(data=rtv)
 M.Loan_rtv.construct(data=rtv)
-M.DiscountRate_rtv.construct(data=rtv)
+M.LoanRate_rtv.construct(data=rtv)
 M.LifetimeProcess_rtv.construct(data=rtv)
 M.RegionalIndices.construct(data=['A'])
-M.MyopicBaseyear.construct(data={None:0})
+M.MyopicBaseyear.construct(data={None: 0})
 M.ModelProcessLife_rptv.construct(data=rptv)
 
 
@@ -47,10 +48,10 @@ M.time_future.construct([2020, 2025, 2030])  # needs to go 1 period beyond optim
 M.PeriodLength.construct()
 M.tech_all.construct(data=['battery'])
 M.regions.construct(data=['A'])
-M.CostInvest.construct(data={rtv: 1300})   # US_9R_8D
-M.CostFixed.construct(data={rptv: 20})     # US_9R_8D
+M.CostInvest.construct(data={rtv: 1300})  # US_9R_8D
+M.CostFixed.construct(data={rptv: 20})  # US_9R_8D
 M.LifetimeLoanProcess.construct(data={rtv: 10})
-M.DiscountRate.construct(data={rtv: 0.05})
+M.LoanRate.construct(data={rtv: 0.05})
 M.LoanAnnualize.construct()
 M.LifetimeTech.construct(data={('A', 'battery'): 20})
 M.LifetimeProcess.construct(data={rtv: 40})
@@ -73,16 +74,16 @@ print('The total cost expression:')
 print(tot_cost_expr)
 
 # how much storage achieved for 1 unit of capacity?
-storage_cap = 1 # unit
-storage_dur = 4 # hr
-c2a         = 31.536 # PJ/GW-yr
-c           = 1/8760 #yr/hr
+storage_cap = 1  # unit
+storage_dur = 4  # hr
+c2a = 31.536  # PJ/GW-yr
+c = 1 / 8760  # yr/hr
 storage = storage_cap * storage_dur * c2a * c
-PJ_to_kwh = 1/3600000 * 1e15
+PJ_to_kwh = 1 / 3600000 * 1e15
 print()
 print(f'storage built: {storage:0.4f} [PJ] / {(storage * PJ_to_kwh):0.2f} [kWh]')
 
-price_per_kwh = total_cost * 1e6/(storage * PJ_to_kwh)
+price_per_kwh = total_cost * 1e6 / (storage * PJ_to_kwh)
 print(f'price_per_kwh: ${price_per_kwh: 0.2f}\n')
 
 # let's look at the constraint for storage level
@@ -94,14 +95,24 @@ tod_slices = 2
 M.time_of_day.construct(data=range(1, tod_slices + 1))
 M.tech_storage.construct(data=['battery'])
 M.ProcessLifeFrac_rptv.construct(data=[rptv])
-M.StorageLevel_rpsdtv.construct(data=[('A', 2020, 'winter', 1, 'battery', 2020),])
-M.StorageConstraints_rpsdtv.construct(data=[('A', 2020, 'winter', 1, 'battery', 2020),])
+M.StorageLevel_rpsdtv.construct(
+    data=[
+        ('A', 2020, 'winter', 1, 'battery', 2020),
+    ]
+)
+M.StorageConstraints_rpsdtv.construct(
+    data=[
+        ('A', 2020, 'winter', 1, 'battery', 2020),
+    ]
+)
 
 # More PARAMS
 M.CapacityToActivity.construct(data={('A', 'battery'): 31.536})
 M.StorageDuration.construct(data={('A', 'battery'): 4})
 seasonal_fractions = {'winter': 0.4, 'summer': 0.6}
-M.SegFrac.construct(data={(s, d): seasonal_fractions[s] / tod_slices for d in M.time_of_day for s in M.time_season})
+M.SegFrac.construct(
+    data={(s, d): seasonal_fractions[s] / tod_slices for d in M.time_of_day for s in M.time_season}
+)
 # QA the total
 print(f'quality check.  Total of all SegFrac: {sum(M.SegFrac.values()):0.3f}')
 M.ProcessLifeFrac.construct(data={('A', 2020, 'battery', 2020): 1.0})
@@ -110,8 +121,8 @@ M.ProcessLifeFrac.construct(data={('A', 2020, 'battery', 2020): 1.0})
 M.V_StorageLevel.construct()
 M.SegFracPerSeason.construct()
 
-upper_limit = StorageEnergyUpperBound_Constraint(M,  'A', 2020, 'winter', 1, 'battery', 2020)
-print('The storage level constraint for the single period in the "super day":\n',upper_limit)
+upper_limit = StorageEnergyUpperBound_Constraint(M, 'A', 2020, 'winter', 1, 'battery', 2020)
+print('The storage level constraint for the single period in the "super day":\n', upper_limit)
 
 # cross-check the multiplier...
 mulitplier = storage_dur * M.SegFracPerSeason['winter'] * 365 * c2a * c

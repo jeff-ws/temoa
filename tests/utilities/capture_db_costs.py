@@ -42,7 +42,7 @@ json_loc = Path(PROJECT_ROOT, 'tests', 'testing_data', 'cost_vector_test_system.
 con = sqlite3.connect(db_loc)
 cur = con.cursor()
 data = cur.execute(
-    "SELECT regions, output_name, tech, vintage, output_cost FROM Output_Costs WHERE scenario = 'test_run'"
+    "SELECT region, output_name, tech, vintage, output_cost FROM OutputCost WHERE scenario = 'test_run'"
 ).fetchall()
 
 with open(json_loc, 'w') as f_out:

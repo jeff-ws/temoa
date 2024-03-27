@@ -20,6 +20,7 @@ A complete copy of the GNU General Public License v2 (GPLv2) is available
 in LICENSE.txt.  Users uncompressing this from an archive may not have
 received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 from itertools import product
 
 from pyomo.core import BuildCheck
@@ -142,14 +143,12 @@ class TemoaModel(AbstractModel):
         M.tech_capacity_min = Set(within=M.tech_all)
         M.tech_capacity_max = Set(within=M.tech_all)
         M.tech_curtailment = Set(within=M.tech_all)
-        M.tech_rps = Set(
-            within=M.regions * M.tech_all, doc='Regional Portfolio Standard Technologies'
-        )
         M.tech_flex = Set(within=M.tech_all)
         M.tech_exchange = Set(within=M.tech_all)
         # Define groups for technologies
-        M.groups = Set(dimen=1)
-        M.tech_groups = Set(within=M.RegionalGlobalIndices * M.groups * M.tech_all)
+
+        M.tech_group_names = Set()
+        M.tech_group_members = Set(M.tech_group_names, within=M.tech_all)
         # Define techs with constant output
         M.tech_annual = Set(within=M.tech_all)
         # TODO:  come back and figure out why I thought annual techs were ineligible!
@@ -289,7 +288,7 @@ class TemoaModel(AbstractModel):
         )
         M.TechOutputSplit = Param(M.regions, M.time_optimize, M.tech_all, M.commodity_carrier)
 
-        M.RenewablePortfolioStandard = Param(M.regions, M.time_optimize)
+        M.RenewablePortfolioStandard = Param(M.regions, M.time_optimize, M.tech_group_names)
 
         # The method below creates a series of helper functions that are used to
         # perform the sparse matrix of indexing for the parameters, variables, and
@@ -306,8 +305,9 @@ class TemoaModel(AbstractModel):
         M.CostVariable_rptv = Set(dimen=4, initialize=CostVariableIndices)
         M.CostVariable = Param(M.CostVariable_rptv)
 
-        M.DiscountRate_rtv = Set(dimen=3, initialize=lambda M: M.CostInvest.keys())
-        M.DiscountRate = Param(M.DiscountRate_rtv, default=0.05)
+        M.LoanRate_rtv = Set(dimen=3, initialize=lambda M: M.CostInvest.keys())
+        M.DefaultLoanRate = Param()
+        M.LoanRate = Param(M.LoanRate_rtv, default=M.DefaultLoanRate)
 
         M.Loan_rtv = Set(dimen=3, initialize=lambda M: M.CostInvest.keys())
         M.LoanAnnualize = Param(M.Loan_rtv, initialize=ParamLoanAnnualize_rule)
@@ -339,12 +339,12 @@ class TemoaModel(AbstractModel):
         M.EmissionLimit = Param(M.RegionalGlobalIndices, M.time_optimize, M.commodity_emissions)
         M.EmissionActivity_reitvo = Set(dimen=6, initialize=EmissionActivityIndices)
         M.EmissionActivity = Param(M.EmissionActivity_reitvo)
-        M.MinActivityGroup = Param(M.RegionalGlobalIndices, M.time_optimize, M.groups)
-        M.MaxActivityGroup = Param(M.RegionalGlobalIndices, M.time_optimize, M.groups)
-        M.MinCapacityGroup = Param(M.RegionalGlobalIndices, M.time_optimize, M.groups)
-        M.MaxCapacityGroup = Param(M.RegionalGlobalIndices, M.time_optimize, M.groups)
-        M.MinNewCapacityGroup = Param(M.RegionalIndices, M.time_optimize, M.groups)
-        M.MaxNewCapacityGroup = Param(M.RegionalIndices, M.time_optimize, M.groups)
+        M.MinActivityGroup = Param(M.RegionalGlobalIndices, M.time_optimize, M.tech_group_names)
+        M.MaxActivityGroup = Param(M.RegionalGlobalIndices, M.time_optimize, M.tech_group_names)
+        M.MinCapacityGroup = Param(M.RegionalGlobalIndices, M.time_optimize, M.tech_group_names)
+        M.MaxCapacityGroup = Param(M.RegionalGlobalIndices, M.time_optimize, M.tech_group_names)
+        M.MinNewCapacityGroup = Param(M.RegionalIndices, M.time_optimize, M.tech_group_names)
+        M.MaxNewCapacityGroup = Param(M.RegionalIndices, M.time_optimize, M.tech_group_names)
         M.MinCapShare_rptg = Set(dimen=4, initialize=MinCapShareIndices)
         M.MinCapacityShare = Param(M.MinCapShare_rptg)
         M.MaxCapacityShare = Param(M.MinCapShare_rptg)
@@ -850,11 +850,11 @@ class TemoaModel(AbstractModel):
             M.TechOutputSplitAnnualConstraint_rptvo, rule=TechOutputSplitAnnual_Constraint
         )
 
-        M.RenewablePortfolioStandardConstraint_rpt = Set(
+        M.RenewablePortfolioStandardConstraint_rpg = Set(
             dimen=2, initialize=lambda M: M.RenewablePortfolioStandard.sparse_iterkeys()
         )
         M.RenewablePortfolioStandardConstraint = Constraint(
-            M.RenewablePortfolioStandardConstraint_rpt, rule=RenewablePortfolioStandard_Constraint
+            M.RenewablePortfolioStandardConstraint_rpg, rule=RenewablePortfolioStandard_Constraint
         )
 
         M.LinkedEmissionsTechConstraint_rpsdtve = Set(

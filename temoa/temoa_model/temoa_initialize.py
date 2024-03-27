@@ -867,8 +867,8 @@ def RegionalGlobalInitializedIndices(M: 'TemoaModel'):
 
 
 def MinCapShareIndices(M: 'TemoaModel'):
-    indices = set((r, p, t, g) for g in M.groups for r, p, t in M.processVintages.keys() if
-                  (r, g, t) in M.tech_groups)
+    indices = set((r, p, t, g) for g in M.tech_group_names for r, p, t in M.processVintages.keys() if
+                  t in M.tech_group_members[g])
 
     return indices
 

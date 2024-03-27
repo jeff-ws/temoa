@@ -2,8 +2,8 @@
 scenario = "test run"
 scenario_mode = "perfect_foresight"
 
-input_file = "testing_data/temoa_utopia.sqlite"
-output_database = "testing_outputs/temoa_utopia.sqlite"
+input_file = "testing_data/temoa_utopia_v3.sqlite"
+output_database = "testing_outputs/temoa_utopia_v3.sqlite"
 neos = false
 
 # solver

@@ -81,7 +81,7 @@ for db in databases:
 def copy_utopia_for_myopic():
     logger.debug('Making a copy of utopia for testing')
     shutil.copy(
-        os.path.join(data_source_path, 'temoa_utopia.sqlite'),
+        os.path.join(data_source_path, 'temoa_utopia_v3.sqlite'),
         os.path.join(data_output_path, 'myo_temoa_utopia.sqlite'),
     )
 

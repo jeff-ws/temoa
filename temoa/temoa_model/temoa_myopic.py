@@ -69,7 +69,7 @@ def myopic_db_generator_solver(self):
                      'TechInputSplit', 'TechInputSplitAverage', 'TechOutputSplit', 'CapacityCredit',
                      'RenewablePortfolioStandard']
     # group 2 consists of non output tables in which "vintage" is a column name except for CostFixed and CostVariable (taken care of above)
-    tables_group2 = ['CapacityFactorProcess', 'CostInvest', 'DiscountRate', \
+    tables_group2 = ['CapacityFactorProcess', 'CostInvest', 'LoanRate', \
                      'Efficiency', 'EmissionActivity', 'ExistingCapacity', 'LifetimeProcess']
 
     version = int(sys.version[0])
@@ -148,7 +148,7 @@ def myopic_db_generator_solver(self):
 
         for table in tables_group2:
             if table in [x[0] for x in table_list]:
-                if table == 'CostInvest' or table == 'DiscountRate':
+                if table == 'CostInvest' or table == 'LoanRate':
                     cur.execute("UPDATE " + table + " SET tech = TRIM(tech);")
                     cur.execute("DELETE FROM " + table + " WHERE vintage > " + str(time_periods[i][0]) + ";")
                 else:
@@ -346,7 +346,7 @@ def myopic_db_generator_solver(self):
                             df_table.to_sql(str(table[0]), con, if_exists='append', index=False)
 
                     # For these two table we only want current vintages.
-                    if table[0] == 'CostInvest' or table[0] == 'DiscountRate':
+                    if table[0] == 'CostInvest' or table[0] == 'LoanRate':
                         cur.execute("DELETE FROM " + str(table[0]) + " WHERE vintage > " + str(
                             time_periods[i][0]) + " OR vintage < " + str(time_periods[i - (N - 1)][0]) + ";")
                     if table[0] == 'CostVariable' or table[0] == 'CostFixed':

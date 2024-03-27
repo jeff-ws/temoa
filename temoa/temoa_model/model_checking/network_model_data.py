@@ -162,23 +162,23 @@ def _build_from_db(
     default_lifetime = TemoaModel.default_lifetime_tech
     if not myopic_index:
         query = (
-            '  SELECT main.Efficiency.regions, input_comm, Efficiency.tech, Efficiency.vintage, output_comm,  '
-            f'  coalesce(main.LifetimeProcess.life_process, main.LifetimeTech.life, {default_lifetime}) AS lifetime '
+            '  SELECT main.Efficiency.region, input_comm, Efficiency.tech, Efficiency.vintage, output_comm,  '
+            f'  coalesce(main.LifetimeProcess.lifetime, main.LifetimeTech.life, {default_lifetime}) AS lifetime '
             '   FROM main.Efficiency '
             '    LEFT JOIN main.LifetimeProcess '
             '       ON main.Efficiency.tech = LifetimeProcess.tech '
             '       AND main.Efficiency.vintage = LifetimeProcess.vintage '
-            '       AND main.Efficiency.regions = LifetimeProcess.region '
+            '       AND main.Efficiency.region = LifetimeProcess.region '
             '    LEFT JOIN main.LifetimeTech '
             '       ON main.Efficiency.tech = main.LifetimeTech.tech '
-            '     AND main.Efficiency.regions = main.LifeTimeTech.region '
+            '     AND main.Efficiency.region = main.LifeTimeTech.region '
             '   JOIN TimePeriod '
-            '   ON Efficiency.vintage = time_periods.t_periods '
+            '   ON Efficiency.vintage = TimePeriod.period '
         )
     else:  # we need to pull from the MyopicEfficiency Table
         query = (
             '  SELECT main.MyopicEfficiency.region, input_comm, MyopicEfficiency.tech, MyopicEfficiency.vintage, output_comm,  '
-            f'  coalesce(main.LifetimeProcess.life_process, main.LifetimeTech.life, {default_lifetime}) AS lifetime '
+            f'  coalesce(main.LifetimeProcess.lifetime, main.LifetimeTech.lifetime, {default_lifetime}) AS lifetime '
             '   FROM main.MyopicEfficiency '
             '    LEFT JOIN main.LifetimeProcess '
             '       ON main.MyopicEfficiency.tech = LifetimeProcess.tech '
@@ -188,7 +188,7 @@ def _build_from_db(
             '       ON main.MyopicEfficiency.tech = main.LifetimeTech.tech '
             '     AND main.MyopicEfficiency.region = main.LifeTimeTech.region '
             '   JOIN TimePeriod '
-            '   ON MyopicEfficiency.vintage = time_periods.t_periods '
+            '   ON MyopicEfficiency.vintage = TimePeriod.period '
             # f'   WHERE main.MyopicEfficiency.vintage <= {myopic_index.last_demand_year}'
         )
     raw = cur.execute(query).fetchall()
