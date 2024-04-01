@@ -104,7 +104,7 @@ def build(data, *args, **kwargs) -> NetworkModelData:
     return builder(data, *args, **kwargs)
 
 
-def _get_builder(data) -> NetworkModelData:
+def _get_builder(data):
     if isinstance(data, TemoaModel | ConcreteModel):
         # dev note:  The built instance will be a ConcreteModel
         builder = _build_from_model

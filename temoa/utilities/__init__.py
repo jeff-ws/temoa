@@ -1,6 +1,4 @@
-"""
-
-"""
+""" """
 
 # Written by:  J. F. Hyink
 # jeff@westernspark.us
