@@ -29,10 +29,11 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 import sqlite3
 from logging import getLogger
 from pathlib import Path
-from sys import stderr as SE
+from sys import stderr as SE, version_info
 from time import time
 from typing import Tuple
 
+import deprecated
 import pyomo.opt
 from pyomo.environ import DataPortal, Suffix, Var, Constraint, value, UnknownSolver, SolverFactory
 from pyomo.opt import SolverResults, SolverStatus, TerminationCondition
@@ -44,6 +45,7 @@ from temoa.temoa_model.temoa_model import TemoaModel
 logger = getLogger(__name__)
 
 
+@deprecated.deprecated('dat files are no longer supported...for removal')
 def load_portal_from_dat(dat_file: Path, silent: bool = False) -> DataPortal:
     loaded_portal = DataPortal(model=TemoaModel())
 
@@ -64,34 +66,75 @@ def load_portal_from_dat(dat_file: Path, silent: bool = False) -> DataPortal:
     return loaded_portal
 
 
-def check_database_version(config: TemoaConfig) -> bool:
-    """use some indicators to determine if a database(s) are current with version"""
+def check_python_version(min_major, min_minor) -> bool:
+    if (min_major, min_minor) >= version_info:
+        logger.error(
+            'Model is being run with python %d.%d.  Expecting version %d.%d or later.  ',
+            version_info.major,
+            version_info.minor,
+            min_major,
+            min_minor,
+        )
+        return False
+    return True
+
+
+def check_database_version(config: TemoaConfig, db_major_reqd: int, min_db_minor) -> bool:
+    """
+    check the db version
+    :param config: TemoaConfig instance
+    :param db_major_reqd: the required major version (equality test)
+    :param min_db_minor: the required minimum minor version (GTE test)
+    :return: T/F
+    """
     input_conn, input_path = sqlite3.connect(config.input_file), config.input_file
     if config.input_file == config.output_database:
         output_conn = None
     else:
         output_conn = sqlite3.connect(config.output_database)
-    conns = [
+    cons = [
         (input_conn, input_path),
     ]
     if output_conn is not None:
-        conns.append((output_conn, config.output_database))
-    # check for db migration #1:  indicator: unlim_cap field in technologies
-    for conn, name in conns:
-        try:
-            conn.execute('SELECT unlim_cap FROM Technology').fetchone()
-        except sqlite3.OperationalError:
-            logger.error('Database did not pass screening for db migration #1')
-            SE.write(
-                f'Database {name} did not pass screening for db migration #1 which adds "unlim_cap" field\n'
-                'to the database Technology table.  Migrate the DB manually using the sql\n'
-                'command in the utilities folder.  Command should look similar to:\n'
-                '> sqlite3 /path/to/my_database.sqlite < /path/to/utilities/db_migration_1.sql'
-            )
-            return False
+        cons.append((output_conn, config.output_database))
+    # check for correct version
+    all_good = True
 
-    # other future check ...
-    return True
+    for con, name in cons:
+        try:
+            db_major = con.execute(
+                "SELECT value from MetaData where element = 'DB_MAJOR'"
+            ).fetchone()
+            db_minor = con.execute(
+                "SELECT value from MetaData where element = 'DB_MINOR'"
+            ).fetchone()
+            db_major = db_major[0] if db_major else -1
+            db_minor = db_minor[0] if db_minor else -1
+        except sqlite3.OperationalError:
+            logger.error(
+                'Database does not appear to have MetaData table with required versioning info.  See schema for v3+.'
+            )
+            SE.write(
+                'Database does not appear to have MetaData table with required.  Is this version 3+ compatible?\n'
+                'If required, see dox on using the database migrator to move to v3.'
+            )
+            db_major, db_minor = -1, -1
+        finally:
+            con.close()
+
+        good_version = db_major == db_major_reqd and db_minor >= min_db_minor
+        if not good_version:
+            logger.error(
+                'Database %s version %d.%d does not match the major version %d and have at least minor version %d',
+                str(name),
+                db_major,
+                db_minor,
+                db_major_reqd,
+                min_db_minor,
+            )
+        all_good &= good_version
+
+    return all_good
 
 
 def build_instance(
@@ -176,69 +219,52 @@ def solve_instance(
         SE.write('[        ] Solving.')
         SE.flush()
 
-    try:
-        logger.info(
-            'Starting the solve process using %s solver on model %s', solver_name, instance.name
-        )
-        if solver_name == 'neos':
-            raise NotImplementedError('Neos based solve is not currently supported')
-            # result = options.optimizer.solve(instance, opt=options.solver)
-        else:
-            if solver_name == 'cbc':
-                pass
-                # dev note:  I think these options are outdated.  Getting decent results without them...
-                #            preserved for now.
-                # Solver options. Reference:
-                # https://genxproject.github.io/GenX/dev/solver_configuration/
-                # optimizer.options["dualTolerance"] = 1e-6
-                # optimizer.options["primalTolerance"] = 1e-6
-                # optimizer.options["zeroTolerance"] = 1e-12
-                # optimizer.options["crossover"] = 'off'
+    logger.info(
+        'Starting the solve process using %s solver on model %s', solver_name, instance.name
+    )
+    if solver_name == 'neos':
+        raise NotImplementedError('Neos based solve is not currently supported')
+        # result = options.optimizer.solve(instance, opt=options.solver)
+    else:
+        if solver_name == 'cbc':
+            pass
+            # dev note:  I think these options are outdated.  Getting decent results without them...
+            #            preserved for now.
+            # Solver options. Reference:
+            # https://genxproject.github.io/GenX/dev/solver_configuration/
+            # optimizer.options["dualTolerance"] = 1e-6
+            # optimizer.options["primalTolerance"] = 1e-6
+            # optimizer.options["zeroTolerance"] = 1e-12
+            # optimizer.options["crossover"] = 'off'
 
-            elif solver_name == 'cplex':
-                # Note: these parameter values are taken to be the same as those in PyPSA
-                # (see: https://pypsa-eur.readthedocs.io/en/latest/configuration.html)
-                optimizer.options['lpmethod'] = 4  # barrier
-                optimizer.options['solutiontype'] = 2  # non basic solution, ie no crossover
-                optimizer.options['barrier convergetol'] = 1.0e-5
-                optimizer.options['feasopt tolerance'] = 1.0e-6
+        elif solver_name == 'cplex':
+            # Note: these parameter values are taken to be the same as those in PyPSA
+            # (see: https://pypsa-eur.readthedocs.io/en/latest/configuration.html)
+            optimizer.options['lpmethod'] = 4  # barrier
+            optimizer.options['solutiontype'] = 2  # non basic solution, ie no crossover
+            optimizer.options['barrier convergetol'] = 1.0e-5
+            optimizer.options['feasopt tolerance'] = 1.0e-6
 
-            elif solver_name == 'appsi_highs':
-                optimizer = SolverFactory('appsi_highs')
+        elif solver_name == 'appsi_highs':
+            pass
 
-            # TODO: still need to add gurobi parameters?
+        # TODO: still need to add gurobi parameters?
 
-            result = optimizer.solve(
-                instance, load_solutions=False
-            )  # , tee=True)  <-- if needed for T/S
-            if (
-                result.solver.status == SolverStatus.ok
-                and result.solver.termination_condition == TerminationCondition.optimal
-            ):
-                instance.solutions.load_from(result)
+        result = optimizer.solve(
+            instance, load_solutions=False
+        )  # , tee=True)  <-- if needed for T/S
+        if (
+            result.solver.status == SolverStatus.ok
+            and result.solver.termination_condition == TerminationCondition.optimal
+        ):
+            instance.solutions.load_from(result)
 
-            # opt = appsi.solvers.Highs()
-            # # opt.config.load_solution=False
-            # try:
-            #     res = opt.solve(instance)
-            #     result = res.termination_condition.name
-            # except RuntimeError as e:
-            #     print('failed highs solve')
-            #     result = None
+        logger.info('Solve process complete')
+        logger.debug('Solver results: \n %s', result.solver)
 
-            logger.info('Solve process complete')
-            logger.debug('Solver results: \n %s', result.solver)
-
-        if not silent:
-            SE.write('\r[%8.2f] Model solved.\n' % (time() - hack))
-            SE.flush()
-
-    except Exception as model_exc:
-        # yield "Exception found in solve_temoa_instance\n"
-        SE.write('Exception found in solve_temoa_instance\n')
-        # yield str(model_exc) + '\n'
-        SE.write(str(model_exc))
-        raise model_exc
+    if not silent:
+        SE.write('\r[%8.2f] Model solved.\n' % (time() - hack))
+        SE.flush()
 
     # TODO:  It isn't clear that we need to push the solution values into the Result object:  it appears to be used in
     #        pformat results, but why not just use the instance?
@@ -252,7 +278,7 @@ def check_solve_status(result: SolverResults) -> tuple[bool, str]:
     :param result: the results object returned by the solver
     :return: tuple of status boolean (True='optimal', others False), and string message if not optimal
     """
-    # dev note:  pyomo now offerst the check function below, which simplifies this function
+    # dev note:  pyomo now offers the check function below, which simplifies this function
     #            probably to a 1-liner.  Unsure if it is supported for all solvers, so will leave this
     #            for now.
 

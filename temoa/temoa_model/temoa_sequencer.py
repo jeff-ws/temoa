@@ -44,12 +44,19 @@ from temoa.temoa_model.run_actions import (
     solve_instance,
     handle_results,
     check_solve_status,
+    check_python_version,
+    check_database_version,
 )
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_mode import TemoaMode
 from temoa.temoa_model.temoa_model import TemoaModel
-from temoa.temoa_model.temoa_run import temoa_checks
+from temoa.temoa_model.version_requirements import (
+    DB_MAJOR_VERSION,
+    MIN_DB_MINOR_VERSION,
+    MIN_PYTHON_MAJOR,
+    MIN_PYTHON_MINOR,
+)
 
 logger = getLogger(__name__)
 
@@ -109,8 +116,15 @@ class TemoaSequencer:
             config_file=self.config_file, output_path=self.output_path, silent=self.silent
         )
 
-        # TODO:  Screen this vs. what is already done at this point
-        temoa_checks(self.config)
+        # Run some checks...
+        good = True
+        good &= check_python_version(MIN_PYTHON_MAJOR, MIN_PYTHON_MINOR)
+        good &= check_database_version(
+            self.config, db_major_reqd=DB_MAJOR_VERSION, min_db_minor=MIN_DB_MINOR_VERSION
+        )
+        if not good:
+            logger.error('Failed pre-run checks...')
+            sys.exit(-1)
 
         # Distill the TemoaMode
         # self.temoa_mode = self.mode_override if self.mode_override else self.config.scenario_mode

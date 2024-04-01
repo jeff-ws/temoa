@@ -579,7 +579,7 @@ CREATE TABLE IF NOT EXISTS "tech_flex" (
 CREATE TABLE tech_new_cluster ( regions TEXT, tech TEXT, cap_size REAL, PRIMARY KEY (regions, tech));
 CREATE TABLE IF NOT EXISTS "tech_ramping" (
 	"tech"	text,
-	PRIMARY KEY("tech")
+	PRIMARY KEY("tech"),
 	FOREIGN KEY("tech") REFERENCES "technologies"("tech")
 );
 CREATE TABLE IF NOT EXISTS "tech_reserve" (
