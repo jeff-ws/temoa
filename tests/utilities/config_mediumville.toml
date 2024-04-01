@@ -19,7 +19,7 @@ scenario_mode = "build_only"
 # Input file (Mandatory)
 # Input can be a .sqlite or .dat file
 # Both relative path and absolute path are accepted
-input_file = "../testing_data/mediumville.sqlite"
+input_file = "../testing_outputs/mediumville.sqlite"
 
 # Output file (Mandatory)
 # The output file must be an existing .sqlite file

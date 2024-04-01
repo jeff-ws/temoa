@@ -25,8 +25,9 @@ https://westernspark.us
 Created on:  2/2/24
 
 """
+
 import pytest
-from pyomo.environ import Set, Param, ConcreteModel, Any
+from pyomo.environ import Any, ConcreteModel, Param, Set
 
 from temoa.temoa_model.model_checking.pricing_check import check_tech_uncap
 

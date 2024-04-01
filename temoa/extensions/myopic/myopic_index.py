@@ -1,6 +1,7 @@
 """
 A simple frozen data structure to hold instance info on myopic runs
 """
+
 """
 Tools for Energy Model Optimization and Analysis (Temoa):
 An open source framework for energy systems optimization modeling

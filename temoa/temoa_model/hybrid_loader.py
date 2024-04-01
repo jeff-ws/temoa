@@ -150,7 +150,23 @@ class HybridLoader:
 
         # filter/don't filter.  (always must when myopic)
         if use_raw_data:
-            efficiency_entries = [row[0] for row in contents]
+            efficiency_entries = [row for row in contents]
+            # need to build filters to include everything in the raw efficiency data
+            # this will still help filter anything spurious that is not covered by the data
+            # in the efficiency table
+            self._clear_filters()
+            for row in contents:
+                r, i, t, v, o, _, _ = row
+                self.viable_ritvo.add((r, i, t, v, o))
+                self.viable_rtv.add((r, t, v))
+                self.viable_rt.add((r, t))
+                self.viable_techs.add(t)
+                self.viable_vintages.add(v)
+                self.viable_input_comms.add(i)
+                self.viable_output_comms.add(o)
+            self.viable_comms = self.viable_input_comms | self.viable_output_comms
+            self.viable_rtt = {(r, t1, t2) for r, t1 in self.viable_rt for t2 in self.viable_techs}
+
         else:
             self._clear_filters()
             filts = {}
@@ -461,6 +477,21 @@ class HybridLoader:
                 case _:
                     raise ValueError(f'Component type unrecognized: {c}, {type(c)}')
 
+        def load_indexed_set(indexed_set: Set, index_value, element, element_validator):
+            """
+            load an element into an indexed set in the data store
+            :param set_name: the name of the pyomo Set
+            :param index_value: the index value to load into
+            :param element: the value to add to the indexed set
+            :param element_validator: a set of legal elements for the element to be added
+            :return: None
+            """
+            if element not in element_validator:
+                return
+            data_store = data.get(indexed_set.name, defaultdict(list))
+            data_store[index_value].append(element)
+            data[indexed_set.name] = data_store
+
         M: TemoaModel = TemoaModel()  # for typing purposes only
         cur = self.con.cursor()
 
@@ -584,21 +615,25 @@ class HybridLoader:
 
         if self.table_exists('TechGroupMember'):
             raw = cur.execute('SELECT group_name, tech FROM main.TechGroupMember').fetchall()
-            load_element(M.tech_group_members, raw, self.viable_techs, (1,))
+            for row in raw:
+                load_indexed_set(
+                    M.tech_group_members,
+                    index_value=row[0],
+                    element=row[1],
+                    element_validator=self.viable_techs,
+                )
 
         # tech_annual
         raw = cur.execute('SELECT tech FROM Technology WHERE annual > 0').fetchall()
         load_element(M.tech_annual, raw, self.viable_techs)
 
         # tech_variable
-        if self.table_exists('tech_variable'):
-            raw = cur.execute('SELECT tech FROM Technology WHERE variable > 0').fetchall()
-            load_element(M.tech_variable, raw, self.viable_techs)
+        raw = cur.execute('SELECT tech FROM Technology WHERE variable > 0').fetchall()
+        load_element(M.tech_variable, raw, self.viable_techs)
 
         # tech_retirement
-        if self.table_exists('tech_retirement'):
-            raw = cur.execute('SELECT tech FROM Technology WHERE retire > 0').fetchall()
-            load_element(M.tech_retirement, raw, self.viable_techs)
+        raw = cur.execute('SELECT tech FROM Technology WHERE retire > 0').fetchall()
+        load_element(M.tech_retirement, raw, self.viable_techs)
 
         #  === COMMODITIES ===
 
@@ -771,7 +806,7 @@ class HybridLoader:
             load_element(M.TechOutputSplit, raw, self.viable_rt, (0, 2))
 
         # RenewablePortfolioStandard
-        if self.table_exists('RenewablePortfolioStandard'):
+        if self.table_exists('RPSRequirement'):
             if mi:
                 raw = cur.execute(
                     'SELECT region, period, tech_group, requirement FROM main.RPSRequirement '
@@ -1123,7 +1158,7 @@ class HybridLoader:
         # LinkedTechs
         # Note:  Both of the linked techs must be viable.  As this is non period/vintage
         #        specific, it should be true that if one is built, the other is also
-        if self.table_exists('LinkedTechs'):
+        if self.table_exists('LinkedTech'):
             raw = cur.execute(
                 'SELECT primary_region, primary_tech, emis_comm, driven_tech FROM main.LinkedTech'
             ).fetchall()

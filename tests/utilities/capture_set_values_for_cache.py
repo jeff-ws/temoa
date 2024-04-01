@@ -36,6 +36,7 @@ import pyomo.environ as pyo
 
 from definitions import PROJECT_ROOT
 from temoa.temoa_model.temoa_sequencer import TemoaSequencer
+from tests.conftest import refresh_databases
 
 print(
     'WARNING:  Continuing to execute this file will '
@@ -67,6 +68,9 @@ scenarios = [
         'config_file': Path(PROJECT_ROOT, 'tests', 'utilities', 'config_mediumville.toml'),
     },
 ]
+# make new copies of the DB's from source...
+refresh_databases()
+
 for scenario in scenarios:
     ts = TemoaSequencer(config_file=scenario['config_file'], output_path=output_path)
 

@@ -25,9 +25,10 @@ https://westernspark.us
 Created on:  3/10/24
 
 """
+
 import logging
 import sqlite3
-from collections import namedtuple, defaultdict
+from collections import defaultdict, namedtuple
 from itertools import chain
 from typing import Self
 
@@ -163,7 +164,7 @@ def _build_from_db(
     if not myopic_index:
         query = (
             '  SELECT main.Efficiency.region, input_comm, Efficiency.tech, Efficiency.vintage, output_comm,  '
-            f'  coalesce(main.LifetimeProcess.lifetime, main.LifetimeTech.life, {default_lifetime}) AS lifetime '
+            f'  coalesce(main.LifetimeProcess.lifetime, main.LifetimeTech.lifetime, {default_lifetime}) AS lifetime '
             '   FROM main.Efficiency '
             '    LEFT JOIN main.LifetimeProcess '
             '       ON main.Efficiency.tech = LifetimeProcess.tech '

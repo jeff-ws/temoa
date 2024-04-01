@@ -25,6 +25,7 @@ https://westernspark.us
 Created on:  3/1/24
 
 """
+
 import pytest
 
 from temoa.temoa_model import table_writer

@@ -55,8 +55,8 @@ class TemoaModel(AbstractModel):
     # this is used in several places outside this class, and this provides no-build access to it
     default_lifetime_tech = 40
 
-    def __init__(M, *args, **kwds):
-        AbstractModel.__init__(M, *args, **kwds)
+    def __init__(M, *args, **kwargs):
+        AbstractModel.__init__(M, *args, **kwargs)
 
         ################################################
         #       Internally used Data Containers        #
@@ -306,8 +306,8 @@ class TemoaModel(AbstractModel):
         M.CostVariable = Param(M.CostVariable_rptv)
 
         M.LoanRate_rtv = Set(dimen=3, initialize=lambda M: M.CostInvest.keys())
-        M.DefaultLoanRate = Param()
-        M.LoanRate = Param(M.LoanRate_rtv, default=M.DefaultLoanRate)
+        M.DefaultLoanRate = Param(domain=NonNegativeReals)
+        M.LoanRate = Param(M.LoanRate_rtv, domain=NonNegativeReals, default=get_default_loan_rate)
 
         M.Loan_rtv = Set(dimen=3, initialize=lambda M: M.CostInvest.keys())
         M.LoanAnnualize = Param(M.Loan_rtv, initialize=ParamLoanAnnualize_rule)
@@ -851,7 +851,7 @@ class TemoaModel(AbstractModel):
         )
 
         M.RenewablePortfolioStandardConstraint_rpg = Set(
-            dimen=2, initialize=lambda M: M.RenewablePortfolioStandard.sparse_iterkeys()
+            dimen=3, initialize=lambda M: M.RenewablePortfolioStandard.sparse_iterkeys()
         )
         M.RenewablePortfolioStandardConstraint = Constraint(
             M.RenewablePortfolioStandardConstraint_rpg, rule=RenewablePortfolioStandard_Constraint
