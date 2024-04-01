@@ -2044,7 +2044,9 @@ def MinActivity_Constraint(M: 'TemoaModel', r, p, t):
     expr = activity_rpt >= min_act
     # in the case that there is nothing to sum, skip
     if isinstance(expr, bool):  # an empty list was generated
-        raise ValueError('no activities to support minimum activity constraint')
+        logger.error('No elements available to support min-activity: (%s, %d, %s).'
+                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, t)
+        return Constraint.Skip
     return expr
 
 
@@ -2093,7 +2095,9 @@ def MinActivityGroup_Constraint(M: 'TemoaModel', r, p, g):
     expr = activity_p + activity_p_annual >= min_act
     # in the case that there is nothing to sum, skip
     if isinstance(expr, bool):  # an empty list was generated
-        raise ValueError('no activities to support minimum activity constraint')
+        logger.error('No elements available to support min-activity group: (%s, %d, %s).'
+                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        return Constraint.Skip
     return expr
 
 
@@ -2299,7 +2303,9 @@ def MinCapacityGroup_Constraint(M: 'TemoaModel', r, p, g):
     expr = cap >= min_capgroup
     # in the case that there is nothing to sum, skip
     if isinstance(expr, bool):  # an empty list was generated
-        raise ValueError('no activities to support min capacity group constraint')
+        logger.error('No elements available to support min-capacity group: (%s, %d, %s).'
+                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        return Constraint.Skip
     return expr
 
 
@@ -2314,7 +2320,9 @@ def MinNewCapacityGroup_Constraint(M: 'TemoaModel', r, p, g):
     )
     expr = agg_new_cap >= min_new_cap
     if isinstance(expr, bool):
-        raise ValueError('no activities to support min new capacity group constraint')
+        logger.error('No elements available to support min-activity group: (%s, %d, %s).'
+                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        return Constraint.Skip
     return expr
 
 
@@ -2384,7 +2392,9 @@ def MinActivityShare_Constraint(M: 'TemoaModel', r, p, t, g):
     expr = activity_t >= min_activity_share * activity_group
     # in the case that there is nothing to sum, skip
     if isinstance(expr, bool):  # an empty list was generated
-        raise ValueError('no activity to support min activity share constraint')
+        logger.error('No elements available to support min-activity share group: (%s, %d, %s).'
+                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        return Constraint.Skip
     return expr
 
 
@@ -2471,7 +2481,9 @@ def MinCapacityShare_Constraint(M: 'TemoaModel', r, p, t, g):
 
     expr = capacity_t >= min_cap_share * capacity_group
     if isinstance(expr, bool):
-        raise ValueError('no activity to support min cap share constraint')
+        logger.error('No elements available to support min-capacity share: (%s, %d, %s).'
+                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        return Constraint.Skip
     return expr
 
 
@@ -2515,7 +2527,9 @@ def MinNewCapacityShare_Constraint(M: 'TemoaModel', r, p, t, g):
 
     expr = capacity_t >= min_cap_share * capacity_group
     if isinstance(expr, bool):
-        raise ValueError('no activity to support min capacity share constraint')
+        logger.error('No elements available to support min-new capacity share: (%s, %d, %s).'
+                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        return Constraint.Skip
     return expr
 
 
@@ -2582,7 +2596,9 @@ def MinAnnualCapacityFactor_Constraint(M: 'TemoaModel', r, p, t, o):
     expr = activity_rpt >= min_annual_cf * max_possible_activity_rpt
     # in the case that there is nothing to sum, skip
     if isinstance(expr, bool):  # an empty list was generated
-        raise ValueError('no activities to support min ACF')
+        logger.error('No elements available to support min-annual capacity factor: (%s, %d, %s).'
+                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, t)
+        return Constraint.Skip
     return expr
 
 

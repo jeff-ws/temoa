@@ -1,6 +1,7 @@
 """
 tool for writing outputs to database tables
 """
+
 from collections import defaultdict
 from enum import Enum, unique
 from logging import getLogger
@@ -103,7 +104,7 @@ class ExchangeTechCostLedger:
                 period < vintage,
             )
         ):
-            raise ValueError(f'received a bogus cost for an illegal period.')
+            raise ValueError('received a bogus cost for an illegal period.')
         if tech not in M.tech_annual:
             act_dir1 = value(
                 sum(

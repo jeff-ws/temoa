@@ -5,7 +5,7 @@ source technologies
 
 from temoa.temoa_model.model_checking import network_model_data
 from temoa.temoa_model.model_checking.commodity_graph import generate_graph
-from temoa.temoa_model.model_checking.commodity_network import logger, CommodityNetwork
+from temoa.temoa_model.model_checking.commodity_network import CommodityNetwork, logger
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
 

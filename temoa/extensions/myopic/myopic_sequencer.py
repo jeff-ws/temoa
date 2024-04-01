@@ -25,10 +25,11 @@ https://westernspark.us
 Created on:  1/15/24
 
 """
+
 import logging
 import sqlite3
 import sys
-from collections import deque, defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
 from sqlite3 import Connection
 from sys import stderr as SE
@@ -69,7 +70,7 @@ class MyopicSequencer:
         'OutputFlowOut',
         'OutputNetCapacity',
         'OutputObjective',
-        'OutputRetiredCapacity'
+        'OutputRetiredCapacity',
     ]
     tables_without_scenario_reference = [
         'MyopicNetCapacity',
@@ -89,7 +90,7 @@ class MyopicSequencer:
         'OutputFlowIn',
         'OutputFlowOut',
         'OutputNetCapacity',
-        'OutputRetiredCapacity'
+        'OutputRetiredCapacity',
     ]
 
     def __init__(self, config: TemoaConfig | None):
@@ -304,6 +305,7 @@ class MyopicSequencer:
         # the "coalesce" is an if-else structure to pluck out the correct lifetime value, precedence left->right
         default_lifetime = TemoaModel.default_lifetime_tech
         query = (
+            'INSERT INTO MyopicEfficiency '
             '  SELECT -1, main.Efficiency.region, input_comm, Efficiency.tech, Efficiency.vintage, output_comm, efficiency, '
             f'  coalesce(main.LifetimeProcess.lifetime, main.LifetimeTech.lifetime, {default_lifetime}) AS lifetime '
             '   FROM main.Efficiency '
@@ -316,8 +318,8 @@ class MyopicSequencer:
             '     AND main.Efficiency.region = main.LifeTimeTech.region '
             '   JOIN TimePeriod '
             '   ON Efficiency.vintage = TimePeriod.period '
-            "   WHERE flag = 'e'")
-
+            "   WHERE flag = 'e'"
+        )
 
         if self.debugging:
             print(query)

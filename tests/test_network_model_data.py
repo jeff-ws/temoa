@@ -25,6 +25,7 @@ https://westernspark.us
 Created on:  3/11/24
 
 """
+
 from itertools import chain
 from unittest.mock import MagicMock
 

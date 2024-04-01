@@ -25,6 +25,7 @@ A complete copy of the GNU General Public License v2 (GPLv2) is available
 in LICENSE.txt.  Users uncompressing this from an archive may not have
 received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 import sqlite3
 from logging import getLogger
 from pathlib import Path
@@ -70,7 +71,9 @@ def check_database_version(config: TemoaConfig) -> bool:
         output_conn = None
     else:
         output_conn = sqlite3.connect(config.output_database)
-    conns = [(input_conn, input_path), ]
+    conns = [
+        (input_conn, input_path),
+    ]
     if output_conn is not None:
         conns.append((output_conn, config.output_database))
     # check for db migration #1:  indicator: unlim_cap field in technologies
@@ -79,10 +82,12 @@ def check_database_version(config: TemoaConfig) -> bool:
             conn.execute('SELECT unlim_cap FROM Technology').fetchone()
         except sqlite3.OperationalError:
             logger.error('Database did not pass screening for db migration #1')
-            SE.write(f'Database {name} did not pass screening for db migration #1 which adds "unlim_cap" field\n'
-                     'to the database Technology table.  Migrate the DB manually using the sql\n'
-                     'command in the utilities folder.  Command should look similar to:\n'
-                     '> sqlite3 /path/to/my_database.sqlite < /path/to/utilities/db_migration_1.sql')
+            SE.write(
+                f'Database {name} did not pass screening for db migration #1 which adds "unlim_cap" field\n'
+                'to the database Technology table.  Migrate the DB manually using the sql\n'
+                'command in the utilities folder.  Command should look similar to:\n'
+                '> sqlite3 /path/to/my_database.sqlite < /path/to/utilities/db_migration_1.sql'
+            )
             return False
 
     # other future check ...
@@ -90,11 +95,11 @@ def check_database_version(config: TemoaConfig) -> bool:
 
 
 def build_instance(
-        loaded_portal: DataPortal,
-        model_name=None,
-        silent=False,
-        keep_lp_file=False,
-        lp_path: Path = None,
+    loaded_portal: DataPortal,
+    model_name=None,
+    silent=False,
+    keep_lp_file=False,
+    lp_path: Path = None,
 ) -> TemoaModel:
     """
     Build a Temoa Instance from data
@@ -142,7 +147,7 @@ def build_instance(
 
 
 def solve_instance(
-        instance: TemoaModel, solver_name, silent: bool = False
+    instance: TemoaModel, solver_name, silent: bool = False
 ) -> Tuple[TemoaModel, SolverResults]:
     """
     Solve the instance and return a loaded instance
@@ -207,8 +212,8 @@ def solve_instance(
                 instance, load_solutions=False
             )  # , tee=True)  <-- if needed for T/S
             if (
-                    result.solver.status == SolverStatus.ok
-                    and result.solver.termination_condition == TerminationCondition.optimal
+                result.solver.status == SolverStatus.ok
+                and result.solver.termination_condition == TerminationCondition.optimal
             ):
                 instance.solutions.load_from(result)
 

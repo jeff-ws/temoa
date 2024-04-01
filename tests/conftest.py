@@ -30,8 +30,8 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
 import os
-import pathlib
-import shutil
+import sqlite3
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -62,28 +62,29 @@ logging.getLogger('pyomo').setLevel(logging.WARNING)
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('pyutilib').setLevel(logging.WARNING)
 
-# ensure that dummy copies of utopia and test_system databases are available in testing_outputs
-# to catch data.  These are just sumps to absorb non-inspected output to keep the input sources "pristine"
-data_output_path = os.path.join(PROJECT_ROOT, 'tests', 'testing_outputs')
-data_source_path = os.path.join(PROJECT_ROOT, 'tests', 'testing_data')
-databases = (
-    'temoa_utopia.sqlite',
-    'temoa_test_system.sqlite',
-    'storageville.sqlite',
-    'mediumville.sqlite',
-)
-for db in databases:
-    if not os.path.exists(os.path.join(data_output_path, db)):
-        shutil.copy(os.path.join(data_source_path, db), os.path.join(data_output_path, db))
 
-
-# make a fresh copy of utopia for myopic use, when called for
-def copy_utopia_for_myopic():
-    logger.debug('Making a copy of utopia for testing')
-    shutil.copy(
-        os.path.join(data_source_path, 'temoa_utopia_v3.sqlite'),
-        os.path.join(data_output_path, 'myo_temoa_utopia.sqlite'),
+def refresh_databases() -> None:
+    """make new databases from source for testing...  removes possibility of contamination by earlier runs"""
+    data_output_path = Path(PROJECT_ROOT, 'tests', 'testing_outputs')
+    data_source_path = Path(PROJECT_ROOT, 'tests', 'testing_data')
+    databases = (
+        ('utopia.sql', 'utopia.sqlite'),
+        ('utopia.sql', 'myo_utopia.sqlite'),
+        ('test_system.sql', 'test_system.sqlite'),
+        ('storageville.sql', 'storageville.sqlite'),
+        ('mediumville.sql', 'mediumville.sqlite'),
     )
+    for src, db in databases:
+        if Path.exists(data_output_path / db):
+            os.remove(data_output_path / db)
+        # make a new one and fill it
+        con = sqlite3.connect(data_output_path / db)
+        with open(data_source_path / src, 'r') as script:
+            con.executescript(script.read())
+        con.close()
+
+
+refresh_databases()
 
 
 @pytest.fixture()
@@ -95,11 +96,9 @@ def system_test_run(
     """
     data_name = request.param['name']
     logger.info('Setting up and solving: %s', data_name)
-    if data_name == 'myopic utopia':
-        copy_utopia_for_myopic()
     filename = request.param['filename']
     options = {'silent': True, 'debug': True}
-    config_file = pathlib.Path(PROJECT_ROOT, 'tests', 'testing_configs', filename)
+    config_file = Path(PROJECT_ROOT, 'tests', 'testing_configs', filename)
 
     sequencer = TemoaSequencer(
         config_file=config_file,
