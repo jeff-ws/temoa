@@ -25,6 +25,7 @@ A complete copy of the GNU General Public License v2 (GPLv2) is available
 in LICENSE.txt.  Users uncompressing this from an archive may not have
 received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 import re
 from collections import defaultdict
 from logging import getLogger
@@ -47,7 +48,9 @@ def validate_linked_tech(M: 'TemoaModel') -> bool:
     """
     logger.debug('Starting to validate linked techs.')
     # gather the tech-linked_tech pairs
-    tech_pairs = {(k[0], k[1], v) for (k, v) in M.LinkedTechs.items() if v in M.time_optimize}  # (r, t,
+    tech_pairs = {
+        (k[0], k[1], v) for (k, v) in M.LinkedTechs.items() if v in M.time_optimize
+    }  # (r, t,
     # linked_tech) tuples
 
     # get the lifetimes by (r, t) and v for comparison
@@ -134,7 +137,7 @@ def linked_region_check(M: 'TemoaModel', region_pair) -> bool:
         r1 = linked_regions.group(1)
         r2 = linked_regions.group(2)
         if (
-                all(r in M.regions for r in (r1, r2)) and r1 != r2
+            all(r in M.regions for r in (r1, r2)) and r1 != r2
         ):  # both captured regions are in the set of M.R
             return True
     return False
@@ -152,7 +155,7 @@ def region_group_check(M: 'TemoaModel', rg) -> bool:
             # break up the group
             contained_regions = rg.strip().split('+')
             if all(t in M.regions for t in contained_regions) and len(
-                    set(contained_regions)
+                set(contained_regions)
             ) == len(contained_regions):  # no dupes
                 return True
         else:  # it is a singleton
@@ -232,7 +235,12 @@ def activity_group_param_check(M: 'TemoaModel', val, rg, p, g) -> bool:
     :return: True if all OK
     """
     return all(
-        (val in NonNegativeReals, region_group_check(M, rg), p in M.time_optimize, g in M.tech_group_names)
+        (
+            val in NonNegativeReals,
+            region_group_check(M, rg),
+            p in M.time_optimize,
+            g in M.tech_group_names,
+        )
     )
 
 
@@ -277,15 +285,15 @@ def validate_Efficiency(M: 'TemoaModel', val, r, si, t, v, so) -> bool:
     """Handy for troubleshooting problematic entries"""
 
     if all(
-            (
-                    isinstance(val, float),
-                    val > 0,
-                    r in M.RegionalIndices,
-                    si in M.commodity_physical,
-                    t in M.tech_all,
-                    so in M.commodity_carrier,
-                    v in M.vintage_all,
-            )
+        (
+            isinstance(val, float),
+            val > 0,
+            r in M.RegionalIndices,
+            si in M.commodity_physical,
+            t in M.tech_all,
+            so in M.commodity_carrier,
+            v in M.vintage_all,
+        )
     ):
         return True
     print('r', r in M.RegionalIndices)

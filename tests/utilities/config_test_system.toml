@@ -2,8 +2,8 @@
 scenario = "utility run"
 scenario_mode = "build_only"
 
-input_file = "../testing_data/temoa_test_system.sqlite"
-output_database = "../testing_outputs/temoa_test_system.sqlite"
+input_file = "../testing_outputs/test_system.sqlite"
+output_database = "../testing_outputs/test_system.sqlite"
 neos = false
 
 # solver

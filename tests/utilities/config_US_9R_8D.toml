@@ -2,7 +2,7 @@
 scenario = "utility_run"
 scenario_mode = "build_only"
 
-input_file = "../testing_data/US_9R_8D.sqlite"
+input_file = "../testing_outputs/US_9R_8D.sqlite"
 output_database = "../testing_outputs/US_9R_8D.sqlite"
 neos = false
 

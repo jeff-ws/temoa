@@ -2,6 +2,7 @@
 A quick & dirty graph of the commodity network for troubleshooting purposes.  Future
 development may enhance this quite a bit.... lots of opportunity!
 """
+
 from temoa.temoa_model.model_checking.network_model_data import NetworkModelData, Tech
 from temoa.temoa_model.temoa_config import TemoaConfig
 

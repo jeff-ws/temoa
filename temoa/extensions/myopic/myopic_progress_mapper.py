@@ -1,6 +1,7 @@
 """
 Simple visualizer to track the progress of myopic solve
 """
+
 from datetime import datetime, timedelta
 
 from temoa.extensions.myopic.myopic_index import MyopicIndex

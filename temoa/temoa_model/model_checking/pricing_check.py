@@ -41,7 +41,6 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from collections import defaultdict
-
 from logging import getLogger
 from typing import TYPE_CHECKING
 

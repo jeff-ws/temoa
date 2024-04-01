@@ -25,9 +25,10 @@ https://westernspark.us
 Created on:  3/3/24
 
 """
+
 import pytest
 
-from temoa.temoa_model.table_writer import ExchangeTechCostLedger, CostType
+from temoa.temoa_model.table_writer import CostType, ExchangeTechCostLedger
 
 
 class Namespace:

@@ -336,6 +336,12 @@ def get_default_capacity_factor(M: 'TemoaModel', r, s, d, t, v):
     """
     return M.CapacityFactorTech[r,s,d,t]
 
+
+def get_default_loan_rate(M, *_):
+    """get the default loan rate from the DefaultLoanRate param"""
+    return M.DefaultLoanRate()
+
+
 def CreateDemands(M: 'TemoaModel'):
     """
     Steps to create the demand distributions

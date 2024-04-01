@@ -2,8 +2,8 @@
 scenario = "utility_run"
 scenario_mode = "build_only"
 
-input_file = "../testing_data/temoa_utopia.sqlite"
-output_database = "../testing_outputs/temoa_utopia.sqlite"
+input_file = "../testing_outputs/utopia.sqlite"
+output_database = "../testing_outputs/utopia.sqlite"
 neos = false
 
 # solver
