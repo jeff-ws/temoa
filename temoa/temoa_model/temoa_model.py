@@ -305,6 +305,9 @@ class TemoaModel(AbstractModel):
         M.CostVariable_rptv = Set(dimen=4, initialize=CostVariableIndices)
         M.CostVariable = Param(M.CostVariable_rptv)
 
+        M.CostEmission_rpe = Set(dimen=3, domain=M.regions * M.time_optimize * M.commodity_emissions)  # read from data
+        M.CostEmission = Param(M.CostEmission_rpe, domain=NonNegativeReals)
+
         M.LoanRate_rtv = Set(dimen=3, initialize=lambda M: M.CostInvest.keys())
         M.DefaultLoanRate = Param(domain=NonNegativeReals)
         M.LoanRate = Param(M.LoanRate_rtv, domain=NonNegativeReals, default=get_default_loan_rate)
