@@ -104,7 +104,7 @@ class MyopicSequencer:
         self.output_con = self.get_connection() if isinstance(config, TemoaConfig) else None
         self.cursor = self.output_con.cursor()
         self.progress_mapper: MyopicProgressMapper | None = None
-        self.table_writer = TableWriter(self.config, self.output_con)
+        self.table_writer = TableWriter(self.config)
         # break out what is needed from the config
         myopic_options = config.myopic_inputs
         if not myopic_options:

@@ -1,22 +1,22 @@
 """
 tool for writing outputs to database tables
 """
-
+import sqlite3
+import sys
 from collections import defaultdict
-from enum import Enum, unique
 from logging import getLogger
-from sqlite3 import Connection
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from pyomo.core import value
 
 from temoa.temoa_model import temoa_rules
+from temoa.temoa_model.exchange_tech_cost_ledger import CostType, ExchangeTechCostLedger
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_mode import TemoaMode
 from temoa.temoa_model.temoa_model import TemoaModel
 
 if TYPE_CHECKING:
-    from tests.test_exchange_cost_ledger import Namespace
+    pass
 
 """
 Tools for Energy Model Optimization and Analysis (Temoa):
@@ -56,132 +56,16 @@ scenario_based_tables = [
 ]
 
 
-@unique
-class CostType(Enum):
-    INVEST = 1
-    FIXED = 2
-    VARIABLE = 3
-    D_INVEST = 4
-    D_FIXED = 5
-    D_VARIABLE = 6
-
-
-class ExchangeTechCostLedger:
-    def __init__(self, M: Union[TemoaModel, 'Namespace']) -> None:
-        self.cost_records: dict[CostType, dict] = defaultdict(dict)
-        # could be a Namespace for testing purposes...  See the related test
-        self.M = M
-
-    def add_cost_record(self, link: str, period, tech, vintage, cost: float, cost_type: CostType):
-        """
-        add a cost associated with an exchange tech
-        :return:
-        """
-        r1, r2 = link.split('-')
-        if not r1 and r2:
-            raise ValueError(f'problem splitting region-region: {link}')
-        # add to the "seen" records for appropriate cost type
-        self.cost_records[cost_type][r1, r2, tech, vintage, period] = cost
-
-    def get_use_ratio(self, exporter, importer, period, tech, vintage) -> float:
-        """
-        use flow to calculate the use ratio for these 2 entities for cost apportioning purposes
-        :param exporter:
-        :param importer:
-        :param period:
-        :param tech:
-        :param vintage:
-        :return: the proportion to assign to the IMPORTER, or 0.5 if no usage
-        """
-        M = self.M
-        # need to temporarily reconstitute the names
-        rr1 = '-'.join([exporter, importer])
-        rr2 = '-'.join([importer, exporter])
-        if any(
-            (
-                period >= vintage + value(M.LifetimeProcess[rr1, tech, vintage]),
-                period >= vintage + value(M.LifetimeProcess[rr2, tech, vintage]),
-                period < vintage,
-            )
-        ):
-            raise ValueError('received a bogus cost for an illegal period.')
-        if tech not in M.tech_annual:
-            act_dir1 = value(
-                sum(
-                    M.V_FlowOut[rr1, period, s, d, S_i, tech, vintage, S_o]
-                    for s in M.time_season
-                    for d in M.time_of_day
-                    for S_i in M.processInputs[rr1, period, tech, vintage]
-                    for S_o in M.ProcessOutputsByInput[rr1, period, tech, vintage, S_i]
-                )
-            )
-            act_dir2 = value(
-                sum(
-                    M.V_FlowOut[rr2, period, s, d, S_i, tech, vintage, S_o]
-                    for s in M.time_season
-                    for d in M.time_of_day
-                    for S_i in M.processInputs[rr2, period, tech, vintage]
-                    for S_o in M.ProcessOutputsByInput[rr2, period, tech, vintage, S_i]
-                )
-            )
-        else:
-            act_dir1 = value(
-                sum(
-                    M.V_FlowOutAnnual[rr1, period, S_i, tech, vintage, S_o]
-                    for S_i in M.processInputs[rr1, period, tech, vintage]
-                    for S_o in M.ProcessOutputsByInput[rr1, period, tech, vintage, S_i]
-                )
-            )
-            act_dir2 = value(
-                sum(
-                    M.V_FlowOutAnnual[rr2, period, S_i, tech, vintage, S_o]
-                    for S_i in M.processInputs[rr2, period, tech, vintage]
-                    for S_o in M.ProcessOutputsByInput[rr2, period, tech, vintage, S_i]
-                )
-            )
-
-        if act_dir1 + act_dir2 > 0:
-            return act_dir1 / (act_dir1 + act_dir2)
-        return 0.5
-
-    def get_entries(self) -> dict:
-        region_costs = defaultdict(dict)
-        # iterate through each region pairing, pull the cost records and decide if/how to split each one
-        for cost_type in self.cost_records:
-            # make a copy, this will be destructive operation
-            records = self.cost_records[cost_type].copy()
-            while records:
-                (r1, r2, tech, vintage, period), cost = records.popitem()  # pops a random item
-                # try to get the partner (reversed regions), if it exists
-                partner_cost = records.pop((r2, r1, tech, vintage, period), None)
-                if (
-                    partner_cost
-                ):  # they are both entered, so we just record the costs... no splitting
-                    region_costs[r2, period, tech, vintage].update({cost_type: cost})
-                    region_costs[r1, period, tech, vintage].update({cost_type: partner_cost})
-                else:
-                    # only one side had costs: the signal to split based on use
-                    use_ratio = self.get_use_ratio(r1, r2, period, tech, vintage)
-                    # not r2 is the "importer" and that is the ratio assignment
-                    region_costs[r1, period, tech, vintage].update(
-                        {cost_type: cost * (1.0 - use_ratio)}
-                    )
-                    region_costs[r2, period, tech, vintage].update({cost_type: cost * use_ratio})
-
-        return region_costs
-
-
 class TableWriter:
-    def __init__(
-        self,
-        config: TemoaConfig,
-        db_con: Connection,
-        epsilon=1e-5,
-    ):
+    def __init__(self, config: TemoaConfig, epsilon=1e-5):
         self.config = config
         self.epsilon = epsilon
-        self.con = db_con
-
+        try:
+            self.con = sqlite3.connect(config.output_database)
+        except sqlite3.OperationalError as e:
+            logger.error('Failed to connect to output database: %s', config.output_database)
+            logger.error(e)
+            sys.exit(-1)
     def clear_scenario(self):
         cur = self.con.cursor()
         for table in scenario_based_tables:
@@ -408,3 +292,7 @@ class TableWriter:
         qry = 'INSERT INTO OutputCost VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL)'
         cur.executemany(qry, rows)
         self.con.commit()
+
+    def __del__(self):
+        if self.con:
+            self.con.close()

@@ -543,7 +543,7 @@ def pformat_results(pyomo_instance: 'TemoaModel', results: SolverResults, config
               "OutputBuiltCapacity": "OutputBuiltCapacity",
               "OutputRetiredCapacity": "OutputRetiredCapacity",
               #"V_CapacityAvailableByPeriodAndTech": "Output_CapacityByPeriodAndTech",
-              "OutputEmission": "OutputEmission",
+              "V_EmissionActivityByPeriodAndProcess": "OutputEmission",
               "OutputObjective": "OutputObjective",
               #"Costs": "OutputCost"
               }
