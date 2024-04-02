@@ -408,23 +408,29 @@ class HybridLoader:
                                 raise ValueError(
                                     'Trying to use a validation but missing location field in call.'
                                 )
-                            if validation is self.viable_rtv:
+                            elif validation is self.viable_rtv:
                                 data[c.name] = [
                                     t
                                     for t in values
                                     if (t[val_loc[0]], t[val_loc[1]], t[val_loc[2]])
                                     in self.viable_rtv
                                 ]
-                            if validation is self.viable_rt:
+                            elif validation is self.viable_rt:
                                 data[c.name] = [
                                     t
                                     for t in values
                                     if (t[val_loc[0]], t[val_loc[1]]) in self.viable_rt
                                 ]
-                            if validation is self.viable_vintages:
+                            elif validation is self.viable_vintages:
                                 data[c.name] = [
                                     t for t in values if t[val_loc[0]] in self.viable_vintages
                                 ]
+                            elif validation is self.viable_output_comms:
+                                data[c.name] = [
+                                    t for t in values if t[val_loc[0]] in self.viable_output_comms
+                                ]
+                            else:
+                                raise NotImplementedError(f'that validator is not yet incorporated for use in validating: {c.name}')
                         else:
                             data[c.name] = [t for t in values]
 
@@ -856,6 +862,33 @@ class HybridLoader:
                 'SELECT region, period, tech, vintage, cost FROM main.CostVariable '
             ).fetchall()
         load_element(M.CostVariable, raw, self.viable_rtv, (0, 2, 3))
+
+        # CostEmissions (and supporting index set)
+        if self.table_exists('CostEmission'):
+            if mi:
+                raw = cur.execute(
+                    'SELECT region, period, emis_comm from main.CostEmission '
+                    'WHERE period >= ? AND period <= ?',
+                (mi.base_year, mi.last_demand_year),
+                ).fetchall()
+                load_element(M.CostEmission_rpe, raw, self.viable_output_comms, (2,))
+
+                raw = cur.execute(
+                    'SELECT region, period, emis_comm, cost from main.CostEmission '
+                    'WHERE period >= ? AND period <= ?',
+                (mi.base_year, mi.last_demand_year),
+                ).fetchall()
+                load_element(M.CostEmission, raw, self.viable_output_comms, (2,))
+            else:
+                raw = cur.execute(
+                    'SELECT region, period, emis_comm from main.CostEmission '
+                ).fetchall()
+                load_element(M.CostEmission_rpe, raw, self.viable_output_comms, (2,))
+
+                raw = cur.execute(
+                    'SELECT region, period, emis_comm from main.CostEmission '
+                ).fetchall()
+                load_element(M.CostEmission, raw, self.viable_output_comms, (2,))
 
         # DefaultLoanRate
         raw = cur.execute(
