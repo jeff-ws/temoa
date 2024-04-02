@@ -109,6 +109,19 @@ VALUES ('d', 'demand commodity');
 INSERT INTO CommodityType
 VALUES ('s', 'source commodity');
 
+CREATE TABLE IF NOT EXISTS CostEmission
+(
+    region    TEXT
+        REFERENCES Region (region),
+    period    INTEGER
+        REFERENCES TimePeriod (period),
+    emis_comm TEXT NOT NULL
+        REFERENCES Commodity (name),
+    cost      REAL NOT NULL,
+    units     TEXT,
+    notes     TEXT,
+    PRIMARY KEY (region, period, emis_comm)
+);
 CREATE TABLE IF NOT EXISTS CostFixed
 (
     region  TEXT    NOT NULL,

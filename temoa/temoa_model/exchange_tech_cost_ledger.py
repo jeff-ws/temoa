@@ -40,9 +40,11 @@ class CostType(Enum):
     INVEST = 1
     FIXED = 2
     VARIABLE = 3
-    D_INVEST = 4
-    D_FIXED = 5
-    D_VARIABLE = 6
+    EMISS = 4
+    D_INVEST = 5
+    D_FIXED = 6
+    D_VARIABLE = 7
+    D_EMISS = 8
 
 
 class ExchangeTechCostLedger:

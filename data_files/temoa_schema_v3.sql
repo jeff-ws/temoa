@@ -119,6 +119,19 @@ VALUES ('d', 'demand commodity');
 INSERT INTO CommodityType
 VALUES ('s', 'source commodity');
 
+CREATE TABLE IF NOT EXISTS CostEmission
+(
+    region    TEXT
+        REFERENCES Region (region),
+    period    INTEGER
+        REFERENCES TimePeriod (period),
+    emis_comm TEXT NOT NULL
+        REFERENCES Commodity (name),
+    cost      REAL NOT NULL,
+    units     TEXT,
+    notes     TEXT,
+    PRIMARY KEY (region, period, emis_comm)
+);
 CREATE TABLE IF NOT EXISTS CostFixed
 (
     region  TEXT    NOT NULL,
@@ -828,7 +841,7 @@ CREATE TABLE IF NOT EXISTS EmissionLimit
         REFERENCES TimePeriod (period),
     emis_comm TEXT
         REFERENCES Commodity (name),
-    value   REAL,
+    value     REAL,
     units     TEXT,
     notes     TEXT,
     PRIMARY KEY (region, period, emis_comm)
@@ -867,8 +880,8 @@ CREATE TABLE TechGroupMember
 );
 CREATE TABLE IF NOT EXISTS Technology
 (
-    tech         TEXT NOT NULL PRIMARY KEY,
-    flag         TEXT NOT NULL,
+    tech         TEXT    NOT NULL PRIMARY KEY,
+    flag         TEXT    NOT NULL,
     sector       TEXT,
     category     TEXT,
     sub_category TEXT,
