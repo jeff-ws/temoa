@@ -223,7 +223,7 @@ class TemoaSequencer:
                     "SELECT * FROM sqlite_master WHERE name LIKE 'Output_Cost_2'"
                 ).fetchone()
                 if exists:
-                    table_writer = TableWriter(self.config, con)
+                    table_writer = TableWriter(self.config)
                     table_writer.clear_scenario()
                     table_writer.write_costs(instance)
                 con.close()

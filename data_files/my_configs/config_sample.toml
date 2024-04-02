@@ -9,7 +9,7 @@
 
 # Scenario Name (Mandatory)
 # This scenario name is used to label results within the output .sqlite file
-scenario = "test run 777"
+scenario = "zulu"
 
 # Scenaio Mode (Mandatory)
 # See documentation for explanations.  A standard single run is "perfect foresight"
@@ -18,13 +18,13 @@ scenario = "test run 777"
 scenario_mode = "perfect_foresight"
 
 # Input file (Mandatory)
-input_file = "data_files/temoa_utopia.sqlite"
+input_file = "data_files/utopia.sqlite"
 
 # Output file (Mandatory)
 # The output file must be an existing .sqlite file
 # the user may target the same input file or a separate /
 # copied sqlite file in a different location
-output_database = "output_files/temoa_utopia.sqlite"
+output_database = "data_files/utopia.sqlite"
 
 # ------------------------------------
 #        DATA / MODEL CHECKS
@@ -68,7 +68,7 @@ stream_output = true
 save_excel = true
 
 # save the duals in the output .sqlite database
-save_duals = true
+save_duals = false
 
 # save a copy of the pyomo-generated lp file to the outputs folder (maybe a large file!)
 save_lp_file = false
