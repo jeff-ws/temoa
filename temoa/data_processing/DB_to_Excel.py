@@ -42,15 +42,15 @@ def make_excel(ifile, ofile: Path, scenario):
 	INNER JOIN Technology ON Efficiency.tech=Technology.tech"
 	all_techs = pd.read_sql_query(query, con)
 
-	query = "SELECT region, tech, sector, period, capacity FROM OutputNetCapacity WHERE scenario='" + scenario + "'"
+	query = f"SELECT region, tech, sector, period, sum(capacity) as capacity FROM OutputNetCapacity WHERE scenario= '{scenario}' GROUP BY region, tech, sector, period"
 	df_capacity = pd.read_sql_query(query, con)
 	for sector in sorted(df_capacity['sector'].unique()):
 		df_capacity_sector = df_capacity[df_capacity['sector']==sector]
-		df_capacity_sector = df_capacity_sector.drop(columns=['sector']).pivot_table(values='capacity', index=['regions', 'tech'], columns='t_periods')
+		df_capacity_sector = df_capacity_sector.drop(columns=['sector']).pivot_table(values='capacity', index=['region', 'tech'], columns='period')
 		df_capacity_sector.reset_index(inplace=True)
 		sector_techs = all_techs[all_techs['sector']==sector]
-		df_capacity_sector = pd.merge(sector_techs[['regions','tech']], df_capacity_sector, on=['regions','tech'], how='left')
-		df_capacity_sector.rename(columns={'regions':'Region','tech':'Technology'}, inplace=True)
+		df_capacity_sector = pd.merge(sector_techs[['region','tech']], df_capacity_sector, on=['region','tech'], how='left')
+		df_capacity_sector.rename(columns={'region':'Region','tech':'Technology'}, inplace=True)
 		df_capacity_sector.to_excel(writer, sheet_name='Capacity_' + sector, index=False, startrow=1, header=False)
 		worksheet = writer.sheets['Capacity_' + sector]
 		worksheet.set_column('A:A', 10)
@@ -63,11 +63,11 @@ def make_excel(ifile, ofile: Path, scenario):
 	df_activity = pd.read_sql_query(query, con)
 	for sector in sorted(df_activity['sector'].unique()):
 		df_activity_sector = df_activity[df_activity['sector']==sector]
-		df_activity_sector = df_activity_sector.drop(columns=['sector']).pivot_table(values='vflow_out', index=['regions', 'tech'], columns='t_periods')
+		df_activity_sector = df_activity_sector.drop(columns=['sector']).pivot_table(values='vflow_out', index=['region', 'tech'], columns='period')
 		df_activity_sector.reset_index(inplace=True)
 		sector_techs = all_techs[all_techs['sector']==sector]
-		df_activity_sector = pd.merge(sector_techs[['regions','tech']], df_activity_sector, on=['regions','tech'], how='left')
-		df_activity_sector.rename(columns={'regions':'Region','tech':'Technology'}, inplace=True)
+		df_activity_sector = pd.merge(sector_techs[['region','tech']], df_activity_sector, on=['region','tech'], how='left')
+		df_activity_sector.rename(columns={'region':'Region','tech':'Technology'}, inplace=True)
 		df_activity_sector.to_excel(writer, sheet_name='Activity_' + sector, index=False, startrow=1, header=False)
 		worksheet = writer.sheets['Activity_' + sector]
 		worksheet.set_column('A:A', 10)
@@ -75,7 +75,7 @@ def make_excel(ifile, ofile: Path, scenario):
 		for col, val in enumerate(df_activity_sector.columns.values):
 			worksheet.write(0, col, val, header_format)
 
-	query = "SELECT DISTINCT EmissionActivity.region, EmissionActivity.tech, EmissionActivity.emis_comm as emissions_comm, Technology.sector FROM EmissionActivity \
+	query = "SELECT DISTINCT EmissionActivity.region, EmissionActivity.tech, EmissionActivity.emis_comm, Technology.sector FROM EmissionActivity \
 	INNER JOIN Technology ON EmissionActivity.tech=Technology.tech"
 	all_emis_techs = pd.read_sql_query(query, con)
 
@@ -83,10 +83,10 @@ def make_excel(ifile, ofile: Path, scenario):
 	region, tech, sector, period, emis_comm"
 	df_emissions_raw = pd.read_sql_query(query, con)
 	if not df_emissions_raw.empty:
-		df_emissions = df_emissions_raw.pivot_table(values='emissions', index=['regions', 'tech', 'sector','emissions_comm'], columns='t_periods')
+		df_emissions = df_emissions_raw.pivot_table(values='emissions', index=['region', 'tech', 'sector', 'emis_comm'], columns='period')
 		df_emissions.reset_index(inplace=True)
-		df_emissions = pd.merge(all_emis_techs, df_emissions, on=['regions','tech', 'sector', 'emissions_comm'], how='left')
-		df_emissions.rename(columns={'regions':'Region', 'tech':'Technology', 'emissions_comm':'Emission Commodity', 'sector':'Sector'}, inplace=True)
+		df_emissions = pd.merge(all_emis_techs, df_emissions, on=['region','tech', 'sector', 'emis_comm'], how='left')
+		df_emissions.rename(columns={'region':'Region', 'tech':'Technology', 'emis_comm':'Emission Commodity', 'sector':'Sector'}, inplace=True)
 		df_emissions.to_excel(writer, sheet_name='Emissions', index=False, startrow=1, header=False)
 		worksheet = writer.sheets['Emissions']
 		worksheet.set_column('A:A', 10)
@@ -96,18 +96,18 @@ def make_excel(ifile, ofile: Path, scenario):
 		for col, val in enumerate(df_emissions.columns.values):
 			worksheet.write(0, col, val, header_format)
 
-	query = ("SELECT region, OutputCost.tech, Technology.sector, vintage, sum(d_invest, d_var, d_fixed, d_emiss) FROM OutputCost "
+	query = ("SELECT region, OutputCost.tech, Technology.sector, vintage, d_invest + d_var + d_fixed + d_emiss FROM OutputCost "
 			 " JOIN main.Technology ON OutputCost.tech = main.Technology.tech "
-			 " WHERE scenario = 'scenario'")
+			 f" WHERE scenario = '{scenario}'")
 	df_costs = pd.read_sql_query(query, con)
-	df_costs.columns = ['Region', 'Technology', 'Sector','Output Name', 'Vintage', 'Cost']
+	df_costs.columns = ['Region', 'Technology', 'Sector', 'Vintage', 'Cost']
 	df_costs.to_excel(writer, sheet_name='Costs', index=False,  startrow=1, header=False)
 	worksheet = writer.sheets['Costs']
 	worksheet.set_column('A:A', 10)
 	worksheet.set_column('B:B', 10)
 	worksheet.set_column('C:C', 10)
 	worksheet.set_column('D:D', 30)
-	for col, val in enumerate(df_costs.columns.values):
+	for col, val in enumerate(df_costs.columns):
 		worksheet.write(0, col, val, header_format)
 
 	writer._save()
@@ -115,18 +115,18 @@ def make_excel(ifile, ofile: Path, scenario):
 	#prepare results for IamDataFrame
 	df_emissions_raw['scenario']=scenario
 	df_emissions_raw['unit']='?'
-	df_emissions_raw['variable']='Emissions|' + df_emissions_raw['emissions_comm'] +  '|' + df_emissions_raw['tech']
-	df_emissions_raw.rename(columns={'t_periods':'year', 'emissions':'value', 'regions':'region'}, inplace=True)
+	df_emissions_raw['variable']='Emissions|' + df_emissions_raw['emis_comm'] +  '|' + df_emissions_raw['tech']
+	df_emissions_raw.rename(columns={'period':'year', 'emissions':'value'}, inplace=True)
 
 	df_capacity['scenario'] = scenario
 	df_capacity['unit']='?'
 	df_capacity['variable']='Capacity|' + df_capacity['sector'] +  '|' + df_capacity['tech']
-	df_capacity.rename(columns={'t_periods':'year', 'capacity':'value', 'regions':'region'}, inplace=True)
+	df_capacity.rename(columns={'period':'year', 'capacity':'value'}, inplace=True)
 
 	df_activity['scenario'] = scenario
 	df_activity['unit']='?'
 	df_activity['variable']='Activity|' + df_activity['sector'] +  '|' + df_activity['tech']
-	df_activity.rename(columns={'t_periods':'year', 'vflow_out':'value', 'regions':'region'}, inplace=True)
+	df_activity.rename(columns={'period':'year', 'vflow_out':'value'}, inplace=True)
 
 
 	# cast results to IamDataFrame and write to xlsx
@@ -135,7 +135,7 @@ def make_excel(ifile, ofile: Path, scenario):
 	df = IamDataFrame(_results,
 		     		  model='Temoa')
 
-	emiss = df_emissions_raw['emissions_comm'].unique()
+	emiss = df_emissions_raw['emis_comm'].unique()
 	sector = df_capacity['sector'].unique()
 
 	# adding aggregates of emissions for each species

@@ -8,7 +8,9 @@ Python script that queries database output tables to create an Excel file contai
 2. `Make_Graphviz.py/`
 Python script that creates a Graphviz diagram for the database.
 The most basic way to use graphviz is to view the full energy system map:
-```$ python MakeGraphviz.py -i temoa_utopia.sqlite```
+```$ python MakeGraphviz.py -i temoa_utopia.sqlite```  Other options include a capacitated
+flow graph for a specific period:  ```-i ../../data_files/utopia.sqlite -r utopia -s <scenario name> -c -y 2010```
+note how this input file passes a relative link up to the data_files directory, assuming standard location in the project
 
 
 3. `Network_diagrams.ipynb/`
