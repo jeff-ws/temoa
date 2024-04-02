@@ -1,10 +1,9 @@
-from subprocess import call
-import os
 import sys
+from subprocess import call
 
-from GraphVizUtil import *
 from DatabaseUtil import *
 from GraphVizFormats import *
+from GraphVizUtil import *
 
 
 class GraphvizDiagramGenerator(object):
@@ -129,7 +128,12 @@ class GraphvizDiagramGenerator(object):
 				ecarriers.add((row['input_comm'], commodity_fmt % (row['input_comm'], period)))
 				usedc.add(row['input_comm'])
 			else:
-				cap = V_Cap2.loc[row['tech']].capacity
+				# check to see if this tech is in the unlim_cap set
+				tech = row['tech']
+				if tech not in V_Cap2.tech:
+					cap = 99999
+				else:
+					cap = V_Cap2.loc[row['tech']].capacity
 				xnodes.add((row['tech'], tech_attr_fmt % (row['tech'], cap, row['tech'], period)))
 			udflows.add((row['input_comm'], row['tech']))	
 
@@ -385,7 +389,7 @@ class GraphvizDiagramGenerator(object):
 
 if __name__ == '__main__':
 	input = processInput(sys.argv[1:])
-	graphGen = GraphvizDiagramGenerator(input['ifile'], input['scenario_name'], input['region'])
+	graphGen = GraphvizDiagramGenerator(input['ifile'], input['scenario_name'], input['region'], outDir=input['res_dir'])
 	graphGen.connect()
 	graphGen.setGraphicOptions(greyFlag = input['grey_flag'], splinevar = input['splinevar'])
 	if (input['scenario_name'] is None):

@@ -2,6 +2,7 @@ import os
 import re
 import sqlite3
 
+import deprecated
 import pandas as pd
 
 
@@ -20,8 +21,7 @@ class DatabaseUtil(object):
 			except Exception as e:
 				raise ValueError('Unable to connect to database')
 		elif self.database.endswith('.dat'):
-			self.con = None
-			self.cur = None
+			raise ValueError('Reading .dat files is no longer supported')
 
 	def close(self):
 		if (self.cur):
@@ -36,6 +36,7 @@ class DatabaseUtil(object):
 		else:
 			return False
 
+	@deprecated.deprecated('reading from .dat files no longer supported')
 	def readFromDatFile(self, inp_comm, inp_tech):
 		if (not self.cur is None):
 			raise ValueError("Invalid Operation For Database file")
@@ -129,7 +130,7 @@ class DatabaseUtil(object):
 		if region==None:
 			self.cur.execute("SELECT input_comm, tech, output_comm FROM Efficiency WHERE input_comm is "+inp_comm+" or output_comm is "+inp_comm+" or tech is "+inp_tech)
 		else:
-			self.cur.execute("SELECT input_comm, tech, output_comm FROM Efficiency WHERE regions LIKE '%"+region+"%' and (input_comm is "+inp_comm+" or output_comm is "+inp_comm+" or tech is "+inp_tech+")")
+			self.cur.execute("SELECT input_comm, tech, output_comm FROM Efficiency WHERE region LIKE '%"+region+"%' and (input_comm is "+inp_comm+" or output_comm is "+inp_comm+" or tech is "+inp_tech+")")
 		return pd.DataFrame(self.cur.fetchall(), columns = ['input_comm', 'tech', 'output_comm'])
 
 	def getExistingTechnologiesForCommodity(self, comm, region, comm_type='input'):
@@ -141,7 +142,7 @@ class DatabaseUtil(object):
 		else:
 			query = "SELECT DISTINCT tech FROM Efficiency WHERE output_comm is '"+comm+"'"
 		if region:
-			query +=" AND regions LIKE '%" + region + "%'"
+			query +=" AND region LIKE '%" + region + "%'"
 
 		self.cur.execute(query)
 		result = pd.DataFrame(self.cur.fetchall(), columns = ['tech'])
@@ -179,7 +180,7 @@ class DatabaseUtil(object):
 			raise ValueError('Invalid commodity comm_type: can only be input or output')
 
 		if region:
-			query += " WHERE regions LIKE '%" + region + "%'"
+			query += " WHERE region LIKE '%" + region + "%'"
 		result = set()
 		for row in self.cur.execute(query):
 			result.add((row[0], row[1]))
@@ -196,31 +197,41 @@ class DatabaseUtil(object):
 		if tech is None:
 			columns.append('tech')
 		if period is None:
-			columns.append('t_periods')
-		columns.append('capacity')
-		columns.append('regions')
+			columns.append('period')
+		columns.append('sum(capacity)')
+		columns.append('region')
 
 		query = "SELECT "+columns[0]
 
 		for col in columns[1:]:
 			query += ", " + col
 
-		query += " FROM Output_CapacityByPeriodAndTech WHERE scenario == '"+self.scenario+"'"
+		query += " FROM OutputNetCapacity WHERE scenario == '"+self.scenario+"'"
 
 		if (region):
-			query += " AND regions LIKE '" + region + "%'"
+			query += " AND region LIKE '" + region + "%'"
 		if (tech):
 			query += " AND tech is '"+tech+"'"
 		if (period):
-			query += " AND t_periods == '"+str(period)+"'"
+			query += " AND period == '"+str(period)+"'"
+
+		# sum over vintages
+		query += " GROUP BY tech, region, period, sector;"
 
 		self.cur.execute(query)
+		# quick hack...change the column name for capacity
+		new_columns = []
+		for col in columns:
+			new_col = col.replace('sum(capacity)', 'capacity')
+			new_columns.append(new_col)
+		columns = new_columns
 		result = pd.DataFrame(self.cur.fetchall(), columns=columns)
 		if region is None:
-			mask = result['regions'].str.contains('-')
+			mask = result['region'].str.contains('-')
+			# TODO:  somebody needs to verify this halving of capacity...?
 			result.loc[mask, 'capacity'] /=2
 
-		result.drop(columns=['regions'], inplace=True)
+		result.drop(columns=['region'], inplace=True)
 		if (len(columns) == 2):
 			return result.sum()
 		else:
@@ -235,26 +246,26 @@ class DatabaseUtil(object):
 		table = ''
 		col = ''
 		if (comm_type =='input'):
-			table = 'Output_VFlow_In'
+			table = 'OutputFlowIn'
 			if (commodity is None):
 				columns.append('input_comm')
-			col = 'vflow_in'
+			col = 'flow'
 		columns.append('tech')
 		if (comm_type== 'output'):
-			table = 'Output_VFlow_Out'
+			table = 'OutputFlowOut'
 			if (commodity is None):
 				columns.append('output_comm')
-			col = 'vflow_out'
+			col = 'flow'
 
 		query = "SELECT DISTINCT "
 		for c in columns:
 			query += c+", "
 		query += 'SUM('+col+") AS flow FROM "+table+" WHERE scenario is '"+self.scenario+"'"
 		if (region) and (comm_type=='input'):
-			query += " AND regions LIKE '" + region + "%'"
+			query += " AND region LIKE '" + region + "%'"
 		if (region) and (comm_type=='output'):
-			query += " AND regions LIKE '%" + region + "'"
-		query += " AND t_periods is '"+str(period)+"' "
+			query += " AND region LIKE '%" + region + "'"
+		query += " AND period is '"+str(period)+"' "
 
 		query2 = " GROUP BY tech"
 		if (not commodity is None):
@@ -277,9 +288,9 @@ class DatabaseUtil(object):
 			raise ValueError('For Output related queries, please set a scenario first')
 		query = "SELECT E.emis_comm, E.tech, SUM(E.activity*O.flow) FROM EmissionActivity E, OutputFlowOut O " + \
 		"WHERE E.input_comm == O.input_comm AND E.tech == O.tech AND E.vintage  == O.vintage AND E.output_comm == O.output_comm AND O.scenario == '"+ self.scenario +"' " + \
-		"and O.t_periods == '"+str(period) + "'"
+		"and O.period == '"+str(period) + "'"
 		if (region):
-			query += " AND E.regions LIKE '%" + region + "%'"
+			query += " AND E.region LIKE '%" + region + "%'"
 		query +=" GROUP BY E.tech, E.emis_comm"
 		self.cur.execute(query)
 		result = pd.DataFrame(self.cur.fetchall(), columns=['emis_comm', 'tech', 'emis_activity'])
@@ -318,12 +329,12 @@ WHERE \
 	OF.scenario is '" + self.scenario + "'"
 
 		if (region):
-			query += " AND OF.regions LIKE '%" + region + "%'"
+			query += " AND OF.region LIKE '%" + region + "%'"
 
-		query +=" GROUP BY OF.regions, OF.vintage, OF.input_comm, OF.output_comm"
+		query +=" GROUP BY OF.region, OF.vintage, OF.input_comm, OF.output_comm"
 
 		self.cur.execute(query)
-		result = pd.DataFrame(self.cur.fetchall(), columns=['input_comm', 'output_comm', 'vintage', 'regions','flow_in', 'flow_out', 'capacity'])
+		result = pd.DataFrame(self.cur.fetchall(), columns=['input_comm', 'output_comm', 'vintage', 'region','flow_in', 'flow_out', 'capacity'])
 		result = pd.DataFrame(result.groupby(['input_comm', 'output_comm', 'vintage']).sum().reset_index())
 		return result
 		
