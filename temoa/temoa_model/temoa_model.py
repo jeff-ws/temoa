@@ -44,6 +44,7 @@ from temoa.temoa_model.validators import (
     validate_CapacityFactorProcess,
     region_group_check,
     validate_Efficiency,
+    check_flex_curtail,
 )
 
 
@@ -144,6 +145,9 @@ class TemoaModel(AbstractModel):
         M.tech_capacity_max = Set(within=M.tech_all)
         M.tech_curtailment = Set(within=M.tech_all)
         M.tech_flex = Set(within=M.tech_all)
+        # ensure there is no overlap flex <=> curtailable technologies
+        M.check_flex_and_curtailment = BuildAction(rule=check_flex_curtail)
+
         M.tech_exchange = Set(within=M.tech_all)
         # Define groups for technologies
 
@@ -305,7 +309,9 @@ class TemoaModel(AbstractModel):
         M.CostVariable_rptv = Set(dimen=4, initialize=CostVariableIndices)
         M.CostVariable = Param(M.CostVariable_rptv)
 
-        M.CostEmission_rpe = Set(dimen=3, domain=M.regions * M.time_optimize * M.commodity_emissions)  # read from data
+        M.CostEmission_rpe = Set(
+            dimen=3, domain=M.regions * M.time_optimize * M.commodity_emissions
+        )  # read from data
         M.CostEmission = Param(M.CostEmission_rpe, domain=NonNegativeReals)
 
         M.LoanRate_rtv = Set(dimen=3, initialize=lambda M: M.CostInvest.keys())

@@ -3,7 +3,7 @@ tool for writing outputs to database tables
 """
 import sqlite3
 import sys
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from logging import getLogger
 from typing import TYPE_CHECKING
 
@@ -55,6 +55,8 @@ scenario_based_tables = [
     'OutputCost',
 ]
 
+EI = namedtuple('EI', ['r', 'p', 't', 'v', 'e'])
+
 
 class TableWriter:
     def __init__(self, config: TemoaConfig, epsilon=1e-5):
@@ -66,6 +68,7 @@ class TableWriter:
             logger.error('Failed to connect to output database: %s', config.output_database)
             logger.error(e)
             sys.exit(-1)
+
     def clear_scenario(self):
         cur = self.con.cursor()
         for table in scenario_based_tables:
@@ -207,7 +210,12 @@ class TableWriter:
             )
             if '-' in r:
                 exchange_costs.add_cost_record(
-                    r, period=p, tech=t, vintage=v, cost=fixed_cost, cost_type=CostType.D_FIXED
+                    r,
+                    period=p,
+                    tech=t,
+                    vintage=v,
+                    cost=model_fixed_cost,
+                    cost_type=CostType.D_FIXED,
                 )
                 exchange_costs.add_cost_record(
                     r,
@@ -248,7 +256,12 @@ class TableWriter:
             )
             if '-' in r:
                 exchange_costs.add_cost_record(
-                    r, period=p, tech=t, vintage=v, cost=var_cost, cost_type=CostType.D_VARIABLE
+                    r,
+                    period=p,
+                    tech=t,
+                    vintage=v,
+                    cost=model_var_cost,
+                    cost_type=CostType.D_VARIABLE,
                 )
                 exchange_costs.add_cost_record(
                     r,
@@ -262,11 +275,93 @@ class TableWriter:
                 entries[r, p, t, v].update(
                     {CostType.D_VARIABLE: model_var_cost, CostType.VARIABLE: undiscounted_var_cost}
                 )
-
+        emission_entries = self._gather_emission_costs(M)
+        for k in emission_entries.keys():
+            entries[k].update(emission_entries[k])
         # write to table
         # translate the entries into fodder for the query
         self.write_rows(entries)
         self.write_rows(exchange_costs.get_entries())
+
+    def _gather_emission_costs(self, M: 'TemoaModel'):
+        """there are 5 'flavors' of emission costs.  So, we need to gather the base and then decide on each"""
+        GDR = value(M.GlobalDiscountRate)
+        MPL = M.ModelProcessLife
+        if self.config.scenario_mode == TemoaMode.MYOPIC:
+            p_0 = M.MyopicBaseyear
+        else:
+            p_0 = min(M.time_optimize)
+
+        base = [
+            (r, p, e, i, t, v, o)
+            for (r, e, i, t, v, o) in M.EmissionActivity
+            for p in M.time_optimize
+            if (r, p, e) in M.CostEmission  # tightest filter first
+            and (r, p, t, v) in M.processInputs
+        ]
+        normal = [
+            (r, p, e, s, d, i, t, v, o)
+            for (r, p, e, i, t, v, o) in base
+            for s in M.time_season
+            for d in M.time_of_day
+            if t not in M.tech_annual
+        ]
+        annual = [(r, p, e, i, t, v, o) for (r, p, e, i, t, v, o) in base if t in M.tech_annual]
+
+        flow: dict[EI, float] = defaultdict(float)
+        # iterate through the normal and annual and accumulate flow values
+        for r, p, e, s, d, i, t, v, o in normal:
+            if t in M.tech_curtailment:
+                flow[EI(r, p, t, v, e)] += (
+                    value(M.V_Curtailment[r, p, s, d, i, t, v, o])
+                    * M.EmissionActivity[r, e, i, t, v, o]
+                )
+            elif t in M.tech_flex:
+                flow[EI(r, p, t, v, e)] += (
+                    value(M.V_Flex[r, p, s, d, i, t, v, o]) * M.EmissionActivity[r, e, i, t, v, o]
+                )
+            else:
+                flow[EI(r, p, t, v, e)] += (
+                    value(M.V_FlowOut[r, p, s, d, i, t, v, o])
+                    * M.EmissionActivity[r, e, i, t, v, o]
+                )
+        for r, p, e, i, t, v, o in annual:
+            if t in M.tech_flex and o in M.flex_commodities:
+                flow[EI(r, p, t, v, e)] += (
+                    value(M.V_FlexAnnual[r, p, i, t, v, o]) * M.EmissionActivity[r, e, i, t, v, o]
+                )
+            else:
+                flow[EI(r, p, t, v, e)] += (
+                    value(M.V_FlowOutAnnual[r, p, i, t, v, o])
+                    * M.EmissionActivity[r, e, i, t, v, o]
+                )
+
+        ud_costs = defaultdict(float)
+        d_costs = defaultdict(float)
+        for ei in flow:
+            if flow[ei] < self.epsilon:
+                continue
+            undiscounted_emiss_cost = (
+                flow[ei] * M.CostEmission[ei.r, ei.p, ei.e] * MPL[ei.r, ei.p, ei.t, ei.v]
+            )
+            discounted_emiss_cost = temoa_rules.fixed_or_variable_cost(
+                cap_or_flow=flow[ei],
+                cost_factor=M.CostEmission[ei.r, ei.p, ei.e],
+                process_lifetime=MPL[ei.r, ei.p, ei.t, ei.v],
+                GDR=GDR,
+                P_0=p_0,
+                p=ei.p,
+            )
+            ud_costs[ei.r, ei.p, ei.t, ei.v] += undiscounted_emiss_cost
+            d_costs[ei.r, ei.p, ei.t, ei.v] += discounted_emiss_cost
+        entries = defaultdict(dict)
+        for k in ud_costs:
+            entries[k][CostType.EMISS] = ud_costs[k]
+        for k in d_costs:
+            entries[k][CostType.D_EMISS] = d_costs[k]
+
+        # wow, that was like pulling teeth
+        return entries
 
     def write_rows(self, entries):
         rows = [
@@ -276,12 +371,14 @@ class TableWriter:
                 p,
                 t,
                 v,
-                round(entries[r, p, t, v].get(CostType.D_INVEST, 0), 2),
-                round(entries[r, p, t, v].get(CostType.D_FIXED, 0), 2),
-                round(entries[r, p, t, v].get(CostType.D_VARIABLE, 0), 2),
-                round(entries[r, p, t, v].get(CostType.INVEST, 0), 2),
-                round(entries[r, p, t, v].get(CostType.FIXED, 0), 2),
-                round(entries[r, p, t, v].get(CostType.VARIABLE, 0), 2),
+                entries[r, p, t, v].get(CostType.D_INVEST, 0),
+                entries[r, p, t, v].get(CostType.D_FIXED, 0),
+                entries[r, p, t, v].get(CostType.D_VARIABLE, 0),
+                entries[r, p, t, v].get(CostType.D_EMISS, 0),
+                entries[r, p, t, v].get(CostType.INVEST, 0),
+                entries[r, p, t, v].get(CostType.FIXED, 0),
+                entries[r, p, t, v].get(CostType.VARIABLE, 0),
+                entries[r, p, t, v].get(CostType.EMISS, 0),
             )
             for (r, p, t, v) in entries
         ]
@@ -289,7 +386,7 @@ class TableWriter:
         rows.sort(key=lambda r: (r[1], r[4], r[3], r[2]))
         # TODO:  maybe extract this to a pure writing function...we shall see
         cur = self.con.cursor()
-        qry = 'INSERT INTO OutputCost VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL)'
+        qry = 'INSERT INTO OutputCost VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         cur.executemany(qry, rows)
         self.con.commit()
 

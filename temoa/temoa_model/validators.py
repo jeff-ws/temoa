@@ -302,3 +302,14 @@ def validate_Efficiency(M: 'TemoaModel', val, r, si, t, v, so) -> bool:
     print('v', v in M.vintage_all)
     print('so', so in M.commodity_carrier)
     return False
+
+
+def check_flex_curtail(M: 'TemoaModel'):
+    violations = M.tech_flex & M.tech_curtailment
+    if violations:
+        logger.error(
+            'The following technologies are in both flex and curtail, which is not permitted:',
+            violations,
+        )
+        return False
+    return True
