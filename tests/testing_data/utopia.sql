@@ -849,7 +849,7 @@ CREATE TABLE OutputFlowIn
     period      INTEGER
         REFERENCES TimePeriod (period),
     season      TEXT
-        REFERENCES TimePeriod (period),
+        REFERENCES TimeSeason (season),
     tod         TEXT
         REFERENCES TimeOfDay (tod),
     input_comm  TEXT
