@@ -8,11 +8,11 @@ CREATE TABLE IF NOT EXISTS MetaData
     notes   TEXT,
     PRIMARY KEY (element)
 );
-INSERT INTO MetaData
+REPLACE INTO MetaData
 VALUES ('myopic_base_year', 2000, 'Base Year for Myopic Analysis');
-INSERT INTO MetaData
+REPLACE INTO MetaData
 VALUES ('DB_MAJOR', 3, 'DB major version number');
-INSERT INTO MetaData
+REPLACE INTO MetaData
 VALUES ('DB_MINOR', 0, 'DB minor version number');
 
 CREATE TABLE IF NOT EXISTS MetaDataReal
@@ -23,9 +23,9 @@ CREATE TABLE IF NOT EXISTS MetaDataReal
 
     PRIMARY KEY (element)
 );
-INSERT INTO MetaDataReal
+REPLACE INTO MetaDataReal
 VALUES ('global_discount_rate', 0.05, 'Discount Rate for future costs');
-INSERT INTO MetaDataReal
+REPLACE INTO MetaDataReal
 VALUES ('default_loan_rate', 0.05, 'Default Loan Rate if not specified in LoanRate table');
 
 CREATE TABLE IF NOT EXISTS OutputDualVariable
@@ -100,13 +100,13 @@ CREATE TABLE IF NOT EXISTS CommodityType
         PRIMARY KEY,
     description TEXT
 );
-INSERT INTO CommodityType
+REPLACE INTO CommodityType
 VALUES ('p', 'physical commodity');
-INSERT INTO CommodityType
+REPLACE INTO CommodityType
 VALUES ('e', 'emissions commodity');
-INSERT INTO CommodityType
+REPLACE INTO CommodityType
 VALUES ('d', 'demand commodity');
-INSERT INTO CommodityType
+REPLACE INTO CommodityType
 VALUES ('s', 'source commodity');
 
 CREATE TABLE IF NOT EXISTS CostEmission
@@ -412,7 +412,7 @@ CREATE TABLE IF NOT EXISTS OutputFlowIn
     period      INTEGER
         REFERENCES TimePeriod (period),
     season      TEXT
-        REFERENCES TimePeriod (period),
+        REFERENCES TimeSeason (season),
     tod         TEXT
         REFERENCES TimeOfDay (tod),
     input_comm  TEXT
@@ -504,13 +504,13 @@ CREATE TABLE IF NOT EXISTS TechnologyType
         PRIMARY KEY,
     description TEXT
 );
-INSERT INTO TechnologyType
+REPLACE INTO TechnologyType
 VALUES ('r', 'resource technology');
-INSERT INTO TechnologyType
+REPLACE INTO TechnologyType
 VALUES ('p', 'production technology');
-INSERT INTO TechnologyType
+REPLACE INTO TechnologyType
 VALUES ('pb', 'baseload production technology');
-INSERT INTO TechnologyType
+REPLACE INTO TechnologyType
 VALUES ('ps', 'storage production technology');
 
 CREATE TABLE IF NOT EXISTS TechInputSplit
@@ -707,4 +707,5 @@ CREATE TABLE IF NOT EXISTS OutputCost
 );
 COMMIT;
 PRAGMA FOREIGN_KEYS = 1;
+COMMIT;
 
