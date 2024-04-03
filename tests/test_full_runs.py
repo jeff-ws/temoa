@@ -108,7 +108,7 @@ def test_myopic_utopia(system_test_run):
     cur = con.cursor()
     res = cur.execute('SELECT SUM(d_invest) FROM main.OutputCost').fetchone()
     invest_sum = res[0]
-    assert invest_sum == pytest.approx(11564.42), 'sum of investment costs did not match expected'
+    assert invest_sum == pytest.approx(11564.3985), 'sum of investment costs did not match expected'
     con.close()
 
     # TODO:  add additional tests for myopic that have retirement eligible things in them

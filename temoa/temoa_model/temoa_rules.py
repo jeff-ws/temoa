@@ -560,6 +560,7 @@ def PeriodCost_rule(M: 'TemoaModel', p):
         for (r, p, e, s, d, i, t, v, o) in normal
     )
 
+    # 2. flex emissions
     flex_emissions = sum(
         fixed_or_variable_cost(
             cap_or_flow=M.V_Flex[r, p, s, d, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
@@ -573,6 +574,7 @@ def PeriodCost_rule(M: 'TemoaModel', p):
         if t in M.tech_flex and o in M.flex_commodities
     )
 
+    # 3. curtailment emissions
     curtail_emissions = sum(
         fixed_or_variable_cost(
             cap_or_flow=M.V_Curtailment[r, p, s, d, i, t, v, o]
@@ -587,6 +589,7 @@ def PeriodCost_rule(M: 'TemoaModel', p):
         if t in M.tech_curtailment
     )
 
+    # 4. annual emissions
     var_annual_emissions = sum(
         fixed_or_variable_cost(
             cap_or_flow=M.V_FlowOutAnnual[r, p, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
@@ -597,8 +600,9 @@ def PeriodCost_rule(M: 'TemoaModel', p):
             p=p,
         )
         for (r, p, e, i, t, v, o) in annual
+        if t not in M.tech_flex
     )
-
+    # 5. flex annual emissions
     flex_annual_emissions = sum(
         fixed_or_variable_cost(
             cap_or_flow=M.V_FlexAnnual[r, p, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
