@@ -886,7 +886,7 @@ class HybridLoader:
                 load_element(M.CostEmission_rpe, raw, self.viable_output_comms, (2,))
 
                 raw = cur.execute(
-                    'SELECT region, period, emis_comm from main.CostEmission '
+                    'SELECT region, period, emis_comm, cost from main.CostEmission '
                 ).fetchall()
                 load_element(M.CostEmission, raw, self.viable_output_comms, (2,))
 

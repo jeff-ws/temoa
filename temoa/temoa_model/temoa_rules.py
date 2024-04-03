@@ -279,99 +279,99 @@ previous period's total installed capacity (CAPAVL)
 def TotalCost_rule(M):
     r"""
 
-    Using the :code:`FlowOut` and :code:`Capacity` variables, the Temoa objective
-    function calculates the cost of energy supply, under the assumption that capital
-    costs are paid through loans. This implementation sums up all the costs incurred,
-    and is defined as :math:`C_{tot} = C_{loans} + C_{fixed} + C_{variable}`. Each
-    term on the right-hand side represents the cost incurred over the model
-    time horizon and discounted to the initial year in the horizon (:math:`{P}_0`).
-    The calculation of each term is given below.
+        Using the :code:`FlowOut` and :code:`Capacity` variables, the Temoa objective
+        function calculates the cost of energy supply, under the assumption that capital
+        costs are paid through loans. This implementation sums up all the costs incurred,
+        and is defined as :math:`C_{tot} = C_{loans} + C_{fixed} + C_{variable}`. Each
+        term on the right-hand side represents the cost incurred over the model
+        time horizon and discounted to the initial year in the horizon (:math:`{P}_0`).
+        The calculation of each term is given below.
 
-    .. math::
-       :label: obj_loan
+        .. math::
+           :label: obj_loan
 
-       C_{loans} = \sum_{r, t, v \in \Theta_{IC}} \left (
-         \left [
-                 CI_{r, t, v} \cdot LA_{r, t, v}
-                 \cdot \frac{(1 + GDR)^{P_0 - v +1} \cdot (1 - (1 + GDR)^{-LLP_{r, t, v}})}{GDR} \right. \right.
-                 \\ \left. \left. \cdot \frac{ 1-(1+GDR)^{-LPA_{r,t,v}} }{ 1-(1+GDR)^{-LTP_{r,t,v}} }
-         \right ]
-         \cdot \textbf{CAP}_{r, t, v}
+           C_{loans} = \sum_{r, t, v \in \Theta_{IC}} \left (
+             \left [
+                     CI_{r, t, v} \cdot LA_{r, t, v}
+                     \cdot \frac{(1 + GDR)^{P_0 - v +1} \cdot (1 - (1 + GDR)^{-LLP_{r, t, v}})}{GDR} \right. \right.
+                     \\ \left. \left. \cdot \frac{ 1-(1+GDR)^{-LPA_{r,t,v}} }{ 1-(1+GDR)^{-LTP_{r,t,v}} }
+             \right ]
+             \cdot \textbf{CAP}_{r, t, v}
+             \right )
+
+        Note that capital costs (:math:`{IC}_{r,t,v}`) are handled in several steps. First, each capital cost
+        is amortized using the loan rate (i.e., technology-specific discount rate) and loan
+        period. Second, the annual stream of payments is converted into a lump sum using
+        the global discount rate and loan period. Third, the new lump sum is amortized
+        at the global discount rate and technology lifetime. Fourth, loan payments beyond
+        the model time horizon are removed and the lump sum recalculated. The terms used
+        in Steps 3-4 are :math:`\frac{ GDR }{ 1-(1+GDR)^{-LTP_{r,t,v} } }\cdot
+        \frac{ 1-(1+GDR)^{-LPA_{t,v}} }{ GDR }`. The product simplifies to
+        :math:`\frac{ 1-(1+GDR)^{-LPA_{r,t,v}} }{ 1-(1+GDR)^{-LTP_{r,t,v}} }`, where
+        :math:`LPA_{r,t,v}` represents the active lifetime of process t in region r :math:`(r,t,v)`
+        before the end of the model horizon, and :math:`LTP_{r,t,v}` represents the full
+        lifetime of a regional process :math:`(r,t,v)`. Fifth, the lump sum is discounted back to the
+        beginning of the horizon (:math:`P_0`) using the global discount rate. While an
+        explicit salvage term is not included, this approach properly captures the capital
+        costs incurred within the model time horizon, accounting for technology-specific
+        loan rates and periods.
+
+        .. math::
+           :label: obj_fixed
+
+           C_{fixed} = \sum_{r, p, t, v \in \Theta_{CF}} \left (
+             \left [
+                     CF_{r, p, t, v}
+               \cdot \frac{(1 + GDR)^{P_0 - p +1} \cdot (1 - (1 + GDR)^{-{MPL}_{r, t, v}})}{GDR}
+             \right ]
+             \cdot \textbf{CAP}_{r, t, v}
+             \right )
+
+        .. math::
+           :label: obj_variable
+
+       &C_{variable} = \\ &\quad \sum_{r, p, t, v \in \Theta_{CV}} \left (
+               CV_{r, p, t, v}
+         \cdot
+         \frac{
+           (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
+         }{
+           GDR
+         }\cdot \sum_{S,D,I, O} \textbf{FO}_{r, p, s, d,i, t, v, o}
+         \right ) \\ &\quad + \sum_{r, p, t \not \in T^{a}, v \in \Theta_{VC}} \left (
+               CV_{r, p, t, v}
+         \cdot
+         \frac{
+           (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
+         }{
+           GDR
+         }
+         \cdot \sum_{I, O} \textbf{FOA}_{r, p,i, t \in T^{a}, v, o}
          \right )
 
-    Note that capital costs (:math:`{IC}_{r,t,v}`) are handled in several steps. First, each capital cost
-    is amortized using the loan rate (i.e., technology-specific discount rate) and loan
-    period. Second, the annual stream of payments is converted into a lump sum using
-    the global discount rate and loan period. Third, the new lump sum is amortized
-    at the global discount rate and technology lifetime. Fourth, loan payments beyond
-    the model time horizon are removed and the lump sum recalculated. The terms used
-    in Steps 3-4 are :math:`\frac{ GDR }{ 1-(1+GDR)^{-LTP_{r,t,v} } }\cdot
-    \frac{ 1-(1+GDR)^{-LPA_{t,v}} }{ GDR }`. The product simplifies to
-    :math:`\frac{ 1-(1+GDR)^{-LPA_{r,t,v}} }{ 1-(1+GDR)^{-LTP_{r,t,v}} }`, where
-    :math:`LPA_{r,t,v}` represents the active lifetime of process t in region r :math:`(r,t,v)`
-    before the end of the model horizon, and :math:`LTP_{r,t,v}` represents the full
-    lifetime of a regional process :math:`(r,t,v)`. Fifth, the lump sum is discounted back to the
-    beginning of the horizon (:math:`P_0`) using the global discount rate. While an
-    explicit salvage term is not included, this approach properly captures the capital
-    costs incurred within the model time horizon, accounting for technology-specific
-    loan rates and periods.
-
     .. math::
-       :label: obj_fixed
+       :label: obj_emissions
 
-       C_{fixed} = \sum_{r, p, t, v \in \Theta_{CF}} \left (
-         \left [
-                 CF_{r, p, t, v}
-           \cdot \frac{(1 + GDR)^{P_0 - p +1} \cdot (1 - (1 + GDR)^{-{MPL}_{r, t, v}})}{GDR}
-         \right ]
-         \cdot \textbf{CAP}_{r, t, v}
+       &C_{emissions} = \\ &\quad \sum_{r, p, t, v \in \Theta_{CV}} \left (
+               CE_{r, p, c} \cdot EAC_{r,e,i,t,v,o}
+         \cdot
+         \frac{
+           (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
+         }{
+           GDR
+         }\cdot \sum_{S,D,I, O} \textbf{FO}_{r, p, s, d,i, t, v, o}
+         \right ) \\ &\quad + \sum_{r, p, t \not \in T^{a}, v \in \Theta_{CE}} \left (
+               CE_{r, p, c} \cdot EAC_{r,e,i,t,v,o}
+         \cdot
+         \frac{
+           (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
+         }{
+           GDR
+         }
+         \cdot \sum_{I, O} \textbf{FOA}_{r, p,i, t \in T^{a}, v, o}
          \right )
 
-    .. math::
-       :label: obj_variable
-
-   &C_{variable} = \\ &\quad \sum_{r, p, t, v \in \Theta_{CV}} \left (
-           CV_{r, p, t, v}
-     \cdot
-     \frac{
-       (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
-     }{
-       GDR
-     }\cdot \sum_{S,D,I, O} \textbf{FO}_{r, p, s, d,i, t, v, o}
-     \right ) \\ &\quad + \sum_{r, p, t \not \in T^{a}, v \in \Theta_{VC}} \left (
-           CV_{r, p, t, v}
-     \cdot
-     \frac{
-       (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
-     }{
-       GDR
-     }
-     \cdot \sum_{I, O} \textbf{FOA}_{r, p,i, t \in T^{a}, v, o}
-     \right )
-
-.. math::
-   :label: obj_emissions
-
-   &C_{emissions} = \\ &\quad \sum_{r, p, t, v \in \Theta_{CV}} \left (
-           CE_{r, p, c} \cdot EAC_{r,e,i,t,v,o}
-     \cdot
-     \frac{
-       (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
-     }{
-       GDR
-     }\cdot \sum_{S,D,I, O} \textbf{FO}_{r, p, s, d,i, t, v, o}
-     \right ) \\ &\quad + \sum_{r, p, t \not \in T^{a}, v \in \Theta_{CE}} \left (
-           CE_{r, p, c} \cdot EAC_{r,e,i,t,v,o}
-     \cdot
-     \frac{
-       (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
-     }{
-       GDR
-     }
-     \cdot \sum_{I, O} \textbf{FOA}_{r, p,i, t \in T^{a}, v, o}
-     \right )
-
-"""
+    """
     return sum(PeriodCost_rule(M, p) for p in M.time_optimize)
 
 
@@ -529,165 +529,98 @@ def PeriodCost_rule(M: 'TemoaModel', p):
     # and to ensure that the techology is active we need to filter that
     # result with processInput.keys()
 
-    base = [(r, p, e, i, t, v, o) for (r, e, i, t, v, o) in M.EmissionActivity
-            if (r, p, e) in M.CostEmission  # tightest filter first
-            and (r, p, t, v) in M.processInputs]
+    base = [
+        (r, p, e, i, t, v, o)
+        for (r, e, i, t, v, o) in M.EmissionActivity
+        if (r, p, e) in M.CostEmission  # tightest filter first
+        and (r, p, t, v) in M.processInputs
+    ]
 
     # then expand the base for the normal (season/tod) set and annual separately:
-    normal = [(r, p, e, s, d, i, t, v, o) for (r, p, e, i, t, v, o) in base
-              for s in M.time_season
-              for d in M.time_of_day
-              if t not in M.tech_annual]
+    normal = [
+        (r, p, e, s, d, i, t, v, o)
+        for (r, p, e, i, t, v, o) in base
+        for s in M.time_season
+        for d in M.time_of_day
+        if t not in M.tech_annual
+    ]
 
-    annual = [(r, p, e, i, t, v, o) for (r, p, e, i, t, v, o) in base
-              if t in M.tech_annual]
-
+    annual = [(r, p, e, i, t, v, o) for (r, p, e, i, t, v, o) in base if t in M.tech_annual]
 
     # 1. variable emissions
     var_emissions = sum(
-        M.V_FlowOut[r, p, s, d, i, t, v, o]
-        * M.EmissionActivity[r, e, i, t, v, o]
-        * M.CostEmission[r, p, e]
+        fixed_or_variable_cost(
+            cap_or_flow=M.V_FlowOut[r, p, s, d, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
+            cost_factor=M.CostEmission[r, p, e],
+            process_lifetime=MPL[r, p, t, v],
+            GDR=GDR,
+            P_0=P_0,
+            p=p,
+        )
         for (r, p, e, s, d, i, t, v, o) in normal
     )
 
     flex_emissions = sum(
-        M.V_Flex[r, p, s, d, i, t, v, o]
-        * M.EmissionActivity[r, e, i, t, v, o]
-        * M.CostEmission[r, p, e]
+        fixed_or_variable_cost(
+            cap_or_flow=M.V_Flex[r, p, s, d, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
+            cost_factor=M.CostEmission[r, p, e],
+            process_lifetime=MPL[r, p, t, v],
+            GDR=GDR,
+            P_0=P_0,
+            p=p,
+        )
         for (r, p, e, s, d, i, t, v, o) in normal
-        if t in M.tech_flex
-        and o in M.flex_commodities
+        if t in M.tech_flex and o in M.flex_commodities
     )
 
     curtail_emissions = sum(
-        M.V_Curtailment[r, p, s, d, i, t, v, o]
-        * M.EmissionActivity[r, e, i, t, v, o]
-        * M.CostEmission[r, p, e]
+        fixed_or_variable_cost(
+            cap_or_flow=M.V_Curtailment[r, p, s, d, i, t, v, o]
+            * M.EmissionActivity[r, e, i, t, v, o],
+            cost_factor=M.CostEmission[r, p, e],
+            process_lifetime=MPL[r, p, t, v],
+            GDR=GDR,
+            P_0=P_0,
+            p=p,
+        )
         for (r, p, e, s, d, i, t, v, o) in normal
         if t in M.tech_curtailment
     )
 
     var_annual_emissions = sum(
-        M.V_FlowOutAnnual[r, p, i, t, v, o]
-        * M.EmissionActivity[r, e, i, t, v, o]
-        * M.CostEmission[r, p, e]
+        fixed_or_variable_cost(
+            cap_or_flow=M.V_FlowOutAnnual[r, p, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
+            cost_factor=M.CostEmission[r, p, e],
+            process_lifetime=MPL[r, p, t, v],
+            GDR=GDR,
+            P_0=P_0,
+            p=p,
+        )
         for (r, p, e, i, t, v, o) in annual
     )
 
     flex_annual_emissions = sum(
-        M.V_FlexAnnual[r, p, i, t, v, o]
-        * M.EmissionActivity[r, e, i, t, v, o]
-        * M.CostEmission[r, p, e]
+        fixed_or_variable_cost(
+            cap_or_flow=M.V_FlexAnnual[r, p, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
+            cost_factor=M.CostEmission[r, p, e],
+            process_lifetime=MPL[r, p, t, v],
+            GDR=GDR,
+            P_0=P_0,
+            p=p,
+        )
         for (r, p, e, i, t, v, o) in annual
         if t in M.tech_flex and o in M.flex_commodities
     )
     period_emission_cost = (
-        var_emissions + flex_emissions + curtail_emissions + var_annual_emissions + flex_annual_emissions
+        var_emissions
+        + flex_emissions
+        + curtail_emissions
+        + var_annual_emissions
+        + flex_annual_emissions
     )
-    
-
-    # # First, sum over all actual emissions:
-    # variable_emission_costs = sum(
-    #     M.V_FlowOut[r, p, S_s, S_d, S_i, S_t, S_v, S_o]
-    #     * M.EmissionActivity[r, e, S_i, S_t, S_v, S_o]
-    #     * (
-    #         value(M.CostEmission[r, p, e])
-    #         * (
-    #             value(MPL[r, p, S_t, S_v])
-    #             if not GDR
-    #             else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
-    #         )
-    #     )
-    #     for r, S_p, e in M.CostEmission.sparse_iterkeys()
-    #     for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
-    #     if tmp_e == e and tmp_r == r and S_p == p and S_t not in M.tech_annual
-    #     # EmissionsActivity not indexed by p, so make sure (r,p,t,v) combos valid
-    #     if (r, p, S_t, S_v) in M.processInputs.keys()
-    #     for S_s in M.time_season
-    #     for S_d in M.time_of_day
-    # )
-    # # Second, sum over all flex emissions
-    # variable_emission_costs += sum(
-    #     M.V_Flex[r, p, S_s, S_d, S_i, S_t, S_v, S_o]
-    #     * M.EmissionActivity[r, e, S_i, S_t, S_v, S_o]
-    #     * (
-    #         value(M.CostEmission[r, p, e])
-    #         * (
-    #             value(MPL[r, p, S_t, S_v])
-    #             if not GDR
-    #             else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
-    #         )
-    #     )
-    #     for r, S_p, e in M.CostEmission.sparse_iterkeys()
-    #     for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
-    #     if tmp_e == e and tmp_r == r and S_p == p and S_t not in M.tech_annual
-    #     and S_t in M.tech_flex and S_o in M.flex_commodities
-    #     if (r, p, S_t, S_v) in M.processInputs.keys()
-    #     for S_s in M.time_season
-    #     for S_d in M.time_of_day
-    # )
-    # # Third, sum over all curtailment emission
-    # variable_emission_costs += sum(
-    #     M.V_Curtailment[r, p, S_s, S_d, S_i, S_t, S_v, S_o]
-    #     * M.EmissionActivity[r, e, S_i, S_t, S_v, S_o]
-    #     * (
-    #         value(M.CostEmission[r, p, e])
-    #         * (
-    #             value(MPL[r, p, S_t, S_v])
-    #             if not GDR
-    #             else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
-    #         )
-    #     )
-    #     for r, S_p, e in M.CostEmission.sparse_iterkeys()
-    #     for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
-    #     if tmp_e == e and tmp_r == r and S_p == p and S_t not in M.tech_annual
-    #     and S_t in M.tech_curtailment
-    #     # EmissionsActivity not indexed by p, so make sure (r,p,t,v) combos valid
-    #     if (r, p, S_t, S_v) in M.processInputs.keys()
-    #     for S_s in M.time_season
-    #     for S_d in M.time_of_day
-    # )
-    #
-    # # Fourth, sum over all annual emissions
-    # variable_emission_costs += sum(
-    #     M.V_FlowOutAnnual[r, p, S_i, S_t, S_v, S_o]
-    #     * M.EmissionActivity[r, e, S_i, S_t, S_v, S_o]
-    #     * (
-    #         value(M.CostEmission[r, p, e])
-    #         * (
-    #             value(MPL[r, p, S_t, S_v])
-    #             if not GDR
-    #             else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
-    #         )
-    #     )
-    #     for r, S_p, e in M.CostEmission.sparse_iterkeys()
-    #     for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
-    #     if tmp_e == e and tmp_r == r and S_p == p and S_t in M.tech_annual
-    #     # EmissionsActivity not indexed by p, so make sure (r,p,t,v) combos valid
-    #     if (r, p, S_t, S_v) in M.processInputs.keys()
-    # )
-    # # Finally, sum over all flex annual emissions
-    # variable_emission_costs += sum(
-    #     M.V_FlexAnnual[r, p, S_i, S_t, S_v, S_o]
-    #     * M.EmissionActivity[r, e, S_i, S_t, S_v, S_o]
-    #     * (
-    #         value(M.CostEmission[r, p, e])
-    #         * (
-    #             value(MPL[r, p, S_t, S_v])
-    #             if not GDR
-    #             else (x ** (P_0 - p + 1) * (1 - x ** (-value(MPL[r, p, S_t, S_v]))) / GDR)
-    #         )
-    #     )
-    #     for r, S_p, e in M.CostEmission.sparse_iterkeys()
-    #     for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
-    #     if tmp_e == e and tmp_r == r and S_p == p and S_t in M.tech_annual
-    #     and S_t in M.tech_flex and S_o in M.flex_commodities
-    #     # EmissionsActivity not indexed by p, so make sure (r,p,t,v) combos valid
-    #     if (r, p, S_t, S_v) in M.processInputs.keys()
-    # )
 
     sponge_cost = 0
+    # see the notes for this in temoa_model... it is optional/troubleshooting technique
     if M.troubleshooting:
         sponge_cost = 10000 * sum(
             M.sponge_abs[r, p, c] for r in M.regions for c in M.commodity_demand
@@ -695,7 +628,14 @@ def PeriodCost_rule(M: 'TemoaModel', p):
         # and add in the excess flows...
         sponge_cost += 10000 * sum(M.sump_abs[rpsdc] for rpsdc in M.sump if rpsdc[1] == p)
 
-    period_costs = loan_costs + fixed_costs + variable_costs + variable_costs_annual + sponge_cost
+    period_costs = (
+        loan_costs
+        + fixed_costs
+        + variable_costs
+        + variable_costs_annual
+        + period_emission_cost
+        + sponge_cost
+    )
     return period_costs
 
 
@@ -939,8 +879,8 @@ reduces computational burden.
                 for S_i in M.ProcessInputsByOutput[r, p, S_t, S_v, c]
             )
 
-    except:
-        raise Exception(
+    except KeyError:
+        raise KeyError(
             'The commodity "'
             + str(c)
             + '" can be produced \
@@ -1111,7 +1051,7 @@ def ResourceExtraction_Constraint(M: 'TemoaModel', reg, p, r):
             for S_s in M.time_season
             for S_d in M.time_of_day
         )
-    except:
+    except KeyError:
         collected = sum(
             M.V_FlowOutAnnual[reg, p, S_i, S_t, S_v, r]
             for S_i, S_t, S_v in M.ProcessByPeriodAndOutput.keys()
@@ -1983,8 +1923,9 @@ output in separate terms.
 """
     emission_limit = M.EmissionLimit[r, p, e]
 
-    # r can be an individual region (r='US'), or a combination of regions separated by a + (r='Mexico+US+Canada'), or 'global'.
-    # Note that regions!=M.regions. We iterate over regions to find actual_emissions and actual_emissions_annual.
+    # r can be an individual region (r='US'), or a combination of regions separated by a + (r='Mexico+US+Canada'),
+    # or 'global'.  Note that regions!=M.regions. We iterate over regions to find actual_emissions
+    # and actual_emissions_annual.
 
     # if r == 'global', the constraint is system-wide
 
@@ -2149,7 +2090,8 @@ def MaxActivity_Constraint(M: 'TemoaModel', r, p, t):
 
        \forall \{r, p, t \in T^{a}\} \in \Theta_{\text{MaxActivity}}
     """
-    # r can be an individual region (r='US'), or a combination of regions separated by a + (r='Mexico+US+Canada'), or 'global'.
+    # r can be an individual region (r='US'), or a combination of regions separated by
+    # a + (r='Mexico+US+Canada'), or 'global'.
     # if r == 'global', the constraint is system-wide
     if r == 'global':
         reg = M.regions
@@ -2206,7 +2148,8 @@ def MinActivity_Constraint(M: 'TemoaModel', r, p, t):
 
        \forall \{r, p, t \in T^{a}\} \in \Theta_{\text{MinActivity}}
     """
-    # r can be an individual region (r='US'), or a combination of regions separated by a + (r='Mexico+US+Canada'), or 'global'.
+    # r can be an individual region (r='US'), or a combination of regions separated by
+    # a + (r='Mexico+US+Canada'), or 'global'.
     # if r == 'global', the constraint is system-wide
     regions = gather_group_regions(M, r)
 
@@ -2233,8 +2176,13 @@ def MinActivity_Constraint(M: 'TemoaModel', r, p, t):
     expr = activity_rpt >= min_act
     # in the case that there is nothing to sum, skip
     if isinstance(expr, bool):  # an empty list was generated
-        logger.error('No elements available to support min-activity: (%s, %d, %s).'
-                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, t)
+        logger.error(
+            'No elements available to support min-activity: (%s, %d, %s).'
+            '  Check data/log for available/suppressed techs.  Requirement IGNORED.',
+            r,
+            p,
+            t,
+        )
         return Constraint.Skip
     return expr
 
@@ -2284,8 +2232,13 @@ def MinActivityGroup_Constraint(M: 'TemoaModel', r, p, g):
     expr = activity_p + activity_p_annual >= min_act
     # in the case that there is nothing to sum, skip
     if isinstance(expr, bool):  # an empty list was generated
-        logger.error('No elements available to support min-activity group: (%s, %d, %s).'
-                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        logger.error(
+            'No elements available to support min-activity group: (%s, %d, %s).'
+            '  Check data/log for available/suppressed techs.  Requirement IGNORED.',
+            r,
+            p,
+            g,
+        )
         return Constraint.Skip
     return expr
 
@@ -2397,7 +2350,7 @@ def MaxResource_Constraint(M: 'TemoaModel', r, t):
             for s in M.time_season
             for d in M.time_of_day
         )
-    except:
+    except KeyError:
         activity_rt = sum(
             M.V_FlowOutAnnual[r, p, S_i, t, S_v, S_o]
             for p in M.time_optimize
@@ -2492,8 +2445,13 @@ def MinCapacityGroup_Constraint(M: 'TemoaModel', r, p, g):
     expr = cap >= min_capgroup
     # in the case that there is nothing to sum, skip
     if isinstance(expr, bool):  # an empty list was generated
-        logger.error('No elements available to support min-capacity group: (%s, %d, %s).'
-                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        logger.error(
+            'No elements available to support min-capacity group: (%s, %d, %s).'
+            '  Check data/log for available/suppressed techs.  Requirement IGNORED.',
+            r,
+            p,
+            g,
+        )
         return Constraint.Skip
     return expr
 
@@ -2509,8 +2467,13 @@ def MinNewCapacityGroup_Constraint(M: 'TemoaModel', r, p, g):
     )
     expr = agg_new_cap >= min_new_cap
     if isinstance(expr, bool):
-        logger.error('No elements available to support min-activity group: (%s, %d, %s).'
-                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        logger.error(
+            'No elements available to support min-activity group: (%s, %d, %s).'
+            '  Check data/log for available/suppressed techs.  Requirement IGNORED.',
+            r,
+            p,
+            g,
+        )
         return Constraint.Skip
     return expr
 
@@ -2581,8 +2544,13 @@ def MinActivityShare_Constraint(M: 'TemoaModel', r, p, t, g):
     expr = activity_t >= min_activity_share * activity_group
     # in the case that there is nothing to sum, skip
     if isinstance(expr, bool):  # an empty list was generated
-        logger.error('No elements available to support min-activity share group: (%s, %d, %s).'
-                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        logger.error(
+            'No elements available to support min-activity share group: (%s, %d, %s).'
+            '  Check data/log for available/suppressed techs.  Requirement IGNORED.',
+            r,
+            p,
+            g,
+        )
         return Constraint.Skip
     return expr
 
@@ -2670,8 +2638,13 @@ def MinCapacityShare_Constraint(M: 'TemoaModel', r, p, t, g):
 
     expr = capacity_t >= min_cap_share * capacity_group
     if isinstance(expr, bool):
-        logger.error('No elements available to support min-capacity share: (%s, %d, %s).'
-                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        logger.error(
+            'No elements available to support min-capacity share: (%s, %d, %s).'
+            '  Check data/log for available/suppressed techs.  Requirement IGNORED.',
+            r,
+            p,
+            g,
+        )
         return Constraint.Skip
     return expr
 
@@ -2716,8 +2689,13 @@ def MinNewCapacityShare_Constraint(M: 'TemoaModel', r, p, t, g):
 
     expr = capacity_t >= min_cap_share * capacity_group
     if isinstance(expr, bool):
-        logger.error('No elements available to support min-new capacity share: (%s, %d, %s).'
-                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, g)
+        logger.error(
+            'No elements available to support min-new capacity share: (%s, %d, %s).'
+            '  Check data/log for available/suppressed techs.  Requirement IGNORED.',
+            r,
+            p,
+            g,
+        )
         return Constraint.Skip
     return expr
 
@@ -2785,8 +2763,13 @@ def MinAnnualCapacityFactor_Constraint(M: 'TemoaModel', r, p, t, o):
     expr = activity_rpt >= min_annual_cf * max_possible_activity_rpt
     # in the case that there is nothing to sum, skip
     if isinstance(expr, bool):  # an empty list was generated
-        logger.error('No elements available to support min-annual capacity factor: (%s, %d, %s).'
-                     '  Check data/log for available/suppressed techs.  Requirement IGNORED.', r, p, t)
+        logger.error(
+            'No elements available to support min-annual capacity factor: (%s, %d, %s).'
+            '  Check data/log for available/suppressed techs.  Requirement IGNORED.',
+            r,
+            p,
+            t,
+        )
         return Constraint.Skip
     return expr
 
