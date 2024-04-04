@@ -30,8 +30,8 @@ VALUES ('default_loan_rate', 0.05, 'Default Loan Rate if not specified in LoanRa
 
 CREATE TABLE IF NOT EXISTS OutputDualVariable
 (
-    constraint_name TEXT,
     scenario        TEXT,
+    constraint_name TEXT,
     dual            REAL,
     PRIMARY KEY (constraint_name, scenario)
 );
@@ -405,8 +405,8 @@ CREATE TABLE IF NOT EXISTS MinCapacityGroup
 );
 CREATE TABLE IF NOT EXISTS OutputCurtailment
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT,
     period      INTEGER
         REFERENCES TimePeriod (period),
@@ -427,8 +427,8 @@ CREATE TABLE IF NOT EXISTS OutputCurtailment
 );
 CREATE TABLE IF NOT EXISTS OutputNetCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     period   INTEGER
@@ -442,8 +442,8 @@ CREATE TABLE IF NOT EXISTS OutputNetCapacity
 );
 CREATE TABLE IF NOT EXISTS OutputBuiltCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     tech     TEXT
@@ -455,8 +455,8 @@ CREATE TABLE IF NOT EXISTS OutputBuiltCapacity
 );
 CREATE TABLE IF NOT EXISTS OutputRetiredCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     period   INTEGER
@@ -470,8 +470,8 @@ CREATE TABLE IF NOT EXISTS OutputRetiredCapacity
 );
 CREATE TABLE IF NOT EXISTS OutputFlowIn
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT
         REFERENCES SectorLabel (sector),
     period      INTEGER
@@ -493,8 +493,8 @@ CREATE TABLE IF NOT EXISTS OutputFlowIn
 );
 CREATE TABLE IF NOT EXISTS OutputFlowOut
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT
         REFERENCES SectorLabel (sector),
     period      INTEGER
@@ -807,8 +807,8 @@ CREATE TABLE IF NOT EXISTS MinNewCapacityShare
 );
 CREATE TABLE IF NOT EXISTS OutputEmission
 (
-    region    TEXT,
     scenario  TEXT,
+    region    TEXT,
     sector    TEXT
         REFERENCES SectorLabel (sector),
     period    INTEGER
