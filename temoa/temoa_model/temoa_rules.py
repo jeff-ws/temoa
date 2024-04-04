@@ -466,7 +466,7 @@ def PeriodCost_rule(M: 'TemoaModel', p):
             M.V_NewCapacity[r, S_t, S_v],
             M.CostInvest[r, S_t, S_v],
             M.LoanAnnualize[r, S_t, S_v],
-            M.LifetimeLoanProcess[r, S_t, S_v],
+            value(M.LifetimeLoanProcess[r, S_t, S_v]),
             M.LifetimeProcess[r, S_t, S_v],
             P_0,
             P_e,

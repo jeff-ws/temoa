@@ -360,6 +360,7 @@ class HybridLoader:
         # 2. use SQL query to get the full table
         # 3. (OPTIONALLY) filter it, as needed for myopic
         # 4. load it into the data dictionary
+        logger.info('Loading data portal')
         tic = time.time()
 
         if myopic_index is not None and not isinstance(myopic_index, MyopicIndex):
@@ -430,7 +431,9 @@ class HybridLoader:
                                     t for t in values if t[val_loc[0]] in self.viable_output_comms
                                 ]
                             else:
-                                raise NotImplementedError(f'that validator is not yet incorporated for use in validating: {c.name}')
+                                raise NotImplementedError(
+                                    f'that validator is not yet incorporated for use in validating: {c.name}'
+                                )
                         else:
                             data[c.name] = [t for t in values]
 
@@ -869,14 +872,14 @@ class HybridLoader:
                 raw = cur.execute(
                     'SELECT region, period, emis_comm from main.CostEmission '
                     'WHERE period >= ? AND period <= ?',
-                (mi.base_year, mi.last_demand_year),
+                    (mi.base_year, mi.last_demand_year),
                 ).fetchall()
                 load_element(M.CostEmission_rpe, raw, self.viable_output_comms, (2,))
 
                 raw = cur.execute(
                     'SELECT region, period, emis_comm, cost from main.CostEmission '
                     'WHERE period >= ? AND period <= ?',
-                (mi.base_year, mi.last_demand_year),
+                    (mi.base_year, mi.last_demand_year),
                 ).fetchall()
                 load_element(M.CostEmission, raw, self.viable_output_comms, (2,))
             else:
