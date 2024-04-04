@@ -137,7 +137,7 @@ def linked_region_check(M: 'TemoaModel', region_pair) -> bool:
         r1 = linked_regions.group(1)
         r2 = linked_regions.group(2)
         if (
-                all(r in M.regions for r in (r1, r2)) and r1 != r2
+            all(r in M.regions for r in (r1, r2)) and r1 != r2
         ):  # both captured regions are in the set of M.R
             return True
     return False
@@ -155,7 +155,7 @@ def region_group_check(M: 'TemoaModel', rg) -> bool:
             # break up the group
             contained_regions = rg.strip().split('+')
             if all(t in M.regions for t in contained_regions) and len(
-                    set(contained_regions)
+                set(contained_regions)
             ) == len(contained_regions):  # no dupes
                 return True
         else:  # it is a singleton
@@ -285,15 +285,15 @@ def validate_Efficiency(M: 'TemoaModel', val, r, si, t, v, so) -> bool:
     """Handy for troubleshooting problematic entries"""
 
     if all(
-            (
-                    isinstance(val, float),
-                    val > 0,
-                    r in M.RegionalIndices,
-                    si in M.commodity_physical,
-                    t in M.tech_all,
-                    so in M.commodity_carrier,
-                    v in M.vintage_all,
-            )
+        (
+            isinstance(val, float),
+            val > 0,
+            r in M.RegionalIndices,
+            si in M.commodity_physical,
+            t in M.tech_all,
+            so in M.commodity_carrier,
+            v in M.vintage_all,
+        )
     ):
         return True
     print('r', r in M.RegionalIndices)
@@ -318,12 +318,12 @@ def check_flex_curtail(M: 'TemoaModel'):
 # M.TechInputSplit = Param(M.regions, M.time_optimize, M.commodity_physical, M.tech_all)
 def validate_tech_input_split(M: 'TemoaModel', val, r, p, c, t):
     if all(
-            (
-                    r in M.regions,
-                    p in M.time_optimize,
-                    c in M.commodity_physical,
-                    t in M.tech_all,
-            )
+        (
+            r in M.regions,
+            p in M.time_optimize,
+            c in M.commodity_physical,
+            t in M.tech_all,
+        )
     ):
         return True
     print('r', r in M.regions)

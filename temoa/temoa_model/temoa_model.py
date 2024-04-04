@@ -259,7 +259,7 @@ class TemoaModel(AbstractModel):
         M.CapacityFactor_rsdt = Set(dimen=4, initialize=CapacityFactorTechIndices)
         M.CapacityFactorTech = Param(M.CapacityFactor_rsdt, default=1)
 
-        # Devnote:  using a default function below alleviates need to make this set.
+        # Dev note:  using a default function below alleviates need to make this set.
         # M.CapacityFactor_rsdtv = Set(dimen=5, initialize=CapacityFactorProcessIndices)
         M.CapacityFactorProcess = Param(
             M.regions,

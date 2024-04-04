@@ -927,6 +927,7 @@ def EmissionActivityIndices(M: 'TemoaModel'):
         (r, e, i, t, v, o)
         for r, i, t, v, o in M.Efficiency.sparse_iterkeys()
         for e in M.commodity_emissions
+        if r in M.regions  # omit any exchange/groups
     )
 
     return indices
