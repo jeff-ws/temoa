@@ -82,6 +82,7 @@ direct_transfer_tables = [
     ('',                    'CapacityToActivity'),
     ('commodities',         'Commodity'),
     ('commodity_labels',    'CommodityType'),
+    ('CostEmissions',       'CostEmission'),
     ('',                    'CostFixed'),
     ('',                    'CostInvest'),
     ('',                    'CostVariable'),
@@ -339,7 +340,7 @@ if unlim_cap_present:
     read_qry = 'SELECT tech, flag, sector, tech_category, unlim_cap, tech_desc FROM technologies'
     write_qry = "INSERT INTO Technology VALUES (?, ?, ?, ?, '', ?, 0, 0, 0, 0, 0, 0, 0, ?)"
 else:
-    read_qry = 'SELECT tech, flag, sector, tech_desc, tech_category FROM technologies'
+    read_qry = 'SELECT tech, flag, sector, tech_category, tech_desc FROM technologies'
     write_qry = "INSERT INTO Technology VALUES (?, ?, ?, ?, '', 0, 0, 0, 0, 0, 0, 0, 0, ?)"
 
 data = con_old.execute(read_qry).fetchall()
@@ -429,9 +430,13 @@ con_new.execute('VACUUM;')
 con_new.execute('PRAGMA FOREIGN_KEYS=1;')
 try:
     data = con_new.execute('PRAGMA FOREIGN_KEY_CHECK;')
-    print('FK check fails:')
-    for row in data:
-        print(row)
+    print('FK check fails (MUST BE FIXED):')
+    if not data:
+        print('No Foreign Key Failures.  (Good news!)')
+    else:
+        print('(Table, Row ID, Reference Table, (fkid) )')
+        for row in data:
+            print(row)
 except sqlite3.OperationalError as e:
     print('Foreign Key Check FAILED on new DB.  Something may be wrong with schema.')
     print(e)

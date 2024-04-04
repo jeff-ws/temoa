@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS MyopicEfficiency
     lifetime    integer,
 
     FOREIGN KEY (tech) REFERENCES Technology (tech),
-    FOREIGN KEY (region) REFERENCES Region (region),
 
     PRIMARY KEY (region, input_comm, tech, vintage, output_comm)
 );

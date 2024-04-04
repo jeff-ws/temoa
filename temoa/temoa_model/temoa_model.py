@@ -282,9 +282,14 @@ class TemoaModel(AbstractModel):
 
         M.LifetimeLoanTech = Param(M.RegionalIndices, M.tech_all, default=10)
         M.LifetimeLoanProcess_rtv = Set(dimen=3, initialize=LifetimeLoanProcessIndices)
-        # TODO:  Remove LifetimeLoanProcess....table no longer exists
-        M.LifetimeLoanProcess = Param(M.LifetimeLoanProcess_rtv, mutable=True)
-        M.initialize_Lifetimes = BuildAction(rule=CreateLifetimes)
+
+        # Dev Note:  The LifetimeLoanProcess table *could* be removed.  There is no longer a supporting
+        #            table in the database.  It is just a "passthrough" now to the default LifetimeLoanTech.
+        #            It is already stitched in to the model, so will leave it for now.  Table may be revived.
+        def get_loan_life(M, r, t, _):
+            return M.LifetimeLoanTech[r, t]
+
+        M.LifetimeLoanProcess = Param(M.LifetimeLoanProcess_rtv, default=get_loan_life)
 
         M.TechInputSplit = Param(M.regions, M.time_optimize, M.commodity_physical, M.tech_all)
         M.TechInputSplitAverage = Param(
