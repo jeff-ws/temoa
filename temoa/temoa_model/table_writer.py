@@ -4,10 +4,11 @@ tool for writing outputs to database tables
 import sqlite3
 import sys
 from collections import defaultdict, namedtuple
+from enum import Enum, unique
 from logging import getLogger
 from typing import TYPE_CHECKING
 
-from pyomo.core import value
+from pyomo.core import value, Objective
 
 from temoa.temoa_model import temoa_rules
 from temoa.temoa_model.exchange_tech_cost_ledger import CostType, ExchangeTechCostLedger
@@ -51,40 +52,211 @@ Note:  This file borrows heavily from the legacy pformat_results.py, and is some
 
 logger = getLogger(__name__)
 
-scenario_based_tables = [
+all_output_tables = [
+    'OutputBuiltCapacity',
     'OutputCost',
+    'OutputCurtailment',
+    'OutputDualVariable',
+    'OutputEmission',
+    'OutputFlowIn',
+    'OutputFlowOut',
+    'OutputNetCapacity',
+    'OutputObjective',
+    'OutputRetiredCapacity',
 ]
 
+
+def _marks(num: int) -> str:
+    marks = '(' + '?, ' * num + ')'
+    return marks
+
 EI = namedtuple('EI', ['r', 'p', 't', 'v', 'e'])
+@unique
+class FT(Enum):
+    IN: 1
+    OUT: 2
+    CURTAIL: 3
+    FLEX: 4
+    LOST: 5
+FI = namedtuple('FI', [
+    'r',
+    'p',
+    's',
+    'd',
+    'i',
+    't',
+    'v',
+    'o'
+])
+def ritvo(fi: FI) -> tuple:
+    return fi.r, fi.i, fi.t, fi.v, fi.o
+def rpetv(fi: FI, e: str) -> tuple:
+    return fi.r, fi.p, e, fi.t, fi.v
 
 
 class TableWriter:
     def __init__(self, config: TemoaConfig, epsilon=1e-5):
         self.config = config
         self.epsilon = epsilon
+        self.tech_sectors: dict[str, str] | None = None
+        self.flow_register: dict[FI, dict[FT, float]] = {
+
+        }
         try:
             self.con = sqlite3.connect(config.output_database)
         except sqlite3.OperationalError as e:
             logger.error('Failed to connect to output database: %s', config.output_database)
             logger.error(e)
             sys.exit(-1)
+            
+    def write_results(self, M: TemoaModel) -> None:
+        """ Write all results for the model to the DB """
+        self.clear_scenario()
+        if not self.tech_sectors:
+            self._get_tech_sectors()
+        self.write_objective()
+        self.write_capacity_tables(M)
+        self.write_costs(M)
+
+        self.con.execute('VACUUM')
+
+    def _get_tech_sectors(self):
+        """pull the sector info and fill the mapping"""
+        qry = 'SELECT tech, sector FROM Technology'
+        data = self.con.execute(qry).fetchall()
+        self.tech_sectors = dict(data)
 
     def clear_scenario(self):
         cur = self.con.cursor()
-        for table in scenario_based_tables:
+        for table in all_output_tables:
             cur.execute(f'DELETE FROM {table} WHERE scenario = ?', (self.config.scenario,))
         self.con.commit()
 
-    def write_objective(self):
-        pass
-        # objs = list(m.component_data_objects(Objective))
-        # if len(objs) > 1:
-        #     msg = '\nWarning: More than one objective.  Using first objective.\n'
-        #     SE.write(msg)
-        # # This is a generic workaround.  Not sure how else to automatically discover
-        # # the objective name
-        # obj_name, obj_value = objs[0].getname(True), value(objs[0])
-        # svars['Objective']["('" + obj_name + "')"] = obj_value
+    def write_objective(self, M: TemoaModel) -> None:
+        """Write the value of all ACTIVE objectives to the DB"""
+        objs: list[Objective] = list(M.component_data_objects(Objective))
+        active_objs = [obj for obj in objs if obj.active]
+        if len(active_objs) > 1:
+            logger.warning('Multiple active objectives found for scenario: %s.  All will be logged in db', self.config.scenario)
+        for obj in active_objs:
+            obj_name, obj_value = obj.getname(fully_qualified=True), value(obj)
+            qry = f'INSERT INTO OutputObjective VALUES (?, ?, ?)'
+            data = (self.config.scenario, obj_name, obj_value)
+            self.con.execute(qry, data)
+            self.con.commit()
+            
+    def write_capacity_tables(self, M: TemoaModel) -> None:
+        """Write the capacity tables to the DB"""
+        if not self.tech_sectors:
+            raise RuntimeError('tech sectors not available... code error')
+        # Built Capacity
+        data = []
+        for r, t, v in M.V_NewCapacity:
+            if v in M.time_optimize:
+                val = value(M.V_NewCapacity[r, t, v])
+                s = self.tech_sectors.get(t)
+                if abs(val) < self.epsilon: continue
+                new_cap = (self.config.scenario, r, s, t, v, val)
+                data.append(new_cap)
+        qry = 'INSERT INTO OutputBuiltCapacity VALUES (?, ?, ?, ?, ?, ?)'
+        self.con.executemany(qry, data)
+
+        # NetCapacity
+        data = []
+        for r, p, t, v in M.V_Capacity:
+            val = value(M.V_Capacity[r, p, t, v])
+            if abs(val) < self.epsilon: continue
+            s = self.tech_sectors.get(t)
+            new_net_cap = (self.config.scenario, r, s, p, t, v, val)
+            data.append(new_net_cap)
+        qry = 'INSERT INTO OutputNetCapacity VALUES (?, ?, ?, ?, ?, ?, ?)'
+        self.con.executemany(qry, data)
+
+        # Retired Capacity
+        data = []
+        for r, p, t, v in M.V_RetiredCapacity:
+            val = value(M.V_RetiredCapacity[r, p, t, v])
+            if abs(val) < self.epsilon: continue
+            s = self.tech_sectors.get(t)
+            new_retired_cap = (self.config.scenario, r, s, p, t, v, val)
+            data.append(new_retired_cap)
+        qry = 'INSERT INTO OutputRetiredCapacity VALUES (?, ?, ?, ?, ?, ?, ?)'
+        self.con.executemany(qry, data)
+
+        self.con.commit()
+
+    @staticmethod
+    def write_flow_in_table(self, M: TemoaModel) -> None:
+        """Write the flow in table to the DB"""
+        if not self.tech_sectors:
+            raise RuntimeError('tech sectors not available... code error')
+        data = []
+        for r, p, s, d, i, t, v, o in M.V_FlowIn:
+            val = value(M.V_FlowIn[r, p, s, d, i, t, v, o])
+            if abs(val) < self.epsilon: continue
+            sector = self.tech_sectors.get(t)
+            flow = (self.config.scenario, r, sector, p, s, d, i, t, v, o, val)
+            data.append(flow)
+
+        qry = f'INSERT INTO OutputFlowIn VALUES {_marks(11)}'
+        self.con.executemany(qry, data)
+        self.con.commit()
+
+    def calculate_flows(self, M: TemoaModel) -> dict[FI, dict[FT, float]]:
+        """Gather all flows by Flow Index and Type"""
+        if not self.tech_sectors:
+            raise RuntimeError('tech sectors not available... code error')
+        res: dict[FI, dict[FT, float]] = defaultdict(lambda: defaultdict(float))
+
+        for key in M.V_FlowOut:
+            fi = FI(*key)
+            val_out = value(M.V_FlowOut[fi])
+            if abs(val_out) < self.epsilon: continue
+            res[fi][FT.OUT] = val_out
+
+            if fi.t not in M.tech_storage:  # we can get the flow in by out/eff...
+                val_in = value(M.V_FlowOut[fi]) / value(M.Efficiency[ritvo(fi)])
+                res[fi][FT.IN] = val_in
+
+        for r, p, i, t, v, o in M.V_FlowOutAnnual:
+            for s in M.time_season:
+                for d in M.time_of_day:
+                    fi = FI(r, p, s, d, i, t, v, o)
+                    val_out = value(M.V_FlowOutAnnual[r, p, i, t, v, o]) * value(M.SegFrac[s, d])
+                    if abs(val_out) < self.epsilon: continue
+                    res[fi][FT.OUT] = val_out
+                    res[fi][FT.IN] = val_out / value(M.Efficiency[ritvo(fi)])
+
+        for key in M.V_Curtailment:
+            fi = FI(*key)
+            val = value(M.V_Curtailment[fi])
+            if abs(val) < self.epsilon: continue
+            res[fi][FT.CURTAIL] = val
+            # calculate input required to support this curtailment flow
+            svars['V_FlowIn'][r, p, s, d, i, t, v, o] = (val + value(
+                M.V_FlowOut[r, p, s, d, i, t, v, o])) / value(
+                M.Efficiency[r, i, t, v, o])
+
+            if (r, i, t, v, o) not in emission_keys: continue
+
+            emissions = emission_keys[r, i, t, v, o]
+            for e in emissions:
+                evalue = val * M.EmissionActivity[r, e, i, t, v, o]
+                svars['V_EmissionActivityByPeriodAndProcess'][r, p, e, t, v] += evalue
+
+        for r, p, i, t, v, o in M.V_FlexAnnual:
+            for s in M.time_season:
+                for d in M.time_of_day:
+                    val_out = value(M.V_FlexAnnual[r, p, i, t, v, o]) * value(M.SegFrac[s, d])
+                    if abs(val_out) < self.epsilon: continue
+                    svars['OutputCurtailment'][r, p, s, d, i, t, v, o] = val_out
+                    flow_out[r, p, s, d, i, t, v, o] -= val_out
+
+        for r, p, s, d, i, t, v, o in M.V_Flex:
+            val_out = value(M.V_Flex[r, p, s, d, i, t, v, o])
+            if abs(val_out) < self.epsilon: continue
+            svars['OutputCurtailment'][r, p, s, d, i, t, v, o] = val_out
+            flow_out[r, p, s, d, i, t, v, o] -= val_out
 
     @staticmethod
     def loan_costs(
@@ -103,6 +275,8 @@ class TableWriter:
         Calculate Loan costs by calling the loan annualize and loan cost functions in temoa_rules
         :return: tuple of [model-view discounted cost, un-discounted annuity]
         """
+        # dev note:  this is a passthrough function.  Sole intent is to use the EXACT formula the
+        #            model uses for these costs
         loan_ar = temoa_rules.loan_annualization_rate(loan_rate=loan_rate, loan_life=loan_life)
         model_ic = temoa_rules.loan_cost(
             capacity,
@@ -280,8 +454,8 @@ class TableWriter:
             entries[k].update(emission_entries[k])
         # write to table
         # translate the entries into fodder for the query
-        self.write_rows(entries)
-        self.write_rows(exchange_costs.get_entries())
+        self._write_cost_rows(entries)
+        self._write_cost_rows(exchange_costs.get_entries())
 
     def _gather_emission_costs(self, M: 'TemoaModel'):
         """there are 5 'flavors' of emission costs.  So, we need to gather the base and then decide on each"""
@@ -299,6 +473,8 @@ class TableWriter:
             if (r, p, e) in M.CostEmission  # tightest filter first
             and (r, p, t, v) in M.processInputs
         ]
+
+        # The "base set" can be expanded now to cover normal/annual indexing sets
         normal = [
             (r, p, e, s, d, i, t, v, o)
             for (r, p, e, i, t, v, o) in base
@@ -363,7 +539,8 @@ class TableWriter:
         # wow, that was like pulling teeth
         return entries
 
-    def write_rows(self, entries):
+    def _write_cost_rows(self, entries):
+        """Write the entries to the OutputCost table"""
         rows = [
             (
                 self.config.scenario,
@@ -392,4 +569,5 @@ class TableWriter:
 
     def __del__(self):
         if self.con:
+
             self.con.close()
