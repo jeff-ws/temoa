@@ -7,9 +7,9 @@ CREATE TABLE MetaData
     notes   TEXT,
     PRIMARY KEY (element)
 );
+INSERT INTO MetaData VALUES('myopic_base_year',2000,'Base Year for Myopic Analysis');
 INSERT INTO MetaData VALUES('DB_MAJOR',3,'DB major version number');
 INSERT INTO MetaData VALUES('DB_MINOR',0,'DB minor version number');
-INSERT INTO MetaData VALUES('myopic_base_year',1990,'');
 CREATE TABLE MetaDataReal
 (
     element TEXT,
@@ -18,12 +18,12 @@ CREATE TABLE MetaDataReal
 
     PRIMARY KEY (element)
 );
-INSERT INTO MetaDataReal VALUES('default_loan_rate',0.05000000000000000277,'Default Loan Rate if not specified in LoanRate table');
-INSERT INTO MetaDataReal VALUES('global_discount_rate',0.05000000000000000277,'');
+INSERT INTO MetaDataReal VALUES('default_loan_rate',0.05,'Default Loan Rate if not specified in LoanRate table');
+INSERT INTO MetaDataReal VALUES('global_discount_rate',0.05,'');
 CREATE TABLE OutputDualVariable
 (
-    constraint_name TEXT,
     scenario        TEXT,
+    constraint_name TEXT,
     dual            REAL,
     PRIMARY KEY (constraint_name, scenario)
 );
@@ -175,10 +175,23 @@ CREATE TABLE CommodityType
         PRIMARY KEY,
     description TEXT
 );
+INSERT INTO CommodityType VALUES('s','source commodity');
 INSERT INTO CommodityType VALUES('p','physical commodity');
 INSERT INTO CommodityType VALUES('e','emissions commodity');
 INSERT INTO CommodityType VALUES('d','demand commodity');
-INSERT INTO CommodityType VALUES('s','source commodity');
+CREATE TABLE CostEmission
+(
+    region    TEXT
+        REFERENCES Region (region),
+    period    INTEGER
+        REFERENCES TimePeriod (period),
+    emis_comm TEXT NOT NULL
+        REFERENCES Commodity (name),
+    cost      REAL NOT NULL,
+    units     TEXT,
+    notes     TEXT,
+    PRIMARY KEY (region, period, emis_comm)
+);
 CREATE TABLE CostFixed
 (
     region  TEXT    NOT NULL,
@@ -777,8 +790,8 @@ CREATE TABLE MinCapacityGroup
 );
 CREATE TABLE OutputCurtailment
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT,
     period      INTEGER
         REFERENCES TimePeriod (period),
@@ -799,8 +812,8 @@ CREATE TABLE OutputCurtailment
 );
 CREATE TABLE OutputNetCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     period   INTEGER
@@ -814,8 +827,8 @@ CREATE TABLE OutputNetCapacity
 );
 CREATE TABLE OutputBuiltCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     tech     TEXT
@@ -827,8 +840,8 @@ CREATE TABLE OutputBuiltCapacity
 );
 CREATE TABLE OutputRetiredCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     period   INTEGER
@@ -842,8 +855,8 @@ CREATE TABLE OutputRetiredCapacity
 );
 CREATE TABLE OutputFlowIn
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT
         REFERENCES SectorLabel (sector),
     period      INTEGER
@@ -865,8 +878,8 @@ CREATE TABLE OutputFlowIn
 );
 CREATE TABLE OutputFlowOut
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT
         REFERENCES SectorLabel (sector),
     period      INTEGER
@@ -1201,8 +1214,8 @@ CREATE TABLE MinNewCapacityShare
 );
 CREATE TABLE OutputEmission
 (
-    region    TEXT,
     scenario  TEXT,
+    region    TEXT,
     sector    TEXT
         REFERENCES SectorLabel (sector),
     period    INTEGER
@@ -1235,7 +1248,7 @@ CREATE TABLE EmissionLimit
         REFERENCES TimePeriod (period),
     emis_comm TEXT
         REFERENCES Commodity (name),
-    value   REAL,
+    value     REAL,
     units     TEXT,
     notes     TEXT,
     PRIMARY KEY (region, period, emis_comm)
@@ -1273,8 +1286,8 @@ CREATE TABLE TechGroupMember
 );
 CREATE TABLE Technology
 (
-    tech         TEXT NOT NULL PRIMARY KEY,
-    flag         TEXT NOT NULL,
+    tech         TEXT    NOT NULL PRIMARY KEY,
+    flag         TEXT    NOT NULL,
     sector       TEXT,
     category     TEXT,
     sub_category TEXT,

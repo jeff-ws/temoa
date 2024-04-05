@@ -38,7 +38,6 @@ import pyomo.opt
 from pyomo.environ import DataPortal, Suffix, Var, Constraint, value, UnknownSolver, SolverFactory
 from pyomo.opt import SolverResults, SolverStatus, TerminationCondition
 
-from temoa.temoa_model.pformat_results import pformat_results
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
@@ -303,17 +302,18 @@ def handle_results(instance: TemoaModel, results, options: TemoaConfig):
         SE.write(msg)
         SE.flush()
 
-    output_stream = pformat_results(instance, results, options)
+    #output_stream = pformat_results(instance, results, options)
     table_writer = TableWriter(config=options)
-    table_writer.clear_scenario()
-    table_writer.write_costs(M=instance)
+    # table_writer.clear_scenario()
+    # table_writer.write_costs(M=instance)
+    table_writer.write_results(M=instance)
 
     if not options.silent:
         SE.write('\r[%8.2f] Results processed.\n' % (time() - hack))
         SE.flush()
 
-    if options.stream_output:
-        print(output_stream.getvalue())
+    # if options.stream_output:
+    #     print(output_stream.getvalue())
     # normal (non-MGA) run will have a TotalCost as the OBJ:
     if hasattr(instance, 'TotalCost'):
         logger.info('TotalCost value: %0.2f', value(instance.TotalCost))

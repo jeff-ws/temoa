@@ -44,8 +44,8 @@ test_vals = {
         TestVals.OBJ_VALUE: 491977.7000753,
         TestVals.EFF_DOMAIN_SIZE: 30720,
         TestVals.EFF_INDEX_SIZE: 74,
-        TestVals.CONSTR_COUNT: 3066,
-        TestVals.VAR_COUNT: 1960,
+        TestVals.CONSTR_COUNT: 2826,
+        TestVals.VAR_COUNT: 1904,
     },
     'utopia': {
         TestVals.OBJ_VALUE: 36535.631200,
