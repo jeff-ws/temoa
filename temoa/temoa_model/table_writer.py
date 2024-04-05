@@ -178,8 +178,6 @@ class TableWriter:
         for ei in self.emission_register:
             sector = self.tech_sectors[ei.t]
             val = self.emission_register[ei]
-            if abs(val) < self.epsilon:
-                continue
             entry = (scenario, ei.r, sector, ei.p, ei.e, ei.t, ei.v, val)
             data.append(entry)
         qry = f'INSERT INTO OutputEmission VALUES {_marks(8)}'
@@ -581,7 +579,8 @@ class TableWriter:
             (r, p, e, i, t, v, o)
             for (r, e, i, t, v, o) in M.EmissionActivity
             for p in M.time_optimize
-            if (r, p, t, v) in M.processInputs
+            if (r, p, e) in M.CostEmission  # tightest filter first
+            and (r, p, t, v) in M.processInputs
         ]
 
         # The "base set" can be expanded now to cover normal/annual indexing sets
@@ -622,15 +621,9 @@ class TableWriter:
                     * M.EmissionActivity[r, e, i, t, v, o]
                 )
 
-        # gather costs
         ud_costs = defaultdict(float)
         d_costs = defaultdict(float)
         for ei in flows:
-            # screen to see if there is an associated cost
-            cost_index = (ei.r, ei.p, ei.e)
-            if cost_index not in M.CostEmission:
-                continue
-            # check for epsilon
             if abs(flows[ei]) < self.epsilon:
                 flows[ei] = 0.0
                 continue
