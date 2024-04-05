@@ -76,18 +76,21 @@ def _marks(num: int) -> str:
 EI = namedtuple('EI', ['r', 'p', 't', 'v', 'e'])
 """Emission Index"""
 
+
 @unique
 class FlowType(Enum):
     """Types of flow tracked"""
-    IN= 1
-    OUT= 2
-    CURTAIL= 3
-    FLEX= 4
-    LOST= 5
+
+    IN = 1
+    OUT = 2
+    CURTAIL = 3
+    FLEX = 4
+    LOST = 5
 
 
 FI = namedtuple('FI', ['r', 'p', 's', 'd', 'i', 't', 'v', 'o'])
 """Flow Index"""
+
 
 def ritvo(fi: FI) -> tuple:
     """convert FI to ritvo index"""
@@ -113,9 +116,15 @@ class TableWriter:
             logger.error(e)
             sys.exit(-1)
 
-    def write_results(self, M: TemoaModel) -> None:
-        """Write all results for the model to the DB"""
-        self.clear_scenario()
+    def write_results(self, M: TemoaModel, append=False) -> None:
+        """
+        Write results to output database
+        :param M: the model
+        :param append: append whatever is already in the tables.  If False (default), clear existing tables by scenario name
+        :return:
+        """
+        if not append:
+            self.clear_scenario()
         if not self.tech_sectors:
             self._get_tech_sectors()
         self.write_objective(M)
@@ -169,7 +178,9 @@ class TableWriter:
         for ei in self.emission_register:
             sector = self.tech_sectors[ei.t]
             val = self.emission_register[ei]
-            entry = (scenario, ei.r, sector, ei.p, ei.e,ei.t, ei.v, val)
+            if abs(val) < self.epsilon:
+                continue
+            entry = (scenario, ei.r, sector, ei.p, ei.e, ei.t, ei.v, val)
             data.append(entry)
         qry = f'INSERT INTO OutputEmission VALUES {_marks(8)}'
         self.con.executemany(qry, data)
@@ -259,11 +270,13 @@ class TableWriter:
 
             fin = flows[fi][FlowType.IN]
             fout = flows[fi][FlowType.OUT]
-            fcurt= flows[fi][FlowType.CURTAIL]
-            flost= flows[fi][FlowType.LOST]
+            fcurt = flows[fi][FlowType.CURTAIL]
+            flost = flows[fi][FlowType.LOST]
             deltas[fi] = fin - fout - fcurt - flost
 
-            if flows[fi][FlowType.IN] != 0 and abs(deltas[fi] / flows[fi][FlowType.IN]) > 0.02:  # 2% of input is missing / surplus
+            if (
+                flows[fi][FlowType.IN] != 0 and abs(deltas[fi] / flows[fi][FlowType.IN]) > 0.02
+            ):  # 2% of input is missing / surplus
                 all_good = False
                 logger.warning(
                     'Flow balance check failed for index: %s, delta: %0.2f', fi, deltas[fi]
@@ -271,7 +284,9 @@ class TableWriter:
             elif flows[fi][FlowType.IN] == 0 and abs(deltas[fi]) > 0.02:
                 all_good = False
                 logger.warning(
-                    'Flow balance check failed for index: %s, delta: %0.2f.  Flows happening with 0 input', fi, deltas[fi]
+                    'Flow balance check failed for index: %s, delta: %0.2f.  Flows happening with 0 input',
+                    fi,
+                    deltas[fi],
                 )
         return all_good
 
@@ -566,8 +581,7 @@ class TableWriter:
             (r, p, e, i, t, v, o)
             for (r, e, i, t, v, o) in M.EmissionActivity
             for p in M.time_optimize
-            if (r, p, e) in M.CostEmission  # tightest filter first
-            and (r, p, t, v) in M.processInputs
+            if (r, p, t, v) in M.processInputs
         ]
 
         # The "base set" can be expanded now to cover normal/annual indexing sets
@@ -608,9 +622,15 @@ class TableWriter:
                     * M.EmissionActivity[r, e, i, t, v, o]
                 )
 
+        # gather costs
         ud_costs = defaultdict(float)
         d_costs = defaultdict(float)
         for ei in flows:
+            # screen to see if there is an associated cost
+            cost_index = (ei.r, ei.p, ei.e)
+            if cost_index not in M.CostEmission:
+                continue
+            # check for epsilon
             if abs(flows[ei]) < self.epsilon:
                 flows[ei] = 0.0
                 continue
