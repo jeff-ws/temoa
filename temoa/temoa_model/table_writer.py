@@ -274,9 +274,10 @@ class TableWriter:
 
             fin = flows[fi][FlowType.IN]
             fout = flows[fi][FlowType.OUT]
-            fcurt = flows[fi][FlowType.CURTAIL]
+            # TODO:  Follow up WRT curtailment flows.  Currently, they are not related to input
+            # fcurt = flows[fi][FlowType.CURTAIL]
             flost = flows[fi][FlowType.LOST]
-            deltas[fi] = fin - fout - fcurt - flost
+            deltas[fi] = fin - fout - flost # - fcurt
 
             if (
                 flows[fi][FlowType.IN] != 0 and abs(deltas[fi] / flows[fi][FlowType.IN]) > 0.02
@@ -330,10 +331,10 @@ class TableWriter:
             if abs(val) < self.epsilon:
                 continue
             res[fi][FlowType.CURTAIL] = val
-            # TODO:  Review/confirm the implementation of this fake flow, not in flow Balance constraint
-            # replace flow in for members of curtailment to include 'fake' in flow.  ???
             # calculate input required to support this curtailment flow
-            res[fi][FlowType.IN] = (res[fi][FlowType.OUT] + val) / value(M.Efficiency[ritvo(fi)])
+
+            # TODO:  Follow up WRT curtailment flows.  Currently, they are not related to input
+            # res[fi][FlowType.IN] = (res[fi][FlowType.OUT] + val) / value(M.Efficiency[ritvo(fi)])
             res[fi][FlowType.LOST] = (1 - value(M.Efficiency[ritvo(fi)])) * res[fi][FlowType.IN]
 
         # flex techs.  This will subtract the flex from their output flow
