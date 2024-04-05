@@ -9,6 +9,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from pyomo.core import value, Objective
+from pyomo.opt import SolverResults
 
 from temoa.temoa_model import temoa_rules
 from temoa.temoa_model.exchange_tech_cost_ledger import CostType, ExchangeTechCostLedger
@@ -116,7 +117,9 @@ class TableWriter:
             logger.error(e)
             sys.exit(-1)
 
-    def write_results(self, M: TemoaModel, append=False) -> None:
+    def write_results(
+        self, M: TemoaModel, results: SolverResults | None = None, append=False
+    ) -> None:
         """
         Write results to output database
         :param M: the model
@@ -137,7 +140,10 @@ class TableWriter:
         self.flow_register = self.calculate_flows(M)
         self.check_flow_balance(M)
         self.write_flow_tables()
-
+        if results:  # write the duals
+            self.write_dual_variables(results)
+        # catch-all
+        self.con.commit()
         self.con.execute('VACUUM')
 
     def _get_tech_sectors(self):
@@ -682,6 +688,15 @@ class TableWriter:
         cur = self.con.cursor()
         qry = 'INSERT INTO OutputCost VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         cur.executemany(qry, rows)
+        self.con.commit()
+
+    def write_dual_variables(self, results: SolverResults):
+        """Write the dual variables to the OutputCost table"""
+        # collect the values
+        constraint_data = results['Solution'].Constraint.items()
+        dual_data = [(self.config.scenario, t[0], t[1]['Dual']) for t in constraint_data]
+        qry = 'INSERT INTO OutputDualVariable VALUES (?, ?, ?)'
+        self.con.executemany(qry, dual_data)
         self.con.commit()
 
     def __del__(self):

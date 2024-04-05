@@ -27,6 +27,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import sqlite3
+import sys
 from logging import getLogger
 from pathlib import Path
 from sys import stderr as SE, version_info
@@ -34,9 +35,9 @@ from time import time
 from typing import Tuple
 
 import deprecated
-import pyomo.opt
-from pyomo.environ import DataPortal, Suffix, Var, Constraint, value, UnknownSolver, SolverFactory
-from pyomo.opt import SolverResults, SolverStatus, TerminationCondition
+from pyomo.environ import DataPortal, Suffix, Var, Constraint, value, UnknownSolver, SolverFactory, \
+    check_optimal_termination
+from pyomo.opt import SolverResults
 
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -189,11 +190,12 @@ def build_instance(
     return instance
 
 
-def solve_instance(
-    instance: TemoaModel, solver_name, silent: bool = False
-) -> Tuple[TemoaModel, SolverResults]:
+def solve_instance(instance: TemoaModel, solver_name, silent: bool = False,
+                   solver_suffixes=None) -> Tuple[TemoaModel, SolverResults]:
     """
     Solve the instance and return a loaded instance
+    :param solver_suffixes: iterable of string names for suffixes.  See pyomo dox.  right now, only
+    'duals' is supported in the Temoa Framework.  Some solvers may not support duals.
     :param silent: Run silently
     :param solver_name: The name of the solver to request from the SolverFactory
     :param instance: the instance to solve
@@ -224,7 +226,7 @@ def solve_instance(
     )
     if solver_name == 'neos':
         raise NotImplementedError('Neos based solve is not currently supported')
-        # result = options.optimizer.solve(instance, opt=options.solver)
+
     else:
         if solver_name == 'cbc':
             pass
@@ -248,16 +250,37 @@ def solve_instance(
         elif solver_name == 'appsi_highs':
             pass
 
-        # TODO: still need to add gurobi parameters?
+        # TODO: still need to add gurobi parameters?  (and move them all to .toml...?)
 
-        result = optimizer.solve(
-            instance, load_solutions=False
-        )  # , tee=True)  <-- if needed for T/S
-        if (
-            result.solver.status == SolverStatus.ok
-            and result.solver.termination_condition == TerminationCondition.optimal
-        ):
-            instance.solutions.load_from(result)
+        # dev note:  The handling of suffixes is pretty weak.  As of today 4/4/2024, highspy crashes if
+        #            the keyword suffixes is passed in (regardless if there are any requested).  CBC only
+        #            supports some.  Perhaps in the future, this will be easier.  For now, we need a different
+        #            solve command for highspy and no suffixes because it works so well.
+        if solver_suffixes:
+            solver_suffixes = set(solver_suffixes)
+            legit_suffixes = {'duals', 'slack', 'rc'}
+            bad_apples = solver_suffixes - legit_suffixes
+            solver_suffixes &= legit_suffixes
+            if bad_apples:
+                logger.warning('Solver suffix %s is not in pyomo standards (see pyomo dox).  Removed', bad_apples)
+        else:
+            solver_suffixes = []
+        try:
+            if solver_name == 'appsi_highs' and not solver_suffixes:
+                result = optimizer.solve(instance)
+            else:  # we can try it...
+                result = optimizer.solve(
+                    instance, suffixes=solver_suffixes)
+        except RuntimeError as error:
+            logger.error('Solver failed to solve and returned an error: %s', error)
+            logger.error("This may be due to asking for suffixes (duals) for an incompatible solver.  "
+                         "Try de-selecting 'save_duals' in the config.  (see note in run_actions.py code)")
+            SE.write('solver failure.  See log file.')
+            sys.exit(-1)
+
+        if check_optimal_termination(result):
+            if solver_suffixes:
+                instance.solutions.store_to(result)  # this is needed to capture the duals/suffixes from the Solutions obj
 
         logger.info('Solve process complete')
         logger.debug('Solver results: \n %s', result.solver)
@@ -266,9 +289,6 @@ def solve_instance(
         SE.write('\r[%8.2f] Model solved.\n' % (time() - hack))
         SE.flush()
 
-    # TODO:  It isn't clear that we need to push the solution values into the Result object:  it appears to be used in
-    #        pformat results, but why not just use the instance?
-    instance.solutions.store_to(result)
     return instance, result
 
 
@@ -278,17 +298,11 @@ def check_solve_status(result: SolverResults) -> tuple[bool, str]:
     :param result: the results object returned by the solver
     :return: tuple of status boolean (True='optimal', others False), and string message if not optimal
     """
-    # dev note:  pyomo now offers the check function below, which simplifies this function
-    #            probably to a 1-liner.  Unsure if it is supported for all solvers, so will leave this
-    #            for now.
-
     soln = result['Solution']
-    # solv = result['Solver']  # currently unused, but may want it later
-    # prob = result['Problem']  # currently unused, but may want it later
 
     lesser_responses = ('feasible', 'globallyOptimal', 'locallyOptimal')
     logger.info('The solver reported status as: %s', soln.Status)
-    if pyomo.opt.check_optimal_termination(results=result):
+    if check_optimal_termination(results=result):
         return True, ''
     else:
         return False, f'{soln.Status} was returned from solve'
@@ -304,8 +318,10 @@ def handle_results(instance: TemoaModel, results, options: TemoaConfig):
 
     # output_stream = pformat_results(instance, results, options)
     table_writer = TableWriter(config=options)
-
-    table_writer.write_results(M=instance)
+    if options.save_duals:
+        table_writer.write_results(M=instance, results=results)
+    else:
+        table_writer.write_results(M=instance)
 
     if not options.silent:
         SE.write('\r[%8.2f] Results processed.\n' % (time() - hack))
