@@ -22,8 +22,8 @@ INSERT INTO MetaDataReal VALUES('default_loan_rate',0.05000000000000000277,'Defa
 INSERT INTO MetaDataReal VALUES('global_discount_rate',0.4199999999999999845,'');
 CREATE TABLE OutputDualVariable
 (
-    constraint_name TEXT,
     scenario        TEXT,
+    constraint_name TEXT,
     dual            REAL,
     PRIMARY KEY (constraint_name, scenario)
 );
@@ -127,6 +127,19 @@ INSERT INTO CommodityType VALUES('p','physical commodity');
 INSERT INTO CommodityType VALUES('e','emissions commodity');
 INSERT INTO CommodityType VALUES('d','demand commodity');
 INSERT INTO CommodityType VALUES('s','source commodity');
+CREATE TABLE CostEmission
+(
+    region    TEXT
+        REFERENCES Region (region),
+    period    INTEGER
+        REFERENCES TimePeriod (period),
+    emis_comm TEXT NOT NULL
+        REFERENCES Commodity (name),
+    cost      REAL NOT NULL,
+    units     TEXT,
+    notes     TEXT,
+    PRIMARY KEY (region, period, emis_comm)
+);
 CREATE TABLE CostFixed
 (
     region  TEXT    NOT NULL,
@@ -499,8 +512,8 @@ CREATE TABLE MinCapacityGroup
 INSERT INTO MinCapacityGroup VALUES('A',2025,'(A)_tech_grp_1',0.2000000000000000111,'',NULL);
 CREATE TABLE OutputCurtailment
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT,
     period      INTEGER
         REFERENCES TimePeriod (period),
@@ -521,8 +534,8 @@ CREATE TABLE OutputCurtailment
 );
 CREATE TABLE OutputNetCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     period   INTEGER
@@ -536,8 +549,8 @@ CREATE TABLE OutputNetCapacity
 );
 CREATE TABLE OutputBuiltCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     tech     TEXT
@@ -549,8 +562,8 @@ CREATE TABLE OutputBuiltCapacity
 );
 CREATE TABLE OutputRetiredCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     period   INTEGER
@@ -564,8 +577,8 @@ CREATE TABLE OutputRetiredCapacity
 );
 CREATE TABLE OutputFlowIn
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT
         REFERENCES SectorLabel (sector),
     period      INTEGER
@@ -587,8 +600,8 @@ CREATE TABLE OutputFlowIn
 );
 CREATE TABLE OutputFlowOut
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT
         REFERENCES SectorLabel (sector),
     period      INTEGER
@@ -920,8 +933,8 @@ CREATE TABLE MinNewCapacityShare
 );
 CREATE TABLE OutputEmission
 (
-    region    TEXT,
     scenario  TEXT,
+    region    TEXT,
     sector    TEXT
         REFERENCES SectorLabel (sector),
     period    INTEGER
@@ -955,7 +968,7 @@ CREATE TABLE EmissionLimit
         REFERENCES TimePeriod (period),
     emis_comm TEXT
         REFERENCES Commodity (name),
-    value   REAL,
+    value     REAL,
     units     TEXT,
     notes     TEXT,
     PRIMARY KEY (region, period, emis_comm)
@@ -999,8 +1012,8 @@ INSERT INTO TechGroupMember VALUES('(A)_tech_grp_1','EH');
 INSERT INTO TechGroupMember VALUES('(A)_tech_grp_1','EF');
 CREATE TABLE Technology
 (
-    tech         TEXT NOT NULL PRIMARY KEY,
-    flag         TEXT NOT NULL,
+    tech         TEXT    NOT NULL PRIMARY KEY,
+    flag         TEXT    NOT NULL,
     sector       TEXT,
     category     TEXT,
     sub_category TEXT,

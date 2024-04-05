@@ -42,7 +42,6 @@ from temoa.extensions.myopic.myopic_progress_mapper import MyopicProgressMapper
 from temoa.temoa_model import run_actions
 from temoa.temoa_model.hybrid_loader import HybridLoader
 from temoa.temoa_model.model_checking.pricing_check import price_checker
-from temoa.temoa_model.pformat_results import pformat_results
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
@@ -134,7 +133,6 @@ class MyopicSequencer:
         """
         input_file = self.config.input_file
         output_db = self.config.output_database
-        output_path = self.config.output_path
 
         if input_file.suffix not in {'.db', '.sqlite'}:
             logger.error(
@@ -191,7 +189,7 @@ class MyopicSequencer:
 
         last_instance_status = None  # solve status
         last_base_year = None
-        idx: MyopicIndex  # just a type-hint
+        idx: MyopicIndex | None = None  # just a type-hint
         logger.info('Starting Myopic Sequence')
         # 1, 2, 3...
         while len(self.instance_queue) > 0:
@@ -281,8 +279,8 @@ class MyopicSequencer:
             self.update_capacity_table(idx, model)
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'report')
-            pformat_results(model, results, self.config)
-            self.table_writer.write_costs(M=model)
+            # write results by appending.  We have already cleared necessary items
+            self.table_writer.write_results(M=model, append=True)
 
             # prep next loop
             last_base_year = idx.base_year  # update
@@ -590,7 +588,7 @@ class MyopicSequencer:
                 raise sqlite3.OperationalError
         for table in self.tables_without_scenario_reference:
             try:
-                self.cursor.execute(f'DELETE FROM {table}')
+                self.cursor.execute(f'DELETE FROM {table} WHERE 1')
             except sqlite3.OperationalError:
                 SE.write(f'Failed to clear table {table}.\n')
                 raise sqlite3.OperationalError
