@@ -302,10 +302,9 @@ def handle_results(instance: TemoaModel, results, options: TemoaConfig):
         SE.write(msg)
         SE.flush()
 
-    #output_stream = pformat_results(instance, results, options)
+    # output_stream = pformat_results(instance, results, options)
     table_writer = TableWriter(config=options)
-    # table_writer.clear_scenario()
-    # table_writer.write_costs(M=instance)
+
     table_writer.write_results(M=instance)
 
     if not options.silent:

@@ -7,7 +7,7 @@ CREATE TABLE MetaData
     notes   TEXT,
     PRIMARY KEY (element)
 );
-INSERT INTO MetaData VALUES('myopic_base_year',2000,'Base Year for Myopic Analysis');
+INSERT INTO MetaData VALUES('myopic_base_year',1990,'Base Year for Myopic Analysis');
 INSERT INTO MetaData VALUES('DB_MAJOR',3,'DB major version number');
 INSERT INTO MetaData VALUES('DB_MINOR',0,'DB minor version number');
 CREATE TABLE MetaDataReal
