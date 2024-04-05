@@ -68,7 +68,8 @@ all_output_tables = [
 
 def _marks(num: int) -> str:
     """convenience to make a sequence of question marks for query"""
-    marks = '(' + '?, ' * num + ')'
+    qs = ','.join('?' for _ in range(num))
+    marks = '(' + qs + ')'
     return marks
 
 
@@ -78,11 +79,11 @@ EI = namedtuple('EI', ['r', 'p', 't', 'v', 'e'])
 @unique
 class FlowType(Enum):
     """Types of flow tracked"""
-    IN: 1
-    OUT: 2
-    CURTAIL: 3
-    FLEX: 4
-    LOST: 5
+    IN= 1
+    OUT= 2
+    CURTAIL= 3
+    FLEX= 4
+    LOST= 5
 
 
 FI = namedtuple('FI', ['r', 'p', 's', 'd', 'i', 't', 'v', 'o'])
@@ -124,8 +125,8 @@ class TableWriter:
         self.emission_register = e_flows
         self.write_emissions()
         self.write_costs(M, emission_entries=e_costs)
-        self.calculate_flows(M)
-        self.check_flow_balance()
+        self.flow_register = self.calculate_flows(M)
+        self.check_flow_balance(M)
         self.write_flow_tables()
 
         self.con.execute('VACUUM')
@@ -230,6 +231,8 @@ class TableWriter:
             sector = self.tech_sectors.get(fi.t)
             for flow_type in self.flow_register[fi]:
                 val = self.flow_register[fi][flow_type]
+                if abs(val) < self.epsilon:
+                    continue
                 entry = (scenario, fi.r, sector, fi.p, fi.s, fi.d, fi.i, fi.t, fi.v, fi.o, val)
                 flows_by_type[flow_type].append(entry)
 
@@ -245,22 +248,30 @@ class TableWriter:
 
         self.con.commit()
 
-    def check_flow_balance(self) -> bool:
-        """An easy sanity check to ensure that the flow tables are balanced"""
+    def check_flow_balance(self, M: TemoaModel) -> bool:
+        """An easy sanity check to ensure that the flow tables are balanced, except for storage"""
         flows = self.flow_register
         all_good = True
         deltas = defaultdict(float)
         for fi in flows:
-            deltas[fi] = (
-                flows[fi][FlowType.IN]
-                - flows[fi][FlowType.OUT]
-                - flows[fi][FlowType.CURTAIL]
-                - flows[fi][FlowType.LOST]
-            )
-            if abs(deltas[fi] / flows[fi][FlowType.IN]) > 0.02:  # 2% of input is missing / surplus
+            if fi.t in M.tech_storage:
+                continue
+
+            fin = flows[fi][FlowType.IN]
+            fout = flows[fi][FlowType.OUT]
+            fcurt= flows[fi][FlowType.CURTAIL]
+            flost= flows[fi][FlowType.LOST]
+            deltas[fi] = fin - fout - fcurt - flost
+
+            if flows[fi][FlowType.IN] != 0 and abs(deltas[fi] / flows[fi][FlowType.IN]) > 0.02:  # 2% of input is missing / surplus
                 all_good = False
                 logger.warning(
                     'Flow balance check failed for index: %s, delta: %0.2f', fi, deltas[fi]
+                )
+            elif flows[fi][FlowType.IN] == 0 and abs(deltas[fi]) > 0.02:
+                all_good = False
+                logger.warning(
+                    'Flow balance check failed for index: %s, delta: %0.2f.  Flows happening with 0 input', fi, deltas[fi]
                 )
         return all_good
 

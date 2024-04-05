@@ -7,9 +7,9 @@ CREATE TABLE MetaData
     notes   TEXT,
     PRIMARY KEY (element)
 );
+INSERT INTO MetaData VALUES('myopic_base_year',2000,'Base Year for Myopic Analysis');
 INSERT INTO MetaData VALUES('DB_MAJOR',3,'DB major version number');
 INSERT INTO MetaData VALUES('DB_MINOR',0,'DB minor version number');
-INSERT INTO MetaData VALUES('myopic_base_year',1990,'');
 CREATE TABLE MetaDataReal
 (
     element TEXT,
@@ -22,8 +22,8 @@ INSERT INTO MetaDataReal VALUES('default_loan_rate',0.05,'Default Loan Rate if n
 INSERT INTO MetaDataReal VALUES('global_discount_rate',0.05,'');
 CREATE TABLE OutputDualVariable
 (
-    constraint_name TEXT,
     scenario        TEXT,
+    constraint_name TEXT,
     dual            REAL,
     PRIMARY KEY (constraint_name, scenario)
 );
@@ -44,6 +44,17 @@ INSERT INTO SectorLabel VALUES('transport');
 INSERT INTO SectorLabel VALUES('commercial');
 INSERT INTO SectorLabel VALUES('residential');
 INSERT INTO SectorLabel VALUES('industrial');
+CREATE TABLE CapacityCredit
+(
+    region  TEXT,
+    period  INTEGER,
+    tech    TEXT,
+    vintage INTEGER,
+    credit  REAL,
+    notes   TEXT,
+    PRIMARY KEY (region, period, tech, vintage),
+    CHECK (credit >= 0 AND credit <= 1)
+);
 CREATE TABLE CapacityFactorProcess
 (
     region  TEXT,
@@ -168,6 +179,19 @@ INSERT INTO CommodityType VALUES('s','source commodity');
 INSERT INTO CommodityType VALUES('p','physical commodity');
 INSERT INTO CommodityType VALUES('e','emissions commodity');
 INSERT INTO CommodityType VALUES('d','demand commodity');
+CREATE TABLE CostEmission
+(
+    region    TEXT
+        REFERENCES Region (region),
+    period    INTEGER
+        REFERENCES TimePeriod (period),
+    emis_comm TEXT NOT NULL
+        REFERENCES Commodity (name),
+    cost      REAL NOT NULL,
+    units     TEXT,
+    notes     TEXT,
+    PRIMARY KEY (region, period, emis_comm)
+);
 CREATE TABLE CostFixed
 (
     region  TEXT    NOT NULL,
@@ -569,6 +593,31 @@ INSERT INTO ExistingCapacity VALUES('utopia','TXD',1970,0.4000000000000000222,''
 INSERT INTO ExistingCapacity VALUES('utopia','TXD',1980,0.2000000000000000111,'','');
 INSERT INTO ExistingCapacity VALUES('utopia','TXG',1970,3.100000000000000088,'','');
 INSERT INTO ExistingCapacity VALUES('utopia','TXG',1980,1.5,'','');
+CREATE TABLE TechGroup
+(
+    group_name TEXT
+        PRIMARY KEY,
+    notes      TEXT
+);
+CREATE TABLE GrowthRateMax
+(
+    region TEXT,
+    tech   TEXT
+        REFERENCES Technology (tech),
+    rate   REAL,
+    notes  TEXT,
+    PRIMARY KEY (region, tech)
+);
+CREATE TABLE GrowthRateSeed
+(
+    region TEXT,
+    tech   TEXT
+        REFERENCES Technology (tech),
+    seed   REAL,
+    units  TEXT,
+    notes  TEXT,
+    PRIMARY KEY (region, tech)
+);
 CREATE TABLE LoanLifetimeTech
 (
     region   TEXT,
@@ -677,6 +726,16 @@ INSERT INTO MaxCapacity VALUES('utopia',1990,'RHE',0.0,'','');
 INSERT INTO MaxCapacity VALUES('utopia',1990,'TXD',0.5999999999999999778,'','');
 INSERT INTO MaxCapacity VALUES('utopia',2000,'TXD',1.760000000000000008,'','');
 INSERT INTO MaxCapacity VALUES('utopia',2010,'TXD',4.759999999999999787,'','');
+CREATE TABLE MaxResource
+(
+    region  TEXT,
+    tech    TEXT
+        REFERENCES Technology (tech),
+    max_res REAL,
+    units   TEXT,
+    notes   TEXT,
+    PRIMARY KEY (region, tech)
+);
 CREATE TABLE MinActivity
 (
     region  TEXT,
@@ -688,6 +747,18 @@ CREATE TABLE MinActivity
     units   TEXT,
     notes   TEXT,
     PRIMARY KEY (region, period, tech)
+);
+CREATE TABLE MaxCapacityGroup
+(
+    region     TEXT,
+    period     INTEGER
+        REFERENCES TimePeriod (period),
+    group_name TEXT
+        REFERENCES TechGroup (group_name),
+    max_cap    REAL,
+    units      TEXT,
+    notes      TEXT,
+    PRIMARY KEY (region, period, group_name)
 );
 CREATE TABLE MinCapacity
 (
@@ -705,10 +776,22 @@ INSERT INTO MinCapacity VALUES('utopia',1990,'E31',0.1300000000000000044,'','');
 INSERT INTO MinCapacity VALUES('utopia',2000,'E31',0.1300000000000000044,'','');
 INSERT INTO MinCapacity VALUES('utopia',2010,'E31',0.1300000000000000044,'','');
 INSERT INTO MinCapacity VALUES('utopia',1990,'SRE',0.1000000000000000055,'','');
+CREATE TABLE MinCapacityGroup
+(
+    region     TEXT,
+    period     INTEGER
+        REFERENCES TimePeriod (period),
+    group_name TEXT
+        REFERENCES TechGroup (group_name),
+    min_cap    REAL,
+    units      TEXT,
+    notes      TEXT,
+    PRIMARY KEY (region, period, group_name)
+);
 CREATE TABLE OutputCurtailment
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT,
     period      INTEGER
         REFERENCES TimePeriod (period),
@@ -729,8 +812,8 @@ CREATE TABLE OutputCurtailment
 );
 CREATE TABLE OutputNetCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     period   INTEGER
@@ -742,63 +825,10 @@ CREATE TABLE OutputNetCapacity
     capacity REAL,
     PRIMARY KEY (region, scenario, period, tech, vintage)
 );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 CREATE TABLE OutputBuiltCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     tech     TEXT
@@ -808,25 +838,10 @@ CREATE TABLE OutputBuiltCapacity
     capacity REAL,
     PRIMARY KEY (region, scenario, tech, vintage)
 );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 CREATE TABLE OutputRetiredCapacity
 (
-    region   TEXT,
     scenario TEXT,
+    region   TEXT,
     sector   TEXT
         REFERENCES SectorLabel (sector),
     period   INTEGER
@@ -840,14 +855,14 @@ CREATE TABLE OutputRetiredCapacity
 );
 CREATE TABLE OutputFlowIn
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT
         REFERENCES SectorLabel (sector),
     period      INTEGER
         REFERENCES TimePeriod (period),
     season      TEXT
-        REFERENCES TimePeriod (period),
+        REFERENCES TimeSeason (season),
     tod         TEXT
         REFERENCES TimeOfDay (tod),
     input_comm  TEXT
@@ -861,287 +876,10 @@ CREATE TABLE OutputFlowIn
     flow        REAL,
     PRIMARY KEY (region, scenario, period, season, tod, input_comm, tech, vintage, output_comm)
 );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 CREATE TABLE OutputFlowOut
 (
-    region      TEXT,
     scenario    TEXT,
+    region      TEXT,
     sector      TEXT
         REFERENCES SectorLabel (sector),
     period      INTEGER
@@ -1161,282 +899,6 @@ CREATE TABLE OutputFlowOut
     flow        REAL,
     PRIMARY KEY (region, scenario, period, season, tod, input_comm, tech, vintage, output_comm)
 );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 CREATE TABLE PlanningReserveMargin
 (
     region TEXT
@@ -1491,6 +953,13 @@ CREATE TABLE StorageDuration
     duration REAL,
     notes    TEXT,
     PRIMARY KEY (region, tech)
+);
+CREATE TABLE StorageInit
+(
+    tech  TEXT
+        PRIMARY KEY,
+    value REAL,
+    notes TEXT
 );
 CREATE TABLE TechnologyType
 (
@@ -1587,6 +1056,32 @@ CREATE TABLE TimePeriodType
 );
 INSERT INTO TimePeriodType VALUES('e','existing vintages');
 INSERT INTO TimePeriodType VALUES('f','future');
+CREATE TABLE MaxActivityShare
+(
+    region         TEXT,
+    period         INTEGER
+        REFERENCES TimePeriod (period),
+    tech           TEXT
+        REFERENCES Technology (tech),
+    group_name     TEXT
+        REFERENCES TechGroup (group_name),
+    max_proportion REAL,
+    notes          TEXT,
+    PRIMARY KEY (region, period, tech, group_name)
+);
+CREATE TABLE MaxCapacityShare
+(
+    region         TEXT,
+    period         INTEGER
+        REFERENCES TimePeriod (period),
+    tech           TEXT
+        REFERENCES Technology (tech),
+    group_name     TEXT
+        REFERENCES TechGroup (group_name),
+    max_proportion REAL,
+    notes          TEXT,
+    PRIMARY KEY (region, period, tech, group_name)
+);
 CREATE TABLE MaxAnnualCapacityFactor
 (
     region      TEXT,
@@ -1601,6 +1096,56 @@ CREATE TABLE MaxAnnualCapacityFactor
     notes       TEXT,
     PRIMARY KEY (region, period, tech),
     CHECK (factor >= 0 AND factor <= 1)
+);
+CREATE TABLE MaxNewCapacity
+(
+    region  TEXT,
+    period  INTEGER
+        REFERENCES TimePeriod (period),
+    tech    TEXT
+        REFERENCES Technology (tech),
+    max_cap REAL,
+    units   TEXT,
+    notes   TEXT,
+    PRIMARY KEY (region, period, tech)
+);
+CREATE TABLE MaxNewCapacityGroup
+(
+    region      TEXT,
+    period      INTEGER
+        REFERENCES TimePeriod (period),
+    group_name  TEXT
+        REFERENCES TechGroup (group_name),
+    max_new_cap REAL,
+    units       TEXT,
+    notes       TEXT,
+    PRIMARY KEY (region, period, group_name)
+);
+CREATE TABLE MaxNewCapacityShare
+(
+    region         TEXT,
+    period         INTEGER
+        REFERENCES TimePeriod (period),
+    tech           TEXT
+        REFERENCES Technology (tech),
+    group_name     TEXT
+        REFERENCES TechGroup (group_name),
+    max_proportion REAL,
+    notes          TEXT,
+    PRIMARY KEY (region, period, tech, group_name)
+);
+CREATE TABLE MinActivityShare
+(
+    region         TEXT,
+    period         INTEGER
+        REFERENCES TimePeriod (period),
+    tech           TEXT
+        REFERENCES Technology (tech),
+    group_name     TEXT
+        REFERENCES TechGroup (group_name),
+    min_proportion REAL,
+    notes          TEXT,
+    PRIMARY KEY (region, period, tech, group_name)
 );
 CREATE TABLE MinAnnualCapacityFactor
 (
@@ -1617,6 +1162,19 @@ CREATE TABLE MinAnnualCapacityFactor
     PRIMARY KEY (region, period, tech),
     CHECK (factor >= 0 AND factor <= 1)
 );
+CREATE TABLE MinCapacityShare
+(
+    region         TEXT,
+    period         INTEGER
+        REFERENCES TimePeriod (period),
+    tech           TEXT
+        REFERENCES Technology (tech),
+    group_name     TEXT
+        REFERENCES TechGroup (group_name),
+    min_proportion REAL,
+    notes          TEXT,
+    PRIMARY KEY (region, period, tech, group_name)
+);
 CREATE TABLE MinNewCapacity
 (
     region  TEXT,
@@ -1629,10 +1187,35 @@ CREATE TABLE MinNewCapacity
     notes   TEXT,
     PRIMARY KEY (region, period, tech)
 );
+CREATE TABLE MinNewCapacityGroup
+(
+    region      TEXT,
+    period      INTEGER
+        REFERENCES TimePeriod (period),
+    group_name  TEXT
+        REFERENCES TechGroup (group_name),
+    min_new_cap REAL,
+    units       TEXT,
+    notes       TEXT,
+    PRIMARY KEY (region, period, group_name)
+);
+CREATE TABLE MinNewCapacityShare
+(
+    region         TEXT,
+    period         INTEGER
+        REFERENCES TimePeriod (period),
+    tech           TEXT
+        REFERENCES Technology (tech),
+    group_name     TEXT
+        REFERENCES TechGroup (group_name),
+    max_proportion REAL,
+    notes          TEXT,
+    PRIMARY KEY (region, period, tech, group_name)
+);
 CREATE TABLE OutputEmission
 (
-    region    TEXT,
     scenario  TEXT,
+    region    TEXT,
     sector    TEXT
         REFERENCES SectorLabel (sector),
     period    INTEGER
@@ -1646,6 +1229,18 @@ CREATE TABLE OutputEmission
     emission  REAL,
     PRIMARY KEY (region, scenario, period, emis_comm, tech, vintage)
 );
+CREATE TABLE MinActivityGroup
+(
+    region     TEXT,
+    period     INTEGER
+        REFERENCES TimePeriod (period),
+    group_name TEXT
+        REFERENCES TechGroup (group_name),
+    min_act    REAL,
+    units      TEXT,
+    notes      TEXT,
+    PRIMARY KEY (region, period, group_name)
+);
 CREATE TABLE EmissionLimit
 (
     region    TEXT,
@@ -1653,15 +1248,46 @@ CREATE TABLE EmissionLimit
         REFERENCES TimePeriod (period),
     emis_comm TEXT
         REFERENCES Commodity (name),
-    value   REAL,
+    value     REAL,
     units     TEXT,
     notes     TEXT,
     PRIMARY KEY (region, period, emis_comm)
 );
+CREATE TABLE MaxActivityGroup
+(
+    region     TEXT,
+    period     INTEGER
+        REFERENCES TimePeriod (period),
+    group_name TEXT
+        REFERENCES TechGroup (group_name),
+    max_act    REAL,
+    units      TEXT,
+    notes      TEXT,
+    PRIMARY KEY (region, period, group_name)
+);
+CREATE TABLE RPSRequirement
+(
+    region      TEXT    NOT NULL
+        REFERENCES Region (region),
+    period      INTEGER NOT NULL
+        REFERENCES TimePeriod (period),
+    tech_group  TEXT    NOT NULL
+        REFERENCES TechGroup (group_name),
+    requirement REAL    NOT NULL,
+    notes       TEXT
+);
+CREATE TABLE TechGroupMember
+(
+    group_name TEXT
+        REFERENCES TechGroup (group_name),
+    tech       TEXT
+        REFERENCES Technology (tech),
+    PRIMARY KEY (group_name, tech)
+);
 CREATE TABLE Technology
 (
-    tech         TEXT NOT NULL PRIMARY KEY,
-    flag         TEXT NOT NULL,
+    tech         TEXT    NOT NULL PRIMARY KEY,
+    flag         TEXT    NOT NULL,
     sector       TEXT,
     category     TEXT,
     sub_category TEXT,
@@ -1676,25 +1302,25 @@ CREATE TABLE Technology
     description  TEXT,
     FOREIGN KEY (flag) REFERENCES TechnologyType (label)
 );
-INSERT INTO Technology VALUES('IMPDSL1','r','supply',' imported diesel','',1,0,0,0,0,0,0,0,'petroleum');
-INSERT INTO Technology VALUES('IMPGSL1','r','supply',' imported gasoline','',1,0,0,0,0,0,0,0,'petroleum');
-INSERT INTO Technology VALUES('IMPHCO1','r','supply',' imported coal','',1,0,0,0,0,0,0,0,'coal');
-INSERT INTO Technology VALUES('IMPOIL1','r','supply',' imported crude oil','',1,0,0,0,0,0,0,0,'petroleum');
-INSERT INTO Technology VALUES('IMPURN1','r','supply',' imported uranium','',1,0,0,0,0,0,0,0,'uranium');
-INSERT INTO Technology VALUES('IMPFEQ','r','supply',' imported fossil equivalent','',1,0,0,0,0,0,0,0,'');
-INSERT INTO Technology VALUES('IMPHYD','r','supply',' imported water -- doesnt exist in Utopia','',1,0,0,0,0,0,0,0,'water');
-INSERT INTO Technology VALUES('E01','pb','electric',' coal power plant','',0,0,0,0,0,0,0,0,'coal');
-INSERT INTO Technology VALUES('E21','pb','electric',' nuclear power plant','',0,0,0,0,0,0,0,0,'nuclear');
-INSERT INTO Technology VALUES('E31','pb','electric',' hydro power','',0,0,0,0,0,0,0,0,'hydro');
-INSERT INTO Technology VALUES('E51','ps','electric',' electric storage','',0,0,0,0,0,0,0,0,'storage');
-INSERT INTO Technology VALUES('E70','p','electric',' diesel power plant','',0,0,0,0,0,0,0,0,'diesel');
-INSERT INTO Technology VALUES('RHE','p','residential',' electric residential heating','',0,0,0,0,0,0,0,0,'electric');
-INSERT INTO Technology VALUES('RHO','p','residential',' diesel residential heating','',0,0,0,0,0,0,0,0,'diesel');
-INSERT INTO Technology VALUES('RL1','p','residential',' residential lighting','',0,0,0,0,0,0,0,0,'electric');
-INSERT INTO Technology VALUES('SRE','p','supply',' crude oil processor','',0,0,0,0,0,0,0,0,'petroleum');
-INSERT INTO Technology VALUES('TXD','p','transport',' diesel powered vehicles','',0,0,0,0,0,0,0,0,'diesel');
-INSERT INTO Technology VALUES('TXE','p','transport',' electric powered vehicles','',0,0,0,0,0,0,0,0,'electric');
-INSERT INTO Technology VALUES('TXG','p','transport',' gasoline powered vehicles','',0,0,0,0,0,0,0,0,'gasoline');
+INSERT INTO Technology VALUES('IMPDSL1','r','supply','petroleum','',1,0,0,0,0,0,0,0,' imported diesel');
+INSERT INTO Technology VALUES('IMPGSL1','r','supply','petroleum','',1,0,0,0,0,0,0,0,' imported gasoline');
+INSERT INTO Technology VALUES('IMPHCO1','r','supply','coal','',1,0,0,0,0,0,0,0,' imported coal');
+INSERT INTO Technology VALUES('IMPOIL1','r','supply','petroleum','',1,0,0,0,0,0,0,0,' imported crude oil');
+INSERT INTO Technology VALUES('IMPURN1','r','supply','uranium','',1,0,0,0,0,0,0,0,' imported uranium');
+INSERT INTO Technology VALUES('IMPFEQ','r','supply','','',1,0,0,0,0,0,0,0,' imported fossil equivalent');
+INSERT INTO Technology VALUES('IMPHYD','r','supply','water','',1,0,0,0,0,0,0,0,' imported water -- doesnt exist in Utopia');
+INSERT INTO Technology VALUES('E01','pb','electric','coal','',0,0,0,0,0,0,0,0,' coal power plant');
+INSERT INTO Technology VALUES('E21','pb','electric','nuclear','',0,0,0,0,0,0,0,0,' nuclear power plant');
+INSERT INTO Technology VALUES('E31','pb','electric','hydro','',0,0,0,0,0,0,0,0,' hydro power');
+INSERT INTO Technology VALUES('E51','ps','electric','storage','',0,0,0,0,0,0,0,0,' electric storage');
+INSERT INTO Technology VALUES('E70','p','electric','diesel','',0,0,0,0,0,0,0,0,' diesel power plant');
+INSERT INTO Technology VALUES('RHE','p','residential','electric','',0,0,0,0,0,0,0,0,' electric residential heating');
+INSERT INTO Technology VALUES('RHO','p','residential','diesel','',0,0,0,0,0,0,0,0,' diesel residential heating');
+INSERT INTO Technology VALUES('RL1','p','residential','electric','',0,0,0,0,0,0,0,0,' residential lighting');
+INSERT INTO Technology VALUES('SRE','p','supply','petroleum','',0,0,0,0,0,0,0,0,' crude oil processor');
+INSERT INTO Technology VALUES('TXD','p','transport','diesel','',0,0,0,0,0,0,0,0,' diesel powered vehicles');
+INSERT INTO Technology VALUES('TXE','p','transport','electric','',0,0,0,0,0,0,0,0,' electric powered vehicles');
+INSERT INTO Technology VALUES('TXG','p','transport','gasoline','',0,0,0,0,0,0,0,0,' gasoline powered vehicles');
 CREATE TABLE OutputCost
 (
     scenario TEXT,
@@ -1714,632 +1340,4 @@ CREATE TABLE OutputCost
     FOREIGN KEY (vintage) REFERENCES TimePeriod (period),
     FOREIGN KEY (tech) REFERENCES Technology (tech)
 );
-CREATE TABLE IF NOT EXISTS "Output_Duals" (
-"constraint_name" TEXT,
-  "Dual" REAL,
-  "scenario" TEXT
-);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-CREATE INDEX "ix_Output_Duals_constraint_name"ON "Output_Duals" ("constraint_name");
-COMMIT;
-PRAGMA FOREIGN_KEYS = 1;
 COMMIT;
