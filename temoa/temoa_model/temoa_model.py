@@ -137,7 +137,9 @@ class TemoaModel(AbstractModel):
         M.tech_production = Set()
         M.tech_all = Set(initialize=M.tech_resource | M.tech_production)
         M.tech_baseload = Set(within=M.tech_all)
-        M.tech_storage = Set(within=M.tech_all)
+        M.tech_annual = Set(within=M.tech_all)
+        # annual storage not supported in Storage constraint or TableWriter, so exclude from domain
+        M.tech_storage = Set(within=M.tech_all - M.tech_annual)
         M.tech_reserve = Set(within=M.tech_all)
         M.tech_ramping = Set(within=M.tech_all)
         # TODO:  both of these below are outdated and can be removed / tests updated
@@ -154,7 +156,6 @@ class TemoaModel(AbstractModel):
         M.tech_group_names = Set()
         M.tech_group_members = Set(M.tech_group_names, within=M.tech_all)
         # Define techs with constant output
-        M.tech_annual = Set(within=M.tech_all)
         # TODO:  come back and figure out why I thought annual techs were ineligible!
         M.tech_uncap = Set(
             within=M.tech_all - M.tech_reserve - M.tech_capacity_min - M.tech_capacity_max
