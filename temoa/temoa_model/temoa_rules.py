@@ -529,6 +529,11 @@ def PeriodCost_rule(M: 'TemoaModel', p):
     # and to ensure that the techology is active we need to filter that
     # result with processInput.keys()
 
+    # TODO:  REVIEW THIS:
+    # ================= Emissions and Flex and Curtailment =================
+    # Flex flows are deducted from V_FlowOut, so it is NOT NEEDED to tax them again.  (See commodity balance constr)
+    # Curtailment does not draw any inputs, so it seems logical that curtailed flows not be taxed either
+
     base = [
         (r, p, e, i, t, v, o)
         for (r, e, i, t, v, o) in M.EmissionActivity
@@ -560,34 +565,34 @@ def PeriodCost_rule(M: 'TemoaModel', p):
         for (r, p, e, s, d, i, t, v, o) in normal
     )
 
-    # 2. flex emissions
-    flex_emissions = sum(
-        fixed_or_variable_cost(
-            cap_or_flow=M.V_Flex[r, p, s, d, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
-            cost_factor=M.CostEmission[r, p, e],
-            process_lifetime=MPL[r, p, t, v],
-            GDR=GDR,
-            P_0=P_0,
-            p=p,
-        )
-        for (r, p, e, s, d, i, t, v, o) in normal
-        if t in M.tech_flex and o in M.flex_commodities
-    )
-
-    # 3. curtailment emissions
-    curtail_emissions = sum(
-        fixed_or_variable_cost(
-            cap_or_flow=M.V_Curtailment[r, p, s, d, i, t, v, o]
-            * M.EmissionActivity[r, e, i, t, v, o],
-            cost_factor=M.CostEmission[r, p, e],
-            process_lifetime=MPL[r, p, t, v],
-            GDR=GDR,
-            P_0=P_0,
-            p=p,
-        )
-        for (r, p, e, s, d, i, t, v, o) in normal
-        if t in M.tech_curtailment
-    )
+    # # 2. flex emissions
+    # flex_emissions = sum(
+    #     fixed_or_variable_cost(
+    #         cap_or_flow=M.V_Flex[r, p, s, d, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
+    #         cost_factor=M.CostEmission[r, p, e],
+    #         process_lifetime=MPL[r, p, t, v],
+    #         GDR=GDR,
+    #         P_0=P_0,
+    #         p=p,
+    #     )
+    #     for (r, p, e, s, d, i, t, v, o) in normal
+    #     if t in M.tech_flex and o in M.flex_commodities
+    # )
+    #
+    # # 3. curtailment emissions
+    # curtail_emissions = sum(
+    #     fixed_or_variable_cost(
+    #         cap_or_flow=M.V_Curtailment[r, p, s, d, i, t, v, o]
+    #         * M.EmissionActivity[r, e, i, t, v, o],
+    #         cost_factor=M.CostEmission[r, p, e],
+    #         process_lifetime=MPL[r, p, t, v],
+    #         GDR=GDR,
+    #         P_0=P_0,
+    #         p=p,
+    #     )
+    #     for (r, p, e, s, d, i, t, v, o) in normal
+    #     if t in M.tech_curtailment
+    # )
 
     # 4. annual emissions
     var_annual_emissions = sum(
@@ -602,25 +607,25 @@ def PeriodCost_rule(M: 'TemoaModel', p):
         for (r, p, e, i, t, v, o) in annual
         if t not in M.tech_flex
     )
-    # 5. flex annual emissions
-    flex_annual_emissions = sum(
-        fixed_or_variable_cost(
-            cap_or_flow=M.V_FlexAnnual[r, p, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
-            cost_factor=M.CostEmission[r, p, e],
-            process_lifetime=MPL[r, p, t, v],
-            GDR=GDR,
-            P_0=P_0,
-            p=p,
-        )
-        for (r, p, e, i, t, v, o) in annual
-        if t in M.tech_flex and o in M.flex_commodities
-    )
+    # # 5. flex annual emissions
+    # flex_annual_emissions = sum(
+    #     fixed_or_variable_cost(
+    #         cap_or_flow=M.V_FlexAnnual[r, p, i, t, v, o] * M.EmissionActivity[r, e, i, t, v, o],
+    #         cost_factor=M.CostEmission[r, p, e],
+    #         process_lifetime=MPL[r, p, t, v],
+    #         GDR=GDR,
+    #         P_0=P_0,
+    #         p=p,
+    #     )
+    #     for (r, p, e, i, t, v, o) in annual
+    #     if t in M.tech_flex and o in M.flex_commodities
+    # )
     period_emission_cost = (
         var_emissions
-        + flex_emissions
-        + curtail_emissions
-        + var_annual_emissions
-        + flex_annual_emissions
+        # + flex_emissions
+        # + curtail_emissions
+        # + var_annual_emissions
+        # + flex_annual_emissions
     )
 
     sponge_cost = 0
@@ -1941,6 +1946,11 @@ output in separate terms.
     else:
         regions = (r,)
 
+    # TODO:  REVIEW THIS:
+    # ================= Emissions and Flex and Curtailment =================
+    # Flex flows are deducted from V_FlowOut, so it is NOT NEEDED to tax them again.  (See commodity balance constr)
+    # Curtailment does not draw any inputs, so it seems logical that curtailed flows not be taxed either
+
     actual_emissions = sum(
         M.V_FlowOut[reg, p, S_s, S_d, S_i, S_t, S_v, S_o]
         * M.EmissionActivity[reg, e, S_i, S_t, S_v, S_o]
@@ -1953,33 +1963,33 @@ output in separate terms.
         for S_d in M.time_of_day
     )
 
-    actual_emissions_flex = sum(
-        M.V_Flex[reg, p, S_s, S_d, S_i, S_t, S_v, S_o]
-        * M.EmissionActivity[reg, e, S_i, S_t, S_v, S_o]
-        for reg in regions
-        for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
-        if tmp_e == e
-        and tmp_r == reg
-        and S_t not in M.tech_annual
-        and S_t in M.tech_flex
-        and S_o in M.flex_commodities
-        # EmissionsActivity not indexed by p, so make sure (r,p,t,v) combos valid
-        if (reg, p, S_t, S_v) in M.processInputs.keys()
-        for S_s in M.time_season
-        for S_d in M.time_of_day
-    )
+    # actual_emissions_flex = sum(
+    #     M.V_Flex[reg, p, S_s, S_d, S_i, S_t, S_v, S_o]
+    #     * M.EmissionActivity[reg, e, S_i, S_t, S_v, S_o]
+    #     for reg in regions
+    #     for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
+    #     if tmp_e == e
+    #     and tmp_r == reg
+    #     and S_t not in M.tech_annual
+    #     and S_t in M.tech_flex
+    #     and S_o in M.flex_commodities
+    #     # EmissionsActivity not indexed by p, so make sure (r,p,t,v) combos valid
+    #     if (reg, p, S_t, S_v) in M.processInputs.keys()
+    #     for S_s in M.time_season
+    #     for S_d in M.time_of_day
+    # )
 
-    actual_emissions_curtail = sum(
-        M.V_Curtailment[reg, p, S_s, S_d, S_i, S_t, S_v, S_o]
-        * M.EmissionActivity[reg, e, S_i, S_t, S_v, S_o]
-        for reg in regions
-        for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
-        if tmp_e == e and tmp_r == reg and S_t not in M.tech_annual and S_t in M.tech_curtailment
-        # EmissionsActivity not indexed by p, so make sure (r,p,t,v) combos valid
-        if (reg, p, S_t, S_v) in M.processInputs.keys()
-        for S_s in M.time_season
-        for S_d in M.time_of_day
-    )
+    # actual_emissions_curtail = sum(
+    #     M.V_Curtailment[reg, p, S_s, S_d, S_i, S_t, S_v, S_o]
+    #     * M.EmissionActivity[reg, e, S_i, S_t, S_v, S_o]
+    #     for reg in regions
+    #     for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
+    #     if tmp_e == e and tmp_r == reg and S_t not in M.tech_annual and S_t in M.tech_curtailment
+    #     # EmissionsActivity not indexed by p, so make sure (r,p,t,v) combos valid
+    #     if (reg, p, S_t, S_v) in M.processInputs.keys()
+    #     for S_s in M.time_season
+    #     for S_d in M.time_of_day
+    # )
 
     actual_emissions_annual = sum(
         M.V_FlowOutAnnual[reg, p, S_i, S_t, S_v, S_o]
@@ -1991,25 +2001,25 @@ output in separate terms.
         if (reg, p, S_t, S_v) in M.processInputs.keys()
     )
 
-    actual_emissions_flex_annual = sum(
-        M.V_FlexAnnual[reg, p, S_i, S_t, S_v, S_o] * M.EmissionActivity[reg, e, S_i, S_t, S_v, S_o]
-        for reg in regions
-        for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
-        if tmp_e == e
-        and tmp_r == reg
-        and S_t in M.tech_annual
-        and S_t in M.tech_flex
-        and S_o in M.flex_commodities
-        # EmissionsActivity not indexed by p, so make sure (r,p,t,v) combos valid
-        if (reg, p, S_t, S_v) in M.processInputs.keys()
-    )
+    # actual_emissions_flex_annual = sum(
+    #     M.V_FlexAnnual[reg, p, S_i, S_t, S_v, S_o] * M.EmissionActivity[reg, e, S_i, S_t, S_v, S_o]
+    #     for reg in regions
+    #     for tmp_r, tmp_e, S_i, S_t, S_v, S_o in M.EmissionActivity.sparse_iterkeys()
+    #     if tmp_e == e
+    #     and tmp_r == reg
+    #     and S_t in M.tech_annual
+    #     and S_t in M.tech_flex
+    #     and S_o in M.flex_commodities
+    #     # EmissionsActivity not indexed by p, so make sure (r,p,t,v) combos valid
+    #     if (reg, p, S_t, S_v) in M.processInputs.keys()
+    # )
 
     if int is type(
         actual_emissions
         + actual_emissions_annual
-        + actual_emissions_flex
-        + actual_emissions_curtail
-        + actual_emissions_flex_annual
+        # + actual_emissions_flex
+        # + actual_emissions_curtail
+        # + actual_emissions_flex_annual
     ):
         # TODO:  make this a logger warning
         msg = (
@@ -2021,9 +2031,9 @@ output in separate terms.
     expr = (
         actual_emissions
         + actual_emissions_annual
-        + actual_emissions_flex
-        + actual_emissions_curtail
-        + actual_emissions_flex_annual
+        # + actual_emissions_flex
+        # + actual_emissions_curtail
+        # + actual_emissions_flex_annual
         <= emission_limit
     )
     # in the case that there is nothing to sum, skip
