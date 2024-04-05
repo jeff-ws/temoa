@@ -67,30 +67,34 @@ all_output_tables = [
 
 
 def _marks(num: int) -> str:
+    """convenience to make a sequence of question marks for query"""
     marks = '(' + '?, ' * num + ')'
     return marks
 
+
 EI = namedtuple('EI', ['r', 'p', 't', 'v', 'e'])
+"""Emission Index"""
+
 @unique
-class FT(Enum):
+class FlowType(Enum):
+    """Types of flow tracked"""
     IN: 1
     OUT: 2
     CURTAIL: 3
     FLEX: 4
     LOST: 5
-FI = namedtuple('FI', [
-    'r',
-    'p',
-    's',
-    'd',
-    'i',
-    't',
-    'v',
-    'o'
-])
+
+
+FI = namedtuple('FI', ['r', 'p', 's', 'd', 'i', 't', 'v', 'o'])
+"""Flow Index"""
+
 def ritvo(fi: FI) -> tuple:
+    """convert FI to ritvo index"""
     return fi.r, fi.i, fi.t, fi.v, fi.o
+
+
 def rpetv(fi: FI, e: str) -> tuple:
+    """convert FI and emission to rpetv index"""
     return fi.r, fi.p, e, fi.t, fi.v
 
 
@@ -99,24 +103,30 @@ class TableWriter:
         self.config = config
         self.epsilon = epsilon
         self.tech_sectors: dict[str, str] | None = None
-        self.flow_register: dict[FI, dict[FT, float]] = {
-
-        }
+        self.flow_register: dict[FI, dict[FlowType, float]] = {}
+        self.emission_register: dict[EI, float] | None = None
         try:
             self.con = sqlite3.connect(config.output_database)
         except sqlite3.OperationalError as e:
             logger.error('Failed to connect to output database: %s', config.output_database)
             logger.error(e)
             sys.exit(-1)
-            
+
     def write_results(self, M: TemoaModel) -> None:
-        """ Write all results for the model to the DB """
+        """Write all results for the model to the DB"""
         self.clear_scenario()
         if not self.tech_sectors:
             self._get_tech_sectors()
-        self.write_objective()
+        self.write_objective(M)
         self.write_capacity_tables(M)
-        self.write_costs(M)
+        # analyze the emissions to get the costs and flows
+        e_costs, e_flows = self._gather_emission_costs_and_flows(M)
+        self.emission_register = e_flows
+        self.write_emissions()
+        self.write_costs(M, emission_entries=e_costs)
+        self.calculate_flows(M)
+        self.check_flow_balance()
+        self.write_flow_tables()
 
         self.con.execute('VACUUM')
 
@@ -137,14 +147,33 @@ class TableWriter:
         objs: list[Objective] = list(M.component_data_objects(Objective))
         active_objs = [obj for obj in objs if obj.active]
         if len(active_objs) > 1:
-            logger.warning('Multiple active objectives found for scenario: %s.  All will be logged in db', self.config.scenario)
+            logger.warning(
+                'Multiple active objectives found for scenario: %s.  All will be logged in db',
+                self.config.scenario,
+            )
         for obj in active_objs:
             obj_name, obj_value = obj.getname(fully_qualified=True), value(obj)
             qry = f'INSERT INTO OutputObjective VALUES (?, ?, ?)'
             data = (self.config.scenario, obj_name, obj_value)
             self.con.execute(qry, data)
             self.con.commit()
-            
+
+    def write_emissions(self):
+        """Write the emission table to the DB"""
+        if not self.tech_sectors:
+            raise RuntimeError('tech sectors not available... code error')
+
+        data = []
+        scenario = self.config.scenario
+        for ei in self.emission_register:
+            sector = self.tech_sectors[ei.t]
+            val = self.emission_register[ei]
+            entry = (scenario, ei.r, sector, ei.p, ei.e,ei.t, ei.v, val)
+            data.append(entry)
+        qry = f'INSERT INTO OutputEmission VALUES {_marks(8)}'
+        self.con.executemany(qry, data)
+        self.con.commit()
+
     def write_capacity_tables(self, M: TemoaModel) -> None:
         """Write the capacity tables to the DB"""
         if not self.tech_sectors:
@@ -155,7 +184,8 @@ class TableWriter:
             if v in M.time_optimize:
                 val = value(M.V_NewCapacity[r, t, v])
                 s = self.tech_sectors.get(t)
-                if abs(val) < self.epsilon: continue
+                if abs(val) < self.epsilon:
+                    continue
                 new_cap = (self.config.scenario, r, s, t, v, val)
                 data.append(new_cap)
         qry = 'INSERT INTO OutputBuiltCapacity VALUES (?, ?, ?, ?, ?, ?)'
@@ -165,7 +195,8 @@ class TableWriter:
         data = []
         for r, p, t, v in M.V_Capacity:
             val = value(M.V_Capacity[r, p, t, v])
-            if abs(val) < self.epsilon: continue
+            if abs(val) < self.epsilon:
+                continue
             s = self.tech_sectors.get(t)
             new_net_cap = (self.config.scenario, r, s, p, t, v, val)
             data.append(new_net_cap)
@@ -176,7 +207,8 @@ class TableWriter:
         data = []
         for r, p, t, v in M.V_RetiredCapacity:
             val = value(M.V_RetiredCapacity[r, p, t, v])
-            if abs(val) < self.epsilon: continue
+            if abs(val) < self.epsilon:
+                continue
             s = self.tech_sectors.get(t)
             new_retired_cap = (self.config.scenario, r, s, p, t, v, val)
             data.append(new_retired_cap)
@@ -185,78 +217,130 @@ class TableWriter:
 
         self.con.commit()
 
-    @staticmethod
-    def write_flow_in_table(self, M: TemoaModel) -> None:
-        """Write the flow in table to the DB"""
+    def write_flow_tables(self) -> None:
+        """Write the flow tables"""
         if not self.tech_sectors:
             raise RuntimeError('tech sectors not available... code error')
-        data = []
-        for r, p, s, d, i, t, v, o in M.V_FlowIn:
-            val = value(M.V_FlowIn[r, p, s, d, i, t, v, o])
-            if abs(val) < self.epsilon: continue
-            sector = self.tech_sectors.get(t)
-            flow = (self.config.scenario, r, sector, p, s, d, i, t, v, o, val)
-            data.append(flow)
+        if not self.flow_register:
+            raise RuntimeError('flow_register not available... code error')
+        # sort the flows
+        flows_by_type: dict[FlowType, list[tuple]] = defaultdict(list)
+        scenario = self.config.scenario
+        for fi in self.flow_register:
+            sector = self.tech_sectors.get(fi.t)
+            for flow_type in self.flow_register[fi]:
+                val = self.flow_register[fi][flow_type]
+                entry = (scenario, fi.r, sector, fi.p, fi.s, fi.d, fi.i, fi.t, fi.v, fi.o, val)
+                flows_by_type[flow_type].append(entry)
 
-        qry = f'INSERT INTO OutputFlowIn VALUES {_marks(11)}'
-        self.con.executemany(qry, data)
+        table_associations = {
+            FlowType.OUT: 'OutputFlowOut',
+            FlowType.IN: 'OutputFlowIn',
+            FlowType.CURTAIL: 'OutputCurtailment',
+        }
+
+        for flow_type, table_name in table_associations.items():
+            qry = f'INSERT INTO {table_name} VALUES {_marks(11)}'
+            self.con.executemany(qry, flows_by_type[flow_type])
+
         self.con.commit()
 
-    def calculate_flows(self, M: TemoaModel) -> dict[FI, dict[FT, float]]:
-        """Gather all flows by Flow Index and Type"""
-        if not self.tech_sectors:
-            raise RuntimeError('tech sectors not available... code error')
-        res: dict[FI, dict[FT, float]] = defaultdict(lambda: defaultdict(float))
+    def check_flow_balance(self) -> bool:
+        """An easy sanity check to ensure that the flow tables are balanced"""
+        flows = self.flow_register
+        all_good = True
+        deltas = defaultdict(float)
+        for fi in flows:
+            deltas[fi] = (
+                flows[fi][FlowType.IN]
+                - flows[fi][FlowType.OUT]
+                - flows[fi][FlowType.CURTAIL]
+                - flows[fi][FlowType.LOST]
+            )
+            if abs(deltas[fi] / flows[fi][FlowType.IN]) > 0.02:  # 2% of input is missing / surplus
+                all_good = False
+                logger.warning(
+                    'Flow balance check failed for index: %s, delta: %0.2f', fi, deltas[fi]
+                )
+        return all_good
 
+    def calculate_flows(self, M: TemoaModel) -> dict[FI, dict[FlowType, float]]:
+        """Gather all flows by Flow Index and Type"""
+
+        res: dict[FI, dict[FlowType, float]] = defaultdict(lambda: defaultdict(float))
+
+        # ---- NON-annual ----
+
+        # Storage, which has a unique v_flow_in (non-storage techs do not have this variable)
+        for key in M.V_FlowIn:
+            fi = FI(*key)
+            flow = value(M.V_FlowIn[fi])
+            if abs(flow) < self.epsilon:
+                continue
+            res[fi][FlowType.IN] = flow
+            res[fi][FlowType.LOST] = (1 - value(M.Efficiency[ritvo(fi)])) * flow
+
+        # regular flows
         for key in M.V_FlowOut:
             fi = FI(*key)
-            val_out = value(M.V_FlowOut[fi])
-            if abs(val_out) < self.epsilon: continue
-            res[fi][FT.OUT] = val_out
+            flow = value(M.V_FlowOut[fi])
+            if abs(flow) < self.epsilon:
+                continue
+            res[fi][FlowType.OUT] = flow
 
             if fi.t not in M.tech_storage:  # we can get the flow in by out/eff...
-                val_in = value(M.V_FlowOut[fi]) / value(M.Efficiency[ritvo(fi)])
-                res[fi][FT.IN] = val_in
+                flow = value(M.V_FlowOut[fi]) / value(M.Efficiency[ritvo(fi)])
+                res[fi][FlowType.IN] = flow
+                res[fi][FlowType.LOST] = (1 - value(M.Efficiency[ritvo(fi)])) * flow
 
+        # curtailment flows
+        for key in M.V_Curtailment:
+            fi = FI(*key)
+            val = value(M.V_Curtailment[fi])
+            if abs(val) < self.epsilon:
+                continue
+            res[fi][FlowType.CURTAIL] = val
+            # TODO:  Review/confirm the implementation of this fake flow, not in flow Balance constraint
+            # replace flow in for members of curtailment to include 'fake' in flow.  ???
+            # calculate input required to support this curtailment flow
+            res[fi][FlowType.IN] = (res[fi][FlowType.OUT] + val) / value(M.Efficiency[ritvo(fi)])
+            res[fi][FlowType.LOST] = (1 - value(M.Efficiency[ritvo(fi)])) * res[fi][FlowType.IN]
+
+        # flex techs.  This will subtract the flex from their output flow
+        for key in M.V_Flex:
+            fi = FI(*key)
+            flow = value(M.V_Flex[fi])
+            if abs(flow) < self.epsilon:
+                continue
+            res[fi][FlowType.CURTAIL] = flow
+            res[fi][FlowType.OUT] -= flow
+
+        # ---- annual ----
+
+        # basic annual flows
         for r, p, i, t, v, o in M.V_FlowOutAnnual:
             for s in M.time_season:
                 for d in M.time_of_day:
                     fi = FI(r, p, s, d, i, t, v, o)
-                    val_out = value(M.V_FlowOutAnnual[r, p, i, t, v, o]) * value(M.SegFrac[s, d])
-                    if abs(val_out) < self.epsilon: continue
-                    res[fi][FT.OUT] = val_out
-                    res[fi][FT.IN] = val_out / value(M.Efficiency[ritvo(fi)])
+                    flow = value(M.V_FlowOutAnnual[r, p, i, t, v, o]) * value(M.SegFrac[s, d])
+                    if abs(flow) < self.epsilon:
+                        continue
+                    res[fi][FlowType.OUT] = flow
+                    res[fi][FlowType.IN] = flow / value(M.Efficiency[ritvo(fi)])
+                    res[fi][FlowType.LOST] = (1 - value(M.Efficiency[ritvo(fi)])) * flow
 
-        for key in M.V_Curtailment:
-            fi = FI(*key)
-            val = value(M.V_Curtailment[fi])
-            if abs(val) < self.epsilon: continue
-            res[fi][FT.CURTAIL] = val
-            # calculate input required to support this curtailment flow
-            svars['V_FlowIn'][r, p, s, d, i, t, v, o] = (val + value(
-                M.V_FlowOut[r, p, s, d, i, t, v, o])) / value(
-                M.Efficiency[r, i, t, v, o])
-
-            if (r, i, t, v, o) not in emission_keys: continue
-
-            emissions = emission_keys[r, i, t, v, o]
-            for e in emissions:
-                evalue = val * M.EmissionActivity[r, e, i, t, v, o]
-                svars['V_EmissionActivityByPeriodAndProcess'][r, p, e, t, v] += evalue
-
+        # flex annual
         for r, p, i, t, v, o in M.V_FlexAnnual:
             for s in M.time_season:
                 for d in M.time_of_day:
-                    val_out = value(M.V_FlexAnnual[r, p, i, t, v, o]) * value(M.SegFrac[s, d])
-                    if abs(val_out) < self.epsilon: continue
-                    svars['OutputCurtailment'][r, p, s, d, i, t, v, o] = val_out
-                    flow_out[r, p, s, d, i, t, v, o] -= val_out
+                    fi = FI(r, p, s, d, i, t, v, o)
+                    flow = value(M.V_FlexAnnual[fi]) * value(M.SegFrac[s, d])
+                    if abs(flow) < self.epsilon:
+                        continue
+                    res[fi][FlowType.CURTAIL] = flow
+                    res[fi][FlowType.OUT] -= flow
 
-        for r, p, s, d, i, t, v, o in M.V_Flex:
-            val_out = value(M.V_Flex[r, p, s, d, i, t, v, o])
-            if abs(val_out) < self.epsilon: continue
-            svars['OutputCurtailment'][r, p, s, d, i, t, v, o] = val_out
-            flow_out[r, p, s, d, i, t, v, o] -= val_out
+        return res
 
     @staticmethod
     def loan_costs(
@@ -304,9 +388,10 @@ class TableWriter:
         )
         return model_ic, undiscounted_cost
 
-    def write_costs(self, M: TemoaModel):
+    def write_costs(self, M: TemoaModel, emission_entries=None):
         """
         Gather the cost data vars
+        :param emission_entries: cost dictionary for emissions
         :param M: the Temoa Model
         :return: dictionary of results of format variable name -> {idx: value}
         """
@@ -449,15 +534,15 @@ class TableWriter:
                 entries[r, p, t, v].update(
                     {CostType.D_VARIABLE: model_var_cost, CostType.VARIABLE: undiscounted_var_cost}
                 )
-        emission_entries = self._gather_emission_costs(M)
-        for k in emission_entries.keys():
-            entries[k].update(emission_entries[k])
+        if emission_entries:
+            for k in emission_entries.keys():
+                entries[k].update(emission_entries[k])
         # write to table
         # translate the entries into fodder for the query
         self._write_cost_rows(entries)
         self._write_cost_rows(exchange_costs.get_entries())
 
-    def _gather_emission_costs(self, M: 'TemoaModel'):
+    def _gather_emission_costs_and_flows(self, M: 'TemoaModel'):
         """there are 5 'flavors' of emission costs.  So, we need to gather the base and then decide on each"""
         GDR = value(M.GlobalDiscountRate)
         MPL = M.ModelProcessLife
@@ -484,44 +569,45 @@ class TableWriter:
         ]
         annual = [(r, p, e, i, t, v, o) for (r, p, e, i, t, v, o) in base if t in M.tech_annual]
 
-        flow: dict[EI, float] = defaultdict(float)
+        flows: dict[EI, float] = defaultdict(float)
         # iterate through the normal and annual and accumulate flow values
         for r, p, e, s, d, i, t, v, o in normal:
             if t in M.tech_curtailment:
-                flow[EI(r, p, t, v, e)] += (
+                flows[EI(r, p, t, v, e)] += (
                     value(M.V_Curtailment[r, p, s, d, i, t, v, o])
                     * M.EmissionActivity[r, e, i, t, v, o]
                 )
             elif t in M.tech_flex:
-                flow[EI(r, p, t, v, e)] += (
+                flows[EI(r, p, t, v, e)] += (
                     value(M.V_Flex[r, p, s, d, i, t, v, o]) * M.EmissionActivity[r, e, i, t, v, o]
                 )
             else:
-                flow[EI(r, p, t, v, e)] += (
+                flows[EI(r, p, t, v, e)] += (
                     value(M.V_FlowOut[r, p, s, d, i, t, v, o])
                     * M.EmissionActivity[r, e, i, t, v, o]
                 )
         for r, p, e, i, t, v, o in annual:
             if t in M.tech_flex and o in M.flex_commodities:
-                flow[EI(r, p, t, v, e)] += (
+                flows[EI(r, p, t, v, e)] += (
                     value(M.V_FlexAnnual[r, p, i, t, v, o]) * M.EmissionActivity[r, e, i, t, v, o]
                 )
             else:
-                flow[EI(r, p, t, v, e)] += (
+                flows[EI(r, p, t, v, e)] += (
                     value(M.V_FlowOutAnnual[r, p, i, t, v, o])
                     * M.EmissionActivity[r, e, i, t, v, o]
                 )
 
         ud_costs = defaultdict(float)
         d_costs = defaultdict(float)
-        for ei in flow:
-            if flow[ei] < self.epsilon:
+        for ei in flows:
+            if abs(flows[ei]) < self.epsilon:
+                flows[ei] = 0.0
                 continue
             undiscounted_emiss_cost = (
-                flow[ei] * M.CostEmission[ei.r, ei.p, ei.e] * MPL[ei.r, ei.p, ei.t, ei.v]
+                flows[ei] * M.CostEmission[ei.r, ei.p, ei.e] * MPL[ei.r, ei.p, ei.t, ei.v]
             )
             discounted_emiss_cost = temoa_rules.fixed_or_variable_cost(
-                cap_or_flow=flow[ei],
+                cap_or_flow=flows[ei],
                 cost_factor=M.CostEmission[ei.r, ei.p, ei.e],
                 process_lifetime=MPL[ei.r, ei.p, ei.t, ei.v],
                 GDR=GDR,
@@ -530,14 +616,14 @@ class TableWriter:
             )
             ud_costs[ei.r, ei.p, ei.t, ei.v] += undiscounted_emiss_cost
             d_costs[ei.r, ei.p, ei.t, ei.v] += discounted_emiss_cost
-        entries = defaultdict(dict)
+        costs = defaultdict(dict)
         for k in ud_costs:
-            entries[k][CostType.EMISS] = ud_costs[k]
+            costs[k][CostType.EMISS] = ud_costs[k]
         for k in d_costs:
-            entries[k][CostType.D_EMISS] = d_costs[k]
+            costs[k][CostType.D_EMISS] = d_costs[k]
 
         # wow, that was like pulling teeth
-        return entries
+        return costs, flows
 
     def _write_cost_rows(self, entries):
         """Write the entries to the OutputCost table"""
@@ -569,5 +655,4 @@ class TableWriter:
 
     def __del__(self):
         if self.con:
-
             self.con.close()
