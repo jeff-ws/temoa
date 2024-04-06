@@ -94,9 +94,6 @@ possibility.
 
    \\
    \forall \{r, p, s, d, t, v\} \in \Theta_{\text{FO}}
-
-
-
 """
     if t in M.tech_storage:
         return Constraint.Skip
@@ -2015,8 +2012,7 @@ output in separate terms.
     # )
 
     if int is type(
-        actual_emissions
-        + actual_emissions_annual
+        actual_emissions + actual_emissions_annual
         # + actual_emissions_flex
         # + actual_emissions_curtail
         # + actual_emissions_flex_annual
@@ -2029,8 +2025,7 @@ output in separate terms.
         return Constraint.Skip
 
     expr = (
-        actual_emissions
-        + actual_emissions_annual
+        actual_emissions + actual_emissions_annual
         # + actual_emissions_flex
         # + actual_emissions_curtail
         # + actual_emissions_flex_annual
