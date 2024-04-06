@@ -229,14 +229,8 @@ class MyopicSequencer:
 
             # 5. pull the data
             # make a data loader
-            data_loader = HybridLoader(self.output_con, self.config, myopic_index=idx)
-            # we MUST source trace when using myopic mode
-            data_loader.source_trace(make_plots=self.config.plot_commodity_network)
-            # load the efficiency table dataset
-            data_loader.build_efficiency_dataset(use_raw_data=False)
-            data_portal = data_loader.load_data_portal(
-                myopic_index=idx
-            )  # just make a new data portal...they are untrustworthy during re-use...
+            data_loader = HybridLoader(self.output_con, self.config)
+            data_portal = data_loader.load_data_portal(myopic_index=idx)
 
             # 6. build
             instance = run_actions.build_instance(

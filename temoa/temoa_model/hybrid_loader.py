@@ -70,26 +70,16 @@ class HybridLoader:
     An instance of the HybridLoader
     """
 
-    def __init__(
-        self,
-        db_connection: Connection,
-        config: TemoaConfig | None,
-        myopic_index: MyopicIndex | None = None,
-    ):
+    def __init__(self, db_connection: Connection, config: TemoaConfig):
         """
         build a loader for an instance.
         :param db_connection: a Connection to the database
-        :param config: the config (or None), which limits functionality
-        :param myopic_index: a myopic index if running myopic.  Passing "None" will load all data
+        :param config: the config, which controls some options during execution
         """
         self.debugging = False  # for T/S, will print to screen the data load values
         self.con = db_connection
         self.config = config
-        self.myopic_index = myopic_index
-        if self.config and not myopic_index and self.config.scenario_mode == TemoaMode.MYOPIC:
-            raise RuntimeError(
-                'Making a loader in Myopic Mode without an index will lead to errors.'
-            )
+
         self.manager: CommodityNetworkManager | None = None
 
         # filters for myopic ops
@@ -104,43 +94,53 @@ class HybridLoader:
         self.viable_rtt = set()  # to support scanning LinkedTech
         self.efficiency_values: list[tuple] = []
 
-    def source_trace(self, make_plots):
-        network_data = network_model_data.build(self.con, self.myopic_index)
+    def source_trace_only(self, make_plots: bool = False, myopic_index: MyopicIndex | None = None):
+        if myopic_index and not isinstance(myopic_index, MyopicIndex):
+            raise ValueError('myopic_index must be an instance of MyopicIndex')
+        self._source_trace(make_plots, myopic_index)
+        self.manager = None  # to prevent possible out-of-synch build from stale data
+
+    def _source_trace(self, make_plots: bool, myopic_index: MyopicIndex = None):
+        network_data = network_model_data.build(self.con, myopic_index=myopic_index)
         cur = self.con.cursor()
         # need periods to execute the source check by [r, p].  At this point, we can only pull from DB
         periods = {
             period for (period, *_) in cur.execute("SELECT period FROM TimePeriod WHERE flag = 'f'")
         }
-        periods = sorted(periods)[
-            :-1
-        ]  # we need to exclude the last period, it is a non-demand year
+        # we need to exclude the last period, it is a non-demand year
+        periods = sorted(periods)[:-1]
 
-        if self.myopic_index:
+        if myopic_index:
             periods = {
-                p
-                for p in periods
-                if self.myopic_index.base_year <= p <= self.myopic_index.last_demand_year
+                p for p in periods if myopic_index.base_year <= p <= myopic_index.last_demand_year
             }
         self.manager = CommodityNetworkManager(periods=periods, network_data=network_data)
         self.manager.analyze_network()
         if make_plots:
             self.manager.make_commodity_plots(self.config)
 
-    def build_efficiency_dataset(self, use_raw_data=False):
-        """Build efficiency data by using the source_trace functionality on the data
-        to analyze the network and deterimine good/bad techs before loading anything else.  Use this to
-        load the filters...
+    def _build_efficiency_dataset(
+        self, use_raw_data=False, myopic_index: MyopicIndex | None = None
+    ):
         """
+        Build the efficiency dataset.  For myopic mode, this means pull from MyopicEfficiency table
+        and we cannot use raw data.  For other modes, we can either use raw data or the filtered data
+        provided by the manager (normal)
+        :param use_raw_data: if True, use raw data (without source-trace filtering) for build
+        :param myopic_index: the myopic index to use (or None for other modes)
+        :return:
+        """
+        if myopic_index and use_raw_data:
+            raise RuntimeError('Cannot build from raw data in myopic mode...  Likely coding error.')
         cur = self.con.cursor()
-
         # pull the data based on whether myopic/not
-        if self.myopic_index:
+        if myopic_index:
             # pull from MyopicEfficiency, and filter by myopic index years
             contents = cur.execute(
                 'SELECT region, input_comm, tech, vintage, output_comm, efficiency, lifetime  '
                 'FROM MyopicEfficiency '
                 'WHERE vintage + lifetime > ?',
-                (self.myopic_index.base_year,),
+                (myopic_index.base_year,),
             ).fetchall()
         else:
             # pull from regular Efficiency table
@@ -148,7 +148,7 @@ class HybridLoader:
                 'SELECT region, input_comm, tech, vintage, output_comm, efficiency, NULL FROM main.Efficiency'
             ).fetchall()
 
-        # filter/don't filter.  (always must when myopic)
+        # filter/don't filter.
         if use_raw_data:
             efficiency_entries = [row for row in contents]
             # need to build filters to include everything in the raw efficiency data
@@ -167,7 +167,7 @@ class HybridLoader:
             self.viable_comms = self.viable_input_comms | self.viable_output_comms
             self.viable_rtt = {(r, t1, t2) for r, t1 in self.viable_rt for t2 in self.viable_techs}
 
-        else:
+        else:  # (always must when myopic)
             self._clear_filters()
             filts = {}
             if self.manager:
@@ -355,23 +355,51 @@ class HybridLoader:
         return False
 
     def load_data_portal(self, myopic_index: MyopicIndex | None = None) -> DataPortal:
+        """
+        Create and Load a Data Portal.  If source tracing is enabled in the config, the source trace will
+        be executed and filtered data will be used.  Without source-trace, raw (unfiltered) data will be loaded.
+        :param myopic_index: the MyopicIndex for myopic run.  None for other modes
+        :return:
+        """
         # the general plan:
-        # 1. iterate through the model elements that are directly read from data
-        # 2. use SQL query to get the full table
-        # 3. (OPTIONALLY) filter it, as needed for myopic
-        # 4. load it into the data dictionary
+        # 0. determine if source trace needs to be done, and do it
+        # 1. build the efficiency table
+        # 2. iterate through the model elements that are directly read from data
+        # 3. use SQL query to get the full table
+        # 4. (OPTIONALLY) filter it, as needed for myopic
+        # 5. load it into the data dictionary
         logger.info('Loading data portal')
-        tic = time.time()
 
-        if myopic_index is not None and not isinstance(myopic_index, MyopicIndex):
-            raise ValueError(f'received an illegal entry for the myopic index: {myopic_index}')
-
-        if not self.efficiency_values:
+        # some logic checking...
+        if myopic_index is not None:
+            if not isinstance(myopic_index, MyopicIndex):
+                raise ValueError(f'received an illegal entry for the myopic index: {myopic_index}')
+            if self.config.scenario_mode != TemoaMode.MYOPIC:
+                raise RuntimeError(
+                    'Myopic Index passed to data portal build, but mode is not Myopic.... '
+                    'Likely code error.'
+                )
+        elif myopic_index is None and self.config.scenario_mode == TemoaMode.MYOPIC:
             raise RuntimeError(
-                'attempting to proceed with loading process before the Efficiency dataset'
-                'has been loaded.  Code error.'
+                'Mode is myopic, but no MyopicIndex specified in data portal build.... Likely code '
+                'error.'
             )
-        mi = self.myopic_index  # convenience
+
+        if self.config.source_trace or self.config.scenario_mode == TemoaMode.MYOPIC:
+            use_raw_data = False
+            self._source_trace(
+                make_plots=self.config.plot_commodity_network, myopic_index=myopic_index
+            )
+        else:
+            use_raw_data = True
+
+        # build the Efficiency Dataset
+        self._build_efficiency_dataset(use_raw_data=use_raw_data, myopic_index=myopic_index)
+
+        mi = myopic_index  # convenience
+
+        # time the creation of the data portal
+        tic = time.time()
         # housekeeping
         data: dict[str, list | dict] = dict()
 
@@ -489,7 +517,7 @@ class HybridLoader:
         def load_indexed_set(indexed_set: Set, index_value, element, element_validator):
             """
             load an element into an indexed set in the data store
-            :param set_name: the name of the pyomo Set
+            :param indexed_set: the name of the pyomo Set
             :param index_value: the index value to load into
             :param element: the value to add to the indexed set
             :param element_validator: a set of legal elements for the element to be added
