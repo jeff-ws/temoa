@@ -36,9 +36,7 @@ from pyomo.environ import (
     Reals,
 )
 
-from temoa.temoa_model.temoa_initialize import *
-from temoa.temoa_model.temoa_rules import *
-from temoa.temoa_model.validators import (
+from temoa.temoa_model.model_checking.validators import (
     validate_linked_tech,
     region_check,
     validate_CapacityFactorProcess,
@@ -46,6 +44,8 @@ from temoa.temoa_model.validators import (
     validate_Efficiency,
     check_flex_curtail,
 )
+from temoa.temoa_model.temoa_initialize import *
+from temoa.temoa_model.temoa_rules import *
 
 
 class TemoaModel(AbstractModel):

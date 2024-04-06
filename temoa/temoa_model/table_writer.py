@@ -122,6 +122,7 @@ class TableWriter:
     ) -> None:
         """
         Write results to output database
+        :param results: if provided, this will trigger the writing of dual variables, pulled from the SolverResults
         :param M: the model
         :param append: append whatever is already in the tables.  If False (default), clear existing tables by scenario name
         :return:
