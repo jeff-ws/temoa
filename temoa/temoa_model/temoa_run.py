@@ -68,7 +68,8 @@ as a StreamingHttpResponse().
 
 logger = getLogger(__name__)
 
-
+# don't check this file...  It hasn't been cleaned yet
+# ruff: noqa
 def temoa_setup(config_filename):
     """This function prepares the model to be solved.
 

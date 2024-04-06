@@ -97,7 +97,6 @@ def price_checker(M: 'TemoaModel'):
     #            Efficiency set
     techs_without_fc_or_ic = set()
     # pull the details...
-    chk_1_errors = []
     for region, tech, vintage in sorted_efficiency_rtv:
         # disregard "unrestricted capacity" technologies that should NOT have a fixed/invest cost
         if tech in M.tech_uncap:
@@ -108,7 +107,6 @@ def price_checker(M: 'TemoaModel'):
             continue
 
         has_fc = (region, tech, vintage) in fixed_costs
-        has_vc = (region, tech, vintage) in var_costs
         has_ic = (region, tech, vintage) in registered_inv_costs
 
         if not any((has_fc, has_ic)):

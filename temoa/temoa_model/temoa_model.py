@@ -20,7 +20,7 @@ A complete copy of the GNU General Public License v2 (GPLv2) is available
 in LICENSE.txt.  Users uncompressing this from an archive may not have
 received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
-
+import logging
 from itertools import product
 
 from pyomo.core import BuildCheck
@@ -47,6 +47,10 @@ from temoa.temoa_model.model_checking.validators import (
 from temoa.temoa_model.temoa_initialize import *
 from temoa.temoa_model.temoa_rules import *
 
+logger = logging.getLogger(__name__)
+
+# disable linter rule that complains about star imports for this file
+# ruff: noqa: F405
 
 class TemoaModel(AbstractModel):
     """
