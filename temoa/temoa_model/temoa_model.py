@@ -142,24 +142,19 @@ class TemoaModel(AbstractModel):
         M.tech_storage = Set(within=M.tech_all - M.tech_annual)
         M.tech_reserve = Set(within=M.tech_all)
         M.tech_ramping = Set(within=M.tech_all)
-        # TODO:  both of these below are outdated and can be removed / tests updated
-        M.tech_capacity_min = Set(within=M.tech_all)
-        M.tech_capacity_max = Set(within=M.tech_all)
         M.tech_curtailment = Set(within=M.tech_all)
         M.tech_flex = Set(within=M.tech_all)
         # ensure there is no overlap flex <=> curtailable technologies
         M.check_flex_and_curtailment = BuildAction(rule=check_flex_curtail)
-
         M.tech_exchange = Set(within=M.tech_all)
         # Define groups for technologies
 
         M.tech_group_names = Set()
         M.tech_group_members = Set(M.tech_group_names, within=M.tech_all)
-        # Define techs with constant output
-        # TODO:  come back and figure out why I thought annual techs were ineligible!
+
         M.tech_uncap = Set(
-            within=M.tech_all - M.tech_reserve - M.tech_capacity_min - M.tech_capacity_max
-        )  # - M.tech_annual)
+            within=M.tech_all - M.tech_reserve
+        )
         """techs with unlimited capacity, ALWAYS available within lifespan"""
         # the below is a convenience for domain checking in params below that should not accept uncap techs...
         M.tech_with_capacity = Set(initialize=M.tech_all - M.tech_uncap)
