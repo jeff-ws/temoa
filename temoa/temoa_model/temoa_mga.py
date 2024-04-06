@@ -40,7 +40,7 @@ def SlackedObjective_rule(M, prev_cost, mga_slack):
     # trying to call this function because it is not aware of the second arg.
     slackcost = (1 + mga_slack) * prev_cost
     oldobjective = TotalCost_rule(M)
-    expr = (slackcost >= oldobjective)
+    expr = slackcost >= oldobjective
     return expr
 
 
@@ -55,7 +55,8 @@ def PreviousAct_rule(instance, mga_weight, prev_activity_t):
         for t in instance.V_ActivityByTech:
             if t in instance.tech_mga:
                 val = value(instance.V_ActivityByTech[t])
-                if abs(val) < epsilon: continue
+                if abs(val) < epsilon:
+                    continue
                 prev_activity_t[t] += 1.0
         return prev_activity_t
 
@@ -65,22 +66,22 @@ def PreviousAct_rule(instance, mga_weight, prev_activity_t):
     elif mga_weight == 'normalized':
         sectors = set(['electric', 'transport', 'industrial', 'commercial', 'residential'])
         act = dict()
-        techs = {'electric': instance.tech_electric,
-                 'transport': instance.tech_transport,
-                 'industrial': instance.tech_industrial,
-                 'commercial': instance.tech_commercial,
-                 'residential': instance.tech_residential}
+        techs = {
+            'electric': instance.tech_electric,
+            'transport': instance.tech_transport,
+            'industrial': instance.tech_industrial,
+            'commercial': instance.tech_commercial,
+            'residential': instance.tech_residential,
+        }
         for s in sectors:
             if len(techs[s]) > 0:
-                act[s] = sum(
-                    value(instance.V_ActivityByTech[S_t])
-                    for S_t in techs[s]
-                )
+                act[s] = sum(value(instance.V_ActivityByTech[S_t]) for S_t in techs[s])
 
         for t in instance.V_ActivityByTech:
             for s in sectors:
                 if t in techs[s]:
                     val = value(instance.V_ActivityByTech[t])
-                    if abs(val) < epsilon: continue
+                    if abs(val) < epsilon:
+                        continue
                     prev_activity_t[t] += val / act[s]
                 return prev_activity_t

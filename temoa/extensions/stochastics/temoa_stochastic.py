@@ -20,30 +20,30 @@ A complete copy of the GNU General Public License v2 (GPLv2) is available
 in LICENSE.txt.  Users uncompressing this from an archive may not have 
 received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
+import os
+import sys
+
+from pformat_results import pformat_results
 from pyomo.core.kernel.numvalue import value
+from pyomo.environ import *
+from pyomo.opt import SolverFactory
+from pyomo.pysp.ef import create_ef_instance
+from pyomo.pysp.scenariotree.manager import ScenarioTreeManagerClientSerial
 from temoa_model import TemoaModel
 from temoa_rules import PeriodCost_rule
 from temoa_run import parse_args
-from pformat_results import pformat_results
-from pyomo.environ import *
-from pyomo.pysp.scenariotree.manager import \
-    ScenarioTreeManagerClientSerial
-from pyomo.pysp.ef import create_ef_instance
-from pyomo.opt import SolverFactory
-import os
-import sys
 
 
 def return_CP_and_path(p_data):
     # return_CP_and_path(p_data) -> dict(), dict()
-    # This function reads the path to the instance directory (p_data) and 
-    # returns conditional two dictionaries, the first one is the conditional 
+    # This function reads the path to the instance directory (p_data) and
+    # returns conditional two dictionaries, the first one is the conditional
     # probability of a scenario, the second one is the path to all files of a
     # scenario.
     from collections import deque, defaultdict
+
     # from pyomo.pysp.util.scenariomodels import scenario_tree_model
-    from pyomo.pysp.scenariotree.tree_structure_model import \
-        CreateAbstractScenarioTreeModel
+    from pyomo.pysp.scenariotree.tree_structure_model import CreateAbstractScenarioTreeModel
 
     pwd = os.getcwd()
     os.chdir(p_data)
@@ -106,7 +106,6 @@ def return_CP_and_path(p_data):
                 s2fp_dict[s].append(n + '.dat')
         s2cd_dict[s] = cp
 
-    from pyomo.core import Objective
     if sStructure.ScenarioBasedData.value:
         for s in sStructure.Scenarios:
             s2fp_dict[s].append(s + '.dat')
@@ -117,8 +116,8 @@ def return_CP_and_path(p_data):
 def solve_ef(p_model, p_data, temoa_options=None):
     """
     solve_ef(p_model, p_data) -> objective value of the extensive form
-    Solves the model in stochastic mode. 
-    p_model -> string, the path to the model file (ReferenceModel.py). 
+    Solves the model in stochastic mode.
+    p_model -> string, the path to the model file (ReferenceModel.py).
     p_data -> string, the path to the directory of data for the stochastic
     mdoel, where ScenarioStructure.dat should resides.
     Returns a float point number of the value of objective function for the
@@ -139,13 +138,11 @@ def solve_ef(p_model, p_data, temoa_options=None):
     with ScenarioTreeManagerClientSerial(options) as manager:
         manager.initialize()
 
-        ef_instance = create_ef_instance(manager.scenario_tree,
-                                         verbose_output=options.verbose)
+        ef_instance = create_ef_instance(manager.scenario_tree, verbose_output=options.verbose)
 
         ef_instance.dual = Suffix(direction=Suffix.IMPORT)
 
         with SolverFactory(temoa_options.solver_name) as opt:
-
             ef_result = opt.solve(ef_instance)
 
         # Write to database
@@ -160,7 +157,7 @@ def solve_ef(p_model, p_data, temoa_options=None):
             # temoa_options.path_to_data = temoa_options.path_to_data
             # temoa_options.saveEXCEL = temoa_options.saveEXCEL
             ef_result.solution.Status = 'feasible'  # Assume it is feasible
-            # Maybe there is a better solution using manager, but now it is a 
+            # Maybe there is a better solution using manager, but now it is a
             # kludge to use return_CP_and_path() function
             s2cd_dict, s2fp_dict = return_CP_and_path(p_data)
             stochastic_run = temoa_options.scenario  # Name of stochastic run
@@ -173,7 +170,7 @@ def solve_ef(p_model, p_data, temoa_options=None):
                         os.path.join(options.scenario_tree_location, fname)
                     )
                 # temoa_options.output = os.path.join(
-                #     options.scenario_tree_location, 
+                #     options.scenario_tree_location,
                 #     stochastic_output
                 #     )
                 msg = '\nStoring results from scenario {} to database.\n'.format(s.name)
@@ -186,7 +183,7 @@ def solve_ef(p_model, p_data, temoa_options=None):
 
 
 def StochasticPointObjective_rule(M, p):
-    expr = (M.StochasticPointCost[p] == PeriodCost_rule(M, p))
+    expr = M.StochasticPointCost[p] == PeriodCost_rule(M, p)
     return expr
 
 
@@ -202,8 +199,8 @@ M.StochasticPointCostConstraint = Constraint(M.time_optimize, rule=StochasticPoi
 del M.TotalCost
 M.TotalCost = Objective(rule=Objective_rule, sense=minimize)
 
-if __name__ == "__main__":
-    p_model = "./ReferenceModel.py"
+if __name__ == '__main__':
+    p_model = './ReferenceModel.py'
     temoa_options, config_flag = parse_args()
     p_dot_dat = temoa_options.dot_dat[0]  # must be ScenarioStructure.dat
     p_data = os.path.dirname(p_dot_dat)

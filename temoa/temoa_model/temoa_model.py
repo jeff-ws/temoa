@@ -152,9 +152,7 @@ class TemoaModel(AbstractModel):
         M.tech_group_names = Set()
         M.tech_group_members = Set(M.tech_group_names, within=M.tech_all)
 
-        M.tech_uncap = Set(
-            within=M.tech_all - M.tech_reserve
-        )
+        M.tech_uncap = Set(within=M.tech_all - M.tech_reserve)
         """techs with unlimited capacity, ALWAYS available within lifespan"""
         # the below is a convenience for domain checking in params below that should not accept uncap techs...
         M.tech_with_capacity = Set(initialize=M.tech_all - M.tech_uncap)

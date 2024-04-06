@@ -34,6 +34,7 @@ from enum import Enum, unique
 @unique
 class TemoaMode(Enum):
     """The processing mode for the scenario"""
+
     PERFECT_FORESIGHT = 1  # Normal run, single execution for full time horizon
     MGA = 2  # Modeling for Generation of Alternatives, multiple runs w/ changing constrained obj
     MYOPIC = 3  # Step-wise execution through the future

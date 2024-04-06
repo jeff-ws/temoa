@@ -29,10 +29,12 @@ def send_query(inp_f, query_string):
 
 
 def help_user():
-    print("""Use as:
+    print(
+        """Use as:
 	python db_query.py -i (or --input) <input database name>
 	| -q (or --query) <sqlite query>
-	| -h (or --help) """)
+	| -h (or --help) """
+    )
 
 
 def get_flags(inputs):
