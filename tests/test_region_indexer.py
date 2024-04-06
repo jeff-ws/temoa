@@ -29,7 +29,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 
 import pyomo.environ as pyo
 
-from temoa.temoa_model.validators import linked_region_check, region_check, region_group_check
+from temoa.temoa_model.model_checking.validators import linked_region_check, region_check, region_group_check
 
 
 def test_region_check():

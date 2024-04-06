@@ -39,4 +39,4 @@ class TemoaMode(Enum):
     MYOPIC = 3  # Step-wise execution through the future
     METHOD_OF_MORRIS = 4  # Method-of-Morris run
     BUILD_ONLY = 5  # Just build the model, no solve
-    CHECK = 6  # build and run price check, source check
+    CHECK = 6  # build and run price check, source trace it

@@ -24,6 +24,10 @@ jeff@westernspark.us
 https://westernspark.us
 Created on:  4/1/24
 
+The purpose of this module is to provide a ledger for all costs for exchange techs.  The main reason
+for the need is that in many cases, the costs need to be apportioned by use ratio so it is helpful to
+separately gather all of the costs and then use a usage ratio to generate entries when asked for
+
 """
 from collections import defaultdict
 from enum import unique, Enum
