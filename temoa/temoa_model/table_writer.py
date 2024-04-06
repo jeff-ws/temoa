@@ -170,7 +170,7 @@ class TableWriter:
             )
         for obj in active_objs:
             obj_name, obj_value = obj.getname(fully_qualified=True), value(obj)
-            qry = f'INSERT INTO OutputObjective VALUES (?, ?, ?)'
+            qry = 'INSERT INTO OutputObjective VALUES (?, ?, ?)'
             data = (self.config.scenario, obj_name, obj_value)
             self.con.execute(qry, data)
             self.con.commit()
@@ -456,7 +456,7 @@ class TableWriter:
             loan_rate = value(M.LoanRate[r, t, v])
 
             model_loan_cost, undiscounted_cost = self.loan_costs(
-                loan_rate=value(M.LoanRate[r, t, v]),
+                loan_rate=loan_rate,
                 loan_life=loan_life,
                 capacity=cap,
                 invest_cost=value(M.CostInvest[r, t, v]),

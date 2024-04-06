@@ -3,6 +3,12 @@ A quick & dirty graph of the commodity network for troubleshooting purposes.  Fu
 development may enhance this quite a bit.... lots of opportunity!
 """
 
+from pathlib import Path
+from typing import Iterable
+
+import gravis as gv
+import networkx as nx
+
 from temoa.temoa_model.model_checking.network_model_data import NetworkModelData, Tech
 from temoa.temoa_model.temoa_config import TemoaConfig
 
@@ -33,11 +39,7 @@ https://westernspark.us
 Created on:  2/14/24
 
 """
-from pathlib import Path
-from typing import Iterable
 
-import gravis as gv
-import networkx as nx
 
 
 def generate_graph(

@@ -1114,10 +1114,9 @@ ensure demand activity remains consistent across time slices.
 
         # Find the first time step where the DSD is not 0
         # Set the time_season and time_of_day to s0 and d0.
-        # TODO:  These should probably be sorted
+
+        # TODO:  This needs some TLC cases (found one/not other, found none, why is first unique?)
         for s0 in M.time_season:
-            # TODO:  We are trying to ID first, but how are the time-of-day blocks
-            #        sorted?  we could miss the first here, no?
             for d0 in M.time_of_day:
                 if (r, s0, d0, dem) in M.DemandSpecificDistribution.sparse_keys():
                     # TODO:  this could probably just be a loop w/ break.  Try-except?
