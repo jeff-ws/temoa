@@ -1,5 +1,0 @@
-These test dbs are not very complete (there is no comparison of expected vs. actual value, etc.)
-
-They are also not compliant with the v3.0 database schema
-
-6 DEC 2023
