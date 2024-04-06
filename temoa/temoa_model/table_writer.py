@@ -278,7 +278,7 @@ class TableWriter:
             # TODO:  Follow up WRT curtailment flows.  Currently, they are not related to input
             # fcurt = flows[fi][FlowType.CURTAIL]
             flost = flows[fi][FlowType.LOST]
-            deltas[fi] = fin - fout - flost # - fcurt
+            deltas[fi] = fin - fout - flost  # - fcurt
 
             if (
                 flows[fi][FlowType.IN] != 0 and abs(deltas[fi] / flows[fi][FlowType.IN]) > 0.02

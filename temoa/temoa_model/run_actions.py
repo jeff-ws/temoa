@@ -35,8 +35,16 @@ from time import time
 from typing import Tuple
 
 import deprecated
-from pyomo.environ import DataPortal, Suffix, Var, Constraint, value, UnknownSolver, SolverFactory, \
-    check_optimal_termination
+from pyomo.environ import (
+    DataPortal,
+    Suffix,
+    Var,
+    Constraint,
+    value,
+    UnknownSolver,
+    SolverFactory,
+    check_optimal_termination,
+)
 from pyomo.opt import SolverResults
 
 from temoa.temoa_model.table_writer import TableWriter
@@ -190,8 +198,9 @@ def build_instance(
     return instance
 
 
-def solve_instance(instance: TemoaModel, solver_name, silent: bool = False,
-                   solver_suffixes=None) -> Tuple[TemoaModel, SolverResults]:
+def solve_instance(
+    instance: TemoaModel, solver_name, silent: bool = False, solver_suffixes=None
+) -> Tuple[TemoaModel, SolverResults]:
     """
     Solve the instance and return a loaded instance
     :param solver_suffixes: iterable of string names for suffixes.  See pyomo dox.  right now, only
@@ -262,25 +271,31 @@ def solve_instance(instance: TemoaModel, solver_name, silent: bool = False,
             bad_apples = solver_suffixes - legit_suffixes
             solver_suffixes &= legit_suffixes
             if bad_apples:
-                logger.warning('Solver suffix %s is not in pyomo standards (see pyomo dox).  Removed', bad_apples)
+                logger.warning(
+                    'Solver suffix %s is not in pyomo standards (see pyomo dox).  Removed',
+                    bad_apples,
+                )
         else:
             solver_suffixes = []
         try:
             if solver_name == 'appsi_highs' and not solver_suffixes:
                 result = optimizer.solve(instance)
             else:  # we can try it...
-                result = optimizer.solve(
-                    instance, suffixes=solver_suffixes)
+                result = optimizer.solve(instance, suffixes=solver_suffixes)
         except RuntimeError as error:
             logger.error('Solver failed to solve and returned an error: %s', error)
-            logger.error("This may be due to asking for suffixes (duals) for an incompatible solver.  "
-                         "Try de-selecting 'save_duals' in the config.  (see note in run_actions.py code)")
+            logger.error(
+                'This may be due to asking for suffixes (duals) for an incompatible solver.  '
+                "Try de-selecting 'save_duals' in the config.  (see note in run_actions.py code)"
+            )
             SE.write('solver failure.  See log file.')
             sys.exit(-1)
 
         if check_optimal_termination(result):
             if solver_suffixes:
-                instance.solutions.store_to(result)  # this is needed to capture the duals/suffixes from the Solutions obj
+                instance.solutions.store_to(
+                    result
+                )  # this is needed to capture the duals/suffixes from the Solutions obj
 
         logger.info('Solve process complete')
         logger.debug('Solver results: \n %s', result.solver)

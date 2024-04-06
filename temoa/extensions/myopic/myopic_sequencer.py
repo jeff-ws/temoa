@@ -256,8 +256,9 @@ class MyopicSequencer:
 
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'solve')
-            model, results = run_actions.solve_instance(instance=instance, solver_name=self.config.solver_name,
-                                                        silent=True)
+            model, results = run_actions.solve_instance(
+                instance=instance, solver_name=self.config.solver_name, silent=True
+            )
 
             # 8.  Run the model and assess solve status
             optimal, status = run_actions.check_solve_status(results)

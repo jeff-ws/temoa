@@ -202,8 +202,9 @@ class TemoaSequencer:
                 )
                 if self.config.price_check:
                     price_checker(instance)
-                self.pf_solved_instance, self.pf_results = solve_instance(instance, self.config.solver_name,
-                                                                          silent=self.config.silent)
+                self.pf_solved_instance, self.pf_results = solve_instance(
+                    instance, self.config.solver_name, silent=self.config.silent
+                )
                 good_solve, msg = check_solve_status(self.pf_results)
                 if not good_solve:
                     logger.error('The solve result is reported as %s.  Aborting', msg)
