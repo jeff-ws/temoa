@@ -645,21 +645,20 @@ Sets
    ":math:`\text{S}`",":code:`time_season`","string","seasonal divisions (e.g. winter, summer)"
    ":math:`\text{D}`",":code:`time_of_day`","string","time-of-day divisions (e.g. morning)"
    ":math:`{}^*\text{T}`",":code:`tech_all`","string","all technologies to be modeled; (:math:`{T}^r \cup {T}^p`)"
-   ":math:`\text{T}^a`",":code:`tech_annual`","string","technologies that produce constant annual output; (:math:`{T}^a \subset T`)" 
+   ":math:`\text{T}^u`",":code:`tech_unlim_cap`","string","technologies that have no bound on capacity, and can have variable costs only (imports, taxes, etc.); (:math:`{T}^a \subset (T - T^{res}`)"
+   ":math:`\text{T}^a`",":code:`tech_annual`","string","technologies that produce constant annual output; (:math:`{T}^a \subset T`)"
    ":math:`\text{T}^b`",":code:`tech_baseload`","string","baseload electric generators; (:math:`{T}^b \subset T`)"
-   ":math:`\text{T}^c`",":code:`tech_curtailment`","string","technologies with curtailable output and no upstream cost; (:math:`{T}^c \subset T`)"
+   ":math:`\text{T}^c`",":code:`tech_curtailment`","string","technologies with curtailable output and no upstream cost; (:math:`{T}^c \subset (T - T^{res})`)"
    ":math:`\text{T}^e`",":code:`tech_exchange`","string","technologies used for interregional commodity flow; (:math:`{T}^e \subset T`)"   
    ":math:`\text{T}^f`",":code:`tech_flex`","string","technologies producing excess commodity flows; (:math:`{T}^f \subset T`)"
-   "",":code:`groups`","string","defined groups of technologies"
-   ":math:`\text{T}^f`",":code:`tech_groups`","string","technologies belonging to each group defined above"
+   "",":code:`TechGroupNames`","string","named groups for use in group parameters or RegionalPortfolioStandard"
+   "",":code:`TechGroupMembers`","(TechGroupName, tech)","technologies belonging to each group defined above"
    ":math:`\text{T}^p`",":code:`tech_production`","string","techs producing intermediate commodities"
    ":math:`\text{T}^r`",":code:`tech_resource`","string","resource extraction technologies"
    ":math:`\text{T}^m`",":code:`tech_ramping`","string","electric generators with a ramp rate limit; (:math:`{T}^m \subset T`)"
    ":math:`\text{T}^{res}`",":code:`tech_reserve`","string","electric generators contributing to the reserve margin requirement; (:math:`{T}^e \subset T`)"
    ":math:`\text{T}^s`",":code:`tech_storage`","string","storage technologies; (:math:`{T}^s \subset T`)"
    ":math:`\text{T}^v`",":code:`tech_variable`","string","technologies used in TechInputSplitAverage constraint; (:math:`{T}^v \subset T`)"
-   ":math:`\text{T}^{cmax}`",":code:`tech_capacity_max`","string","subset of technologies used in MaxCapacitySet constraint; (:math:`{T}^{cmax} \subset T`)"
-   ":math:`\text{T}^{cmin}`",":code:`tech_capacity_min`","string","subset of technologies used in MinCapacitySet constraint; (:math:`{T}^{cmin} \subset T`)"
 
 Temoa uses two different set notation styles, one for code representation and
 one that utilizes standard algebraic notation.  For brevity, the mathematical
@@ -846,7 +845,6 @@ Parameters
    ":math:`\text{DEM}_{r,p,c}`","Demand",":math:`\mathbb{R}^+_0`","End-use demands, by period"
    ":math:`\text{DDD}_{p,s,d}`","DemandDefaultDistribution",":math:`\mathbb{I}`","Default demand distribution"
    ":math:`\text{DSD}_{r,p,s,d,c}`","DemandSpecificDistribution",":math:`\mathbb{I}`","Demand-specific distribution"
-   ":math:`\text{DR}_{r,t,v}`","DiscountRate",":math:`\mathbb{R}`","Tech-specific interest rate on investment"
    ":math:`\text{EFF}_{r,i,t,v,o}`","Efficiency",":math:`\mathbb{R}^+_0`","Tech- and commodity-specific efficiency"
    ":math:`\text{EAC}_{r,i,t,v,o,e}`","EmissionActivity",":math:`\mathbb{R}`","Tech-specific emissions rate"
    ":math:`\text{ELM}_{r,p,e}`","EmissionLimit",":math:`\mathbb{R}^+_0`","Emissions limit by region and period"
@@ -854,11 +852,11 @@ Parameters
    ":math:`\text{GDR}`","GlobalDiscountRate",":math:`\mathbb{R}`","Global rate used to calculate present cost"
    ":math:`\text{GRM}_{r,t}`","GrowthRateMax",":math:`\mathbb{R}`","Global rate used to calculate present cost"
    ":math:`\text{GRS}_{r,t}`","GrowthRateSeed",":math:`\mathbb{R}`","Global rate used to calculate present cost"
-   ":math:`\text{LLP}_{r,t,v}`","LifetimeLoanProcess",":math:`\mathbb{N}`","Tech- and vintage-specific loan term"
-   ":math:`\text{LLT}_{r,t}`","LifetimeLoanTech",":math:`\mathbb{N}`","Tech-specific loan term"
-   ":math:`\text{LTP}_{r,t,v}`","LifetimeProcess",":math:`\mathbb{N}`","Tech- and vintage-specific lifetime"
-   ":math:`\text{LTT}_{r,t}`","LifetimeTech",":math:`\mathbb{N}`","Tech-specific lifetime"
+   ":math:`\text{LTP}_{r,t,v}`","LifetimeProcess",":math:`\mathbb{N}`","Tech- and vintage-specific lifetime (default=LifetimeTech)"
+   ":math:`\text{LTT}_{r,t}`","LifetimeTech",":math:`\mathbb{N}`","Tech-specific lifetime (default=40 periods)"
    ":math:`\text{LIT}_{r,t,e,t}`","LinkedTechs","text","Dummy techs used to convert CO2 emissions to physical commodity"
+   ":math:`\text{LLT}_{r,t}`","LoanLifetimeTech",":math:`\mathbb{N}`","Tech-specific loan term (default=10 periods)"
+   ":math:`\text{DR}_{r,t,v}`","LoanRate",":math:`\mathbb{R}`","Tech-specific interest rate on investment cost"
    ":math:`\text{MAA}_{r,p,t}`","MaxActivity",":math:`\mathbb{R}^+_0`","Maximum tech-specific activity by region and period"
    ":math:`\text{MAC}_{r,p,t}`","MaxCapacity",":math:`\mathbb{R}^+_0`","Maximum tech-specific capacity by period"
    ":math:`\text{MCS}_{t}`","MaxCapacitySum",":math:`\mathbb{R}^+_0`","Maximum capacity for a technology group"
@@ -1067,15 +1065,6 @@ It is this parameter that is actually multiplied by the :code:`Demand` parameter
 in the Demand constraint.
 
 
-DiscountRate
-^^^^^^^^^^^^
-
-:math:`{DR}_{r \in r, t \in T, v \in V}`
-
-In addition to the :code:`GlobalDiscountRate`, a modeler may also specify a
-technology-specific discount rate.  If not specified, this rate defaults to 0.05.
-
-
 EmissionActivity
 ^^^^^^^^^^^^^^^^
 
@@ -1087,7 +1076,7 @@ the :code:`Efficiency` parameter defines the amount of output energy a process
 produces per unit of input, the :code:`EmissionActivity` parameter allows for
 secondary outputs.  As the name suggests, this parameter was originally intended
 to account for emissions per unit activity, but it more accurately describes
-*parallel* activity.  It is restricted to emissions accounting (by the 
+*parallel* activity.  It is restricted to emissions accounting (by the
 :math:`e \in C^e` set restriction).
 
 
@@ -1127,8 +1116,14 @@ formula:
 
    \text{FV} = \text{NPV} \cdot {(1 + GDR)^n}
 
-where :math:`n` is in years.  This parameter is only used in Temoa's objective
-function.
+where :math:`n` is in years.  This parameter is used to calculate all discounted
+costs, which are the basis of the objective function.  Costs are discounted to the
+first future time period in the model by default.  If running a Myopic run, the
+discount base year can be set in the MetaData table.  This is the :code:`MyopicBaseYear`.
+
+The output in the :code:`OutputCost` table shows both discounted and non-discounted (raw)
+values for all model costs.  Of note, all loan costs are displayed as an annuity cost in
+the vintage year, not as a string of payments.
 
 GrowthRateMax
 ^^^^^^^^^^^^^
@@ -1202,6 +1197,16 @@ physical commodity that can be included in the :code:`Efficiency` table. The
 emissions commodity to a physical commodity. Note that the first :code:`t`
 represents the primary upstream technology linked to the dummy linked technology,
 which is represented by the second :code:`t` index.
+
+
+LoanRate
+^^^^^^^^
+
+:math:`{LR}_{r \in r, t \in T, v \in V}`
+
+The interest rate used for loans supporting investment costs.  The default
+loan rate is accessible in the MetaDataReals table in the database.
+
 
 .. _ParamMaxCapacity:
 
@@ -1315,7 +1320,8 @@ Temoa is typically run in "perfect foresight" mode, where all decision variables
 in all time periods are solved simultaneously. However, it is also possible to
 solve the model myopically, whereby the model solves a subset of time periods
 in sequence. The :code:`MyopicBaseYear` parameter specifies the base year to which
-all future costs are discounted.
+all future costs are discounted.  This parameter is located in the :code:`MetaData`
+table in the database.
 
 
 PlanningReserveMargin
@@ -1636,7 +1642,7 @@ curtailment of technologies belonging to the :code:`tech_curtailment` set.
 Renewables such as wind and solar are often placed in this set. While we
 used to simply formulate the :code:`Capacity` and :code:`CommodityBalance`
 constraints as inequalities that implicitly allowed for curtailment, this
-simpler approch does not work with renewable targets because the curtailed
+simpler approach does not work with renewable targets because the curtailed
 portion of the electricity production counts towards the target, and there is
 no way to distinguish it from the useful production. Including an explicit
 curtailment term addresses the issue.
