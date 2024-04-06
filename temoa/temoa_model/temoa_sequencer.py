@@ -47,7 +47,6 @@ from temoa.temoa_model.run_actions import (
     check_python_version,
     check_database_version,
 )
-from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_mode import TemoaMode
 from temoa.temoa_model.temoa_model import TemoaModel
@@ -103,14 +102,14 @@ class TemoaSequencer:
         # for feedback to user
         self.silent = silent
 
-        # for results catching for perfect_foresight / testing
+        # for results catching for perfect_foresight, other modes / testing
         self.pf_results: pyomo.opt.SolverResults | None = None
         self.pf_solved_instance: TemoaModel | None = None
 
     def start(self) -> TemoaModel | None:
         """Start the processing of the scenario"""
 
-        # Run the preliminaries...
+        # ----- Run the "preliminaries"
         # Build a TemoaConfig
         self.config = TemoaConfig.build_config(
             config_file=self.config_file, output_path=self.output_path, silent=self.silent
@@ -123,15 +122,14 @@ class TemoaSequencer:
             self.config, db_major_reqd=DB_MAJOR_VERSION, min_db_minor=MIN_DB_MINOR_VERSION
         )
         if not good:
-            logger.error('Failed pre-run checks...')
+            logger.error('Failed pre-run checks...  See log file for details')
             sys.exit(-1)
 
         # Distill the TemoaMode
-        # self.temoa_mode = self.mode_override if self.mode_override else self.config.scenario_mode
         if self.mode_override and self.mode_override != self.config.scenario_mode:
             # capture and log the override...
             self.temoa_mode = self.mode_override
-            if self.config:
+            if self.config:  # register the override in the config
                 self.config.scenario_mode = self.mode_override
             logger.info('Temoa Mode overridden to be:  %s', self.temoa_mode)
         else:
@@ -156,25 +154,29 @@ class TemoaSequencer:
                 print('\n\nUser requested quit.  Exiting Temoa ...\n')
                 sys.exit()
 
-        # Select execution path based on mode
+        # ---- Select execution path based on mode ----
         match self.temoa_mode:
             case TemoaMode.BUILD_ONLY:
+                # override the "extras"
+                if self.config.source_trace:
+                    self.config.source_trace = False
+                    logger.info('Source trace disabled for BUILD_ONLY')
+                if self.config.plot_commodity_network:
+                    self.config.plot_commodity_network = False
+                    logger.info('Plot commodity network disabled for BUILD_ONLY')
+                if self.config.price_check:
+                    logger.info('Price check disabled for BUILD_ONLY')
                 con = sqlite3.connect(self.config.input_file)
-                hybrid_loader = HybridLoader(db_connection=con, config=None)
-                hybrid_loader.build_efficiency_dataset(use_raw_data=True)
+                hybrid_loader = HybridLoader(db_connection=con, config=self.config)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(data_portal, silent=self.config.silent)
                 con.close()
                 return instance
 
             case TemoaMode.CHECK:
-                # TODO:  This connection should probably be made in the loader?
                 con = sqlite3.connect(self.config.input_file)
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
-                hybrid_loader.source_trace(make_plots=self.config.plot_commodity_network)
-                hybrid_loader.build_efficiency_dataset()
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
-
                 instance = build_instance(
                     data_portal,
                     silent=self.config.silent,
@@ -182,15 +184,14 @@ class TemoaSequencer:
                     lp_path=self.config.output_path,
                 )
                 # disregard what the config says about price_check and source_trace and just do it...
+                if self.config.price_check is False:
+                    logger.info('Price check of model is automatic with CHECK')
                 price_checker(instance)
                 con.close()
 
             case TemoaMode.PERFECT_FORESIGHT:
                 con = sqlite3.connect(self.config.input_file)
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
-                if self.config.source_trace:
-                    hybrid_loader.source_trace(make_plots=self.config.plot_commodity_network)
-                hybrid_loader.build_efficiency_dataset(use_raw_data=not self.config.source_trace)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(
                     data_portal,
@@ -213,15 +214,7 @@ class TemoaSequencer:
                     )
                     sys.exit(-1)
                 handle_results(self.pf_solved_instance, self.pf_results, self.config)
-                # these require that the new cost table be built, which is not guaranteed at this time...
-                # temporary patch while we work through new cost table...
-                exists = con.execute(
-                    "SELECT * FROM sqlite_master WHERE name LIKE 'Output_Cost_2'"
-                ).fetchone()
-                if exists:
-                    table_writer = TableWriter(self.config)
-                    table_writer.clear_scenario()
-                    table_writer.write_costs(instance)
+
                 con.close()
 
             case TemoaMode.MYOPIC:

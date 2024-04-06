@@ -116,8 +116,10 @@ def _get_builder(data):
         raise NotImplementedError('cannot build from that type of data')
 
 
-def _build_from_model(M: TemoaModel) -> NetworkModelData:
+def _build_from_model(M: TemoaModel, myopic_index=None) -> NetworkModelData:
     """Build a NetworkModelData from a TemoaModel"""
+    if myopic_index is not None:
+        raise NotImplementedError('cannot build network data from model using a MyopicIndex')
     res = NetworkModelData()
     res.all_commodities = set(M.commodity_all)
     res.source_commodities = set(M.commodity_source)
