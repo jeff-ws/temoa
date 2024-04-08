@@ -2,16 +2,18 @@
 Entry point for running the model.
 """
 import argparse
-from deprecated import deprecated
 import logging
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
 
+from deprecated import deprecated
+
 from definitions import PROJECT_ROOT
 from temoa.temoa_model.temoa_model import TemoaModel
 from temoa.temoa_model.temoa_sequencer import TemoaMode, TemoaSequencer
+from temoa.version_information import TEMOA_MAJOR, TEMOA_MINOR
 
 # Written by:  J. F. Hyink
 # jeff@westernspark.us
@@ -76,7 +78,7 @@ def parse_args(arg_list: list[str] | None) -> argparse.Namespace:
                         action='store_true',
                         dest='how_to_cite')
     parser.add_argument('-v', '--version',
-                        help='Show current Temoa version and db schema version.',
+                        help='Show current Temoa version',
                         action='store_true',
                         dest='version')
 
@@ -85,7 +87,8 @@ def parse_args(arg_list: list[str] | None) -> argparse.Namespace:
     # handle the non-execution options and quit
     if options.how_to_cite or options.version:
         if options.version:
-            print('Temoa Version 3.0')
+            version = f'{TEMOA_MAJOR}.{TEMOA_MINOR}'
+            print(f'Temoa Version: {version}')
         if options.how_to_cite:
             raise NotImplementedError('Need this information...')
         sys.exit()

@@ -26,6 +26,12 @@ Created on:  4/1/24
 
 """
 
+# === INFORMATION ===
+# current Temoa version
+TEMOA_MAJOR = 3
+TEMOA_MINOR = 0
+
+# === REQUIREMENTS ===
 # python versions are tested internally for greater than these values
 MIN_PYTHON_MAJOR = 3
 MIN_PYTHON_MINOR = 11

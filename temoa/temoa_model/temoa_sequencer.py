@@ -52,7 +52,7 @@ from temoa.temoa_model.run_actions import (
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_mode import TemoaMode
 from temoa.temoa_model.temoa_model import TemoaModel
-from temoa.temoa_model.version_requirements import (
+from temoa.version_information import (
     DB_MAJOR_VERSION,
     MIN_DB_MINOR_VERSION,
     MIN_PYTHON_MAJOR,
