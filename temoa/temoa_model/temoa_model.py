@@ -52,6 +52,7 @@ logger = logging.getLogger(__name__)
 # disable linter rule that complains about star imports for this file
 # ruff: noqa: F405
 
+
 class TemoaModel(AbstractModel):
     """
     An instance of the abstract Temoa model
@@ -217,6 +218,8 @@ class TemoaModel(AbstractModel):
         M.validate_SegFrac = BuildAction(rule=validate_SegFrac)
 
         # Define demand- and resource-related parameters
+        # Dev Note:  There does not appear to be a DB table supporting DemandDefaultDistro.  This does not
+        #            cause any problems, so let it be for now.
         M.DemandDefaultDistribution = Param(M.time_season, M.time_of_day, mutable=True)
         M.DemandSpecificDistribution = Param(
             M.regions, M.time_season, M.time_of_day, M.commodity_demand, mutable=True, default=0
