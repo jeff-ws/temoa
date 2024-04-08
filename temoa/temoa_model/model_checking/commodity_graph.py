@@ -41,7 +41,6 @@ Created on:  2/14/24
 """
 
 
-
 def generate_graph(
     region,
     period,
