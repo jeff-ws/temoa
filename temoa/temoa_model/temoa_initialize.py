@@ -402,7 +402,9 @@ def CreateDemands(M: 'TemoaModel'):
     DSD = M.DemandSpecificDistribution
 
     demands_specified = set(map(DSD_dem_getter, (i for i in DSD.sparse_iterkeys())))
-    unset_demand_distributions = used_dems.difference(demands_specified)
+    unset_demand_distributions = used_dems.difference(
+        demands_specified
+    )  # the demands not mentioned in DSD *at all*
     unset_distributions = set(
         cross_product(M.regions, M.time_season, M.time_of_day, unset_demand_distributions)
     )
@@ -416,14 +418,24 @@ def CreateDemands(M: 'TemoaModel'):
         for r, s, d, dem in unset_distributions:
             DSD[r, s, d, dem] = DDD[s, d]  # DSD._constructed = True
 
-    # Step 5
+    # Step 5: A final "sum to 1" check for all DSD members (which now should be everything)
+    #         Also check that all keys are made...  The demand distro should be supported
+    #         by the full set of (r, p, dem) keys because it is an equality constraint
+    #         and we need to ensure even the zeros are passed in
+    expected_key_length = len(M.time_season) * len(M.time_of_day)
     used_reg_dems = set((r, dem) for r, p, dem in M.Demand.sparse_iterkeys())
     for r, dem in used_reg_dems:
-        keys = (
+        keys = [
             k
             for k in DSD.sparse_iterkeys()
             if DSD_dem_getter(k) == dem and DSD_region_getter(k) == r
-        )
+        ]
+        if len(keys) != expected_key_length:
+            logger.warning(
+                'Missing some keys in this set for creation of Demand Distribution %s: %s',
+                dem,
+                keys,
+            )
         total = sum(DSD[i] for i in keys)
         if abs(value(total) - 1.0) > 0.001:
             # We can't explicitly test for "!= 1.0" because of incremental rounding
@@ -1082,58 +1094,60 @@ DemandActivity constraint. It returns a tuple of the form:
 and "first_d" are the reference season and time-of-day, respectively used to
 ensure demand activity remains consistent across time slices.
 """
-    # TODO:  This probably needs to be looked at in detail, with some understanding
-    #        of the intent.
 
-    # First, we only want to run this for demands for which there are more than
-    # one technology that meet it.
-    # Initialize an empty dictionary to hold unique "t" values for each "dem"
-    unique_t_per_dem = {}
+    # needed data structures...
+    # the count of techs that supply a commodity
+    suppliers = defaultdict(set)
+    # (region, demand): (season, tod)  # the goal of the exercise!
+    anchor_season_tod = {}
+    # (region, demand): (period, tech, vintage) # the viable tech and vintage per region, demand
+    viable_tech_vintage = defaultdict(list)
 
-    # Loop through the Pyomo set to get each index tuple
-    for r, p, t, v, dem in M.ProcessInputsByOutput.keys():
-        if (dem not in M.commodity_demand) or (t in M.tech_annual):
+    # start the loop over possible combos
+    for r, p, t, v, dem in M.ProcessInputsByOutput:
+        # we aren't concerned with non-demand commodities or annual techs
+        if dem not in M.commodity_demand or t in M.tech_annual:
             continue
-        # Add the "t" value to the set corresponding to each "dem"
-        if dem not in unique_t_per_dem:
-            unique_t_per_dem[dem] = set()
-        unique_t_per_dem[dem].add(t)
+        # capture the (p, t, v) in case we need to act on it
+        viable_tech_vintage[r, dem].append((p, t, v))
+        suppliers[dem].add(t)  # one more recognized supplier
+        if len(suppliers[dem]) > 1:
+            # We need to act on (build) for this region-demand, put in a placeholder
+            anchor_season_tod[r, dem] = None
 
-    # Now the logic of the constraint begins.
-    # Find the first timestep of the year where the demand is non-zero:
-    eps = 0.000001
-    for r, p, t, v, dem in M.ProcessInputsByOutput.keys():
-        # No need for constraint if dem is not a demand commodity or
-        # if t is in tech_annual or if there's only one tech meeting the demand.
-        if (
-            (dem not in M.commodity_demand)
-            or (t in M.tech_annual)
-            or (len(unique_t_per_dem[dem]) <= 1)
-        ):
-            continue
+    # Find the first timestep of the year where the demand is appreciably sized:
+    #   appreciable = not so small that we get into numerical instability when applying small multipliers
+    appreciable_size = 0.0001
 
-        # Find the first time step where the DSD is not 0
-        # Set the time_season and time_of_day to s0 and d0.
+    for r, dem in anchor_season_tod:
+        found_flag = False
+        s0, d0 = None, None
+        for s0, d0 in ((ss, dd) for ss in M.time_season for dd in M.time_of_day):
+            if (r, s0, d0, dem) in M.DemandSpecificDistribution.sparse_iterkeys():
+                if value(M.DemandSpecificDistribution[(r, s0, d0, dem)]) >= appreciable_size:
+                    found_flag = True
+                    break  # we have one with some value associated
+        found = 'found' if found_flag else 'not found'
+        # set it.  If nothing was found the first indices should work just fine...
+        anchor_season_tod[r, dem] = (s0, d0)
+        logger.debug(
+            'Using season/tod: %s, %s for commodity %s in region %s which was %s in DSD '
+            'to set DemandActivity baseline',
+            s0,
+            d0,
+            dem,
+            r,
+            found,
+        )
 
-        # TODO:  This needs some TLC cases (found one/not other, found none, why is first unique?)
-        for s0 in M.time_season:
-            for d0 in M.time_of_day:
-                if (r, s0, d0, dem) in M.DemandSpecificDistribution.sparse_keys():
-                    # TODO:  this could probably just be a loop w/ break.  Try-except?
-                    try:
-                        if value(M.DemandSpecificDistribution[r, s0, d0, dem]) > eps:
-                            break
-                    except:
-                        continue
-            else:
-                continue
-            break
-
-        # Start yielding the constraint indices
-        for s in M.time_season:
-            for d in M.time_of_day:
-                if s != s0 or d != d0:
-                    yield r, p, s, d, t, v, dem, s0, d0
+    # Start yielding the constraint indices
+    for r, dem in anchor_season_tod:
+        s0, d0 = anchor_season_tod[r, dem]
+        for p, t, v in viable_tech_vintage[r, dem]:
+            for s in M.time_season:
+                for d in M.time_of_day:
+                    if s != s0 or d != d0:
+                        yield r, p, s, d, t, v, dem, s0, d0
 
 
 def DemandConstraintIndices(M: 'TemoaModel'):
