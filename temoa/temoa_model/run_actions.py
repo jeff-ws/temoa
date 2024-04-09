@@ -96,8 +96,8 @@ def check_database_version(config: TemoaConfig, db_major_reqd: int, min_db_minor
     :param min_db_minor: the required minimum minor version (GTE test)
     :return: T/F
     """
-    input_conn, input_path = sqlite3.connect(config.input_file), config.input_file
-    if config.input_file == config.output_database:
+    input_conn, input_path = sqlite3.connect(config.input_database), config.input_database
+    if config.input_database == config.output_database:
         output_conn = None
     else:
         output_conn = sqlite3.connect(config.output_database)
