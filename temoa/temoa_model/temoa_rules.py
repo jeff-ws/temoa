@@ -377,7 +377,6 @@ def loan_cost(
     invest_cost: float,
     loan_annualize: float,
     lifetime_loan_process: float | int,
-    lifetime_process: int,
     P_0: int,
     P_e: int,
     GDR: float,
@@ -390,7 +389,6 @@ def loan_cost(
     :param invest_cost: the cost/capacity
     :param loan_annualize: parameter
     :param lifetime_loan_process: lifetime of the loan
-    :param lifetime_process: lifetime of the process
     :param P_0: the year to discount the costs back to
     :param P_e: the 'end year' or cutoff year for loan payments
     :param GDR: Global Discount Rate
@@ -413,7 +411,10 @@ def loan_cost(
                 else (x ** (P_0 - vintage + 1) * (1 - x ** (-lifetime_loan_process)) / GDR)
             )
         )
-        * ((1 - x ** (-min(lifetime_process, P_e - vintage))) / (1 - x ** (-lifetime_process)))
+        * (
+            (1 - x ** (-min(lifetime_loan_process, P_e - vintage)))
+            / (1 - x ** (-lifetime_loan_process))
+        )
     )
     return res
 
@@ -464,7 +465,6 @@ def PeriodCost_rule(M: 'TemoaModel', p):
             M.CostInvest[r, S_t, S_v],
             M.LoanAnnualize[r, S_t, S_v],
             value(M.LifetimeLoanProcess[r, S_t, S_v]),
-            M.LifetimeProcess[r, S_t, S_v],
             P_0,
             P_e,
             GDR,
