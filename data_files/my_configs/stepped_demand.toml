@@ -9,22 +9,22 @@
 
 # Scenario Name (Mandatory)
 # This scenario name is used to label results within the output .sqlite file
-scenario = "test run 123"
+scenario = "myo_1"
 
 # Scenaio Mode (Mandatory)
-# See documentation for explanations.  A standard single run is "perfect foresight"
+# See documentation for explanations.  A standard single run is "perfect_foresight"
 # mode must be one of (case-insensitive):
 #     [perfect_foresight, MGA, myopic, method_of_morris, build_only, check]
 scenario_mode = "myopic"
 
-# Input file (Mandatory)
-input_file = "data_files/myo_utopia.sqlite"
+# Input database (Mandatory)
+input_database = "data_files/stepped_demand.sqlite"
 
 # Output file (Mandatory)
 # The output file must be an existing .sqlite file
-# the user may target the same input file or a separate /
-# copied sqlite file in a different location
-output_database = "data_files/myo_utopia.sqlite"
+# For Pefrect Foresight, the user may target the same input file or a separate /
+# copied sqlite file in a different location.  Myopic requires that input_database = output_database
+output_database = "data_files/stepped_demand.sqlite"
 
 # ------------------------------------
 #        DATA / MODEL CHECKS
@@ -37,11 +37,12 @@ price_check = true
 
 # Check the network connectivity for processes in the model.  Strongly
 # recommended to ensure proper performance.  Results are reported in log file
-# temp note:  This requires that source commodities be marked with 's'
+# This requires that source commodities be marked with 's' in Commodity table
+# This is required for Myopic runs
 source_trace = true
 
 # Produce HTML files for Commodity Networks.  Requires source_trace above
-plot_commodity_network = false
+plot_commodity_network = true
 
 # ------------------------------------
 #             SOLVER
@@ -52,6 +53,8 @@ plot_commodity_network = false
 neos = false
 
 # solver (Mandatory)
+# Depending on what client machine has installed.
+#  [cbc, appsi_highs, gurobi, cplex, ...]
 solver_name = "cbc"
 
 # ------------------------------------
@@ -59,18 +62,13 @@ solver_name = "cbc"
 # select desired output products/files
 # ------------------------------------
 
-# streaming output will stream the results in string format to the std output stream
-# when running in "perfect foresight" only.
-# This should probably only be used for "small" models
-stream_output = true
-
 # generate an Excel file in the output_files folder
-save_excel = false
+save_excel = true
 
-# save the duals in the output .sqlite database
+# save the duals in the output Database (may slow execution slightly?)
 save_duals = false
 
-# save a copy of the pyomo-generated lp file to the outputs folder (maybe a large file!)
+# save a copy of the pyomo-generated lp file(s) to the outputs folder (maybe a large file(s)!)
 save_lp_file = false
 
 # ---------------------------------------------------
@@ -84,9 +82,8 @@ iterations = 4
 weight = "integer"   # currently supported: [integer, normalized]
 
 [myopic]
-view_depth = 2  # number of periods seen/analyzed per iteration
-step_size = 1    # number of periods to step by
-
+view_depth = 2   # number of periods seen/analyzed per iteration
+step_size = 1    # number of periods to step by (must be <= view depth)
 
 
 

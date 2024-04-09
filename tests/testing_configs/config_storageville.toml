@@ -19,7 +19,7 @@ scenario_mode = "perfect_foresight"
 # Input file (Mandatory)
 # Input can be a .sqlite or .dat file
 # Both relative path and absolute path are accepted
-input_file = "testing_outputs/storageville.sqlite"
+input_database = "testing_outputs/storageville.sqlite"
 
 # Output file (Mandatory)
 # The output file must be an existing .sqlite file
@@ -64,7 +64,7 @@ weight = "integer"   # currently supported: [integer, normalized]
 
 [myopic]
 myopic_view = 2  # number of periods seen at one iteration
-keep_myopic_databases = true
+
 
 
 

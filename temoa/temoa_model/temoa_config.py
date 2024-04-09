@@ -34,27 +34,12 @@ class TemoaConfig:
     The overall configuration for a Temoa Scenario
     """
 
-    def __init__(
-        self,
-        scenario: str,
-        scenario_mode: TemoaMode | str,
-        input_file: Path,
-        output_database: Path,
-        output_path: Path,
-        solver_name: str,
-        neos: bool = False,
-        save_excel: bool = False,
-        save_duals: bool = False,
-        save_lp_file: bool = False,
-        MGA: dict | None = None,
-        myopic: dict | None = None,
-        config_file: Path | None = None,
-        silent: bool = False,
-        stream_output: bool = False,
-        price_check: bool = True,
-        source_trace: bool = False,
-        plot_commodity_network: bool = False,
-    ):
+    def __init__(self, scenario: str, scenario_mode: TemoaMode | str, input_database: Path, output_database: Path,
+                 output_path: Path, solver_name: str, neos: bool = False, save_excel: bool = False,
+                 save_duals: bool = False, save_lp_file: bool = False, MGA: dict | None = None,
+                 myopic: dict | None = None, config_file: Path | None = None, silent: bool = False,
+                 stream_output: bool = False, price_check: bool = True, source_trace: bool = False,
+                 plot_commodity_network: bool = False):
         self.scenario = scenario
         # capture the operating mode
         self.scenario_mode: TemoaMode
@@ -82,12 +67,12 @@ class TemoaConfig:
         self.config_file = config_file
 
         # accept and screen the input file
-        self.input_file = Path(input_file)
-        if not self.input_file.is_file():
-            raise FileNotFoundError(f'could not locate the input file: {self.input_file}')
-        if self.input_file.suffix not in {'.dat', '.sqlite'}:
-            logger.error('Input file is not of type .dat or .sqlite')
-            raise AttributeError('Input file is not of type .dat or .sqlite')
+        self.input_database = Path(input_database)
+        if not self.input_database.is_file():
+            raise FileNotFoundError(f'could not locate the input database: {self.input_database}')
+        if self.input_database.suffix not in {'.db', '.sqlite'}:
+            logger.error('Input file is not of type .ddb or .sqlite')
+            raise AttributeError('Input file is not of type .db or .sqlite')
 
         # accept and validate the output db
         self.output_database = Path(output_database)
@@ -99,9 +84,7 @@ class TemoaConfig:
 
         # create a placeholder for .dat file.  If conversion is needed, this
         # is the destination...
-        self.dat_file: Path | None
-        if self.input_file.suffix == '.dat':
-            self.dat_file = self.input_file
+        self.dat_file: Path | None = None
 
         self.output_path = output_path
         self.neos = neos
@@ -126,8 +109,8 @@ class TemoaConfig:
         )
 
         # warn if output db != input db
-        if self.input_file.suffix == self.output_database.suffix:  # they are both .db/.sqlite
-            if self.input_file != self.output_database:  # they are not the same db
+        if self.input_database.suffix == self.output_database.suffix:  # they are both .db/.sqlite
+            if self.input_database != self.output_database:  # they are not the same db
                 msg = (
                     'Input file, which is a database, does not match the output file\n User '
                     'is responsible to ensure the data ~ results congruency in the output db'
@@ -149,7 +132,7 @@ class TemoaConfig:
             case {
                 'scenario': str(),
                 'scenario_mode': str(),
-                'input_file': str(),
+                'input_database': str(),
                 'output_database': str(),
                 'neos': bool(),
                 'solver_name': str(),
@@ -158,7 +141,6 @@ class TemoaConfig:
                 'save_lp_file': bool(),
                 'MGA': {'slack': int(), 'iterations': int(), 'weight': str()},
                 'myopic': {'myopic_view': int(), 'keep_myopic_databases': bool()},
-                'stream_output': bool(),
                 'price_check': bool(),
                 'source_trace': bool(),
                 'plot_commodity_network': bool(),
@@ -168,7 +150,7 @@ class TemoaConfig:
             case {
                 'scenario': str(),
                 'scenario_mode': str(),
-                'input_file': str(),
+                'input_database': str(),
                 'output_database': str(),
                 'solver_name': str(),
                 'save_excel': bool(),
@@ -196,7 +178,7 @@ class TemoaConfig:
         TemoaConfig.validate_schema(data=data)
         tc = TemoaConfig(output_path=output_path, config_file=config_file, silent=silent, **data)
         logger.info('Scenario Name:  %s', tc.scenario)
-        logger.info('Data source:  %s', tc.input_file)
+        logger.info('Data source:  %s', tc.input_database)
         logger.info('Data target:  %s', tc.output_database)
         logger.info('Mode:  %s', tc.scenario_mode.name)
         return tc
@@ -213,24 +195,24 @@ class TemoaConfig:
         msg += '{:>{}s}: {}\n'.format('Scenario', width, self.scenario)
         msg += '{:>{}s}: {}\n'.format('Scenario mode', width, self.scenario_mode.name)
         msg += '{:>{}s}: {}\n'.format('Config file', width, self.config_file)
-        msg += '{:>{}s}: {}\n'.format('Data source', width, self.input_file)
+        msg += '{:>{}s}: {}\n'.format('Data source', width, self.input_database)
         msg += '{:>{}s}: {}\n'.format('Output database target', width, self.output_database)
         msg += '{:>{}s}: {}\n'.format('Path for outputs and log', width, self.output_path)
+
         msg += spacer
         msg += '{:>{}s}: {}\n'.format('Price check', width, self.price_check)
-        msg += '{:>{}s}: {}\n'.format('Source check', width, self.source_trace)
+        msg += '{:>{}s}: {}\n'.format('Source trace', width, self.source_trace)
         msg += '{:>{}s}: {}\n'.format('Commodity network plots', width, self.plot_commodity_network)
 
         msg += spacer
         msg += '{:>{}s}: {}\n'.format('Selected solver', width, self.solver_name)
         msg += '{:>{}s}: {}\n'.format('NEOS status', width, self.neos)
-        msg += '{:>{}s}: {}\n'.format('Price Check', width, self.price_check)
-        msg += '{:>{}s}: {}\n'.format('Source Check', width, self.source_trace)
+
         msg += spacer
         msg += '{:>{}s}: {}\n'.format('Spreadsheet output', width, self.save_excel)
         msg += '{:>{}s}: {}\n'.format('Pyomo LP write status', width, self.save_lp_file)
         msg += '{:>{}s}: {}\n'.format('Save duals to output db', width, self.save_duals)
-        msg += '{:>{}s}: {}\n'.format('Stream output', width, self.stream_output)
+
         # TODO:  conditionally add in the mode options
 
         if self.scenario_mode == TemoaMode.MYOPIC:
