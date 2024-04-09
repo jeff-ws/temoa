@@ -23,7 +23,7 @@ from temoa.version_information import TEMOA_MAJOR, TEMOA_MINOR
 logger = logging.getLogger(__name__)
 
 
-@deprecated("currently deprecated functionality")
+@deprecated('currently deprecated functionality')
 def runModelUI(config_filename):
     """This function launches the model run from the Temoa GUI"""
     raise NotImplementedError
@@ -41,10 +41,12 @@ def runModel(arg_list: list[str] | None = None) -> TemoaModel | None:
     """
     options = parse_args(arg_list=arg_list)
     mode = TemoaMode.BUILD_ONLY if options.build_only else None
-    ts = TemoaSequencer(config_file=options.config_file,
-                        output_path=options.output_path,
-                        mode_override=mode,
-                        silent=options.silent)
+    ts = TemoaSequencer(
+        config_file=options.config_file,
+        output_path=options.output_path,
+        mode_override=mode,
+        silent=options.silent,
+    )
     result = ts.start()
     return result
 
@@ -55,32 +57,47 @@ def parse_args(arg_list: list[str] | None) -> argparse.Namespace:
     if provided :param arg_list: default None --> process sys.argv :return:  options Namespace
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', help='Path to file containing configuration information.',
-                        action='store',
-                        dest='config_file', default=None)
-    parser.add_argument('-b', '--build_only',
-                        help='Build and return an unsolved TemoaModel instance.',
-                        action='store_true',
-                        dest='build_only')
-    parser.add_argument('-s', '--silent', help='Silent run.  No prompts.', action='store_true',
-                        dest='silent')
-    parser.add_argument('-d', '--debug',
-                        help='Set logging level to DEBUG to see debugging output in log file.',
-                        action='store_true',
-                        dest='debug')
-    parser.add_argument('-o', '--output_path',
-                        help='Set the path for log and program outputs to an existing directory.  '
-                             'Default is time-stamped folder in output_files.',
-                        action='store',
-                        dest='output_path')
-    parser.add_argument('--how_to_cite',
-                        help='Show citation information for publishing purposes.',
-                        action='store_true',
-                        dest='how_to_cite')
-    parser.add_argument('-v', '--version',
-                        help='Show current Temoa version',
-                        action='store_true',
-                        dest='version')
+    parser.add_argument(
+        '--config',
+        help='Path to file containing configuration information.',
+        action='store',
+        dest='config_file',
+        default=None,
+    )
+    parser.add_argument(
+        '-b',
+        '--build_only',
+        help='Build and return an unsolved TemoaModel instance.',
+        action='store_true',
+        dest='build_only',
+    )
+    parser.add_argument(
+        '-s', '--silent', help='Silent run.  No prompts.', action='store_true', dest='silent'
+    )
+    parser.add_argument(
+        '-d',
+        '--debug',
+        help='Set logging level to DEBUG to see debugging output in log file.',
+        action='store_true',
+        dest='debug',
+    )
+    parser.add_argument(
+        '-o',
+        '--output_path',
+        help='Set the path for log and program outputs to an existing directory.  '
+        'Default is time-stamped folder in output_files.',
+        action='store',
+        dest='output_path',
+    )
+    parser.add_argument(
+        '--how_to_cite',
+        help='Show citation information for publishing purposes.',
+        action='store_true',
+        dest='how_to_cite',
+    )
+    parser.add_argument(
+        '-v', '--version', help='Show current Temoa version', action='store_true', dest='version'
+    )
 
     options = parser.parse_args(args=arg_list)  # dev note:  The default (if None) is sys.argv
 
@@ -97,8 +114,10 @@ def parse_args(arg_list: list[str] | None) -> argparse.Namespace:
     output_path: Path
     if options.output_path:
         if not Path(options.output_path).is_dir():
-            raise FileNotFoundError(f'The selected output path directory {options.output_path} '
-                                    f'could not be located.')
+            raise FileNotFoundError(
+                f'The selected output path directory {options.output_path} '
+                f'could not be located.'
+            )
         else:
             output_path = Path(options.output_path)
     else:
@@ -113,7 +132,8 @@ def parse_args(arg_list: list[str] | None) -> argparse.Namespace:
     if not options.config_file:
         logger.error(
             'No config file found in CLA.  '
-            'Temoa needs a config file to operate, see documentation.')
+            'Temoa needs a config file to operate, see documentation.'
+        )
         raise AttributeError('no config file provided.')
     else:
         # convert it to a Path, if it isn't one already
@@ -134,8 +154,7 @@ def create_output_folder() -> Path:
     create a time-stamped folder as the default catch-all for outputs
     :return: Path to default folder
     """
-    output_path = Path(PROJECT_ROOT, "output_files",
-                       datetime.now().strftime("%Y-%m-%d %H%Mh"))
+    output_path = Path(PROJECT_ROOT, 'output_files', datetime.now().strftime('%Y-%m-%d %H%Mh'))
     if not output_path.is_dir():
         output_path.mkdir()
     return output_path
@@ -147,15 +166,15 @@ def setup_logging(output_path: Path, debug_level=False):
         level = logging.DEBUG
     else:
         level = logging.INFO
-    logging.getLogger("pyomo").setLevel(logging.WARNING)
-    logging.getLogger("matplotlib").setLevel(logging.WARNING)
-    filename = "log.log"
+    logging.getLogger('pyomo').setLevel(logging.WARNING)
+    logging.getLogger('matplotlib').setLevel(logging.WARNING)
+    filename = 'log.log'
     logging.basicConfig(
         filename=os.path.join(output_path, filename),
-        filemode="w",
-        format="%(asctime)s | %(module)s | %(levelname)s | %(message)s",
-        datefmt="%d-%b-%y %H:%M:%S",
-        level=level
+        filemode='w',
+        format='%(asctime)s | %(module)s | %(levelname)s | %(message)s',
+        datefmt='%d-%b-%y %H:%M:%S',
+        level=level,
     )
     logger.info('*** STARTING TEMOA ***')
 

@@ -125,7 +125,7 @@ class MyopicSequencer:
         Get a connection to the output database
         :return: a database connection
         """
-        input_file = self.config.input_file
+        input_file = self.config.input_database
         output_db = self.config.output_database
 
         if input_file.suffix not in {'.db', '.sqlite'}:

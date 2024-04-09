@@ -47,10 +47,18 @@ params = [
     },
     {
         'ID': 'shortened term',
-        'capacity': 100_000, 'invest_cost': 1, 'loan_life': 40,
-        'loan_rate': 0.08, 'global_discount_rate': 0.05, 'process_life': 50,
-        'p_0': 2020, 'vintage': 2030, 'p_e': 2035, 'model_cost': 21997.72, 'undiscounted_cost': 41930.08
-    }
+        'capacity': 100_000,
+        'invest_cost': 1,
+        'loan_life': 40,
+        'loan_rate': 0.08,
+        'global_discount_rate': 0.05,
+        'process_life': 50,
+        'p_0': 2020,
+        'vintage': 2030,
+        'p_e': 2035,
+        'model_cost': 21997.72,
+        'undiscounted_cost': 41930.08,
+    },
 ]
 params_with_zero_GDR = [
     {
@@ -81,7 +89,9 @@ def test_loan_costs(param):
     assert undiscounted_cost == pytest.approx(param['undiscounted_cost'], rel=0.01)
 
 
-@pytest.mark.parametrize('param', params_with_zero_GDR, ids=(param['ID'] for param in params_with_zero_GDR))
+@pytest.mark.parametrize(
+    'param', params_with_zero_GDR, ids=(param['ID'] for param in params_with_zero_GDR)
+)
 def test_loan_costs_with_zero_GDR(param):
     """
     Test the formula with zero for GDR to make sure it is handled correctly.  The formula
