@@ -32,13 +32,18 @@ from sys import argv, stderr as SE
 from sys import version_info
 from time import time
 
+from deprecated.classic import deprecated
 from pyomo.environ import *  # TODO:  specify this better!
 from pyomo.opt import SolverFactory as SF
 from pyutilib.common import ApplicationError
 from temoa.temoa_model.pformat_results import pformat_results
 
+from temoa.extensions.modeling_to_generate_alternatives.temoa_mga import (
+    ActivityObj_rule,
+    SlackedObjective_rule,
+    PreviousAct_rule,
+)
 from temoa.temoa_model.temoa_config import TemoaConfig
-from temoa.temoa_model.temoa_mga import ActivityObj_rule, SlackedObjective_rule, PreviousAct_rule
 from temoa.temoa_model.temoa_rules import TotalCost_rule, ActivityByTech_Constraint
 
 # from pyutilib.services import TempfileManager
@@ -67,6 +72,7 @@ as a StreamingHttpResponse().
 """
 
 logger = getLogger(__name__)
+
 
 # don't check this file...  It hasn't been cleaned yet
 # ruff: noqa
@@ -142,6 +148,7 @@ It uses the self.model, self.optimzer, and self.options parameters of the class 
 """
 
 
+@deprecated()
 def solveWithMGA(self):
     scenario_names = []
     scenario_names.append(self.options.scenario)
