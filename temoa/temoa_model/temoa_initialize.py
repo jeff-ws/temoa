@@ -597,6 +597,7 @@ def CreateSparseDicts(M: 'TemoaModel'):
                     '%s.  If specifying a capacity of zero, you may simply '
                     'omit the declaration.\n'
                 )
+                logger.info(msg, str(l_process))
                 SE.write(msg % str(l_process))
                 continue
             if v + l_lifetime <= l_first_period:
@@ -607,16 +608,18 @@ def CreateSparseDicts(M: 'TemoaModel'):
                     '\n\tLifetime:     %s'
                     '\n\tFirst period: %s\n'
                 )
+                logger.warning(msg, l_process, l_lifetime, l_first_period)
                 SE.write(msg % (l_process, l_lifetime, l_first_period))
                 continue
 
         eindex = (r, i, t, v, o)
-        if 0 == M.Efficiency[eindex]:
+        if M.Efficiency[eindex] == 0:
             msg = (
                 '\nNotice: Unnecessary specification of Efficiency %s.  If '
                 'specifying an efficiency of zero, you may simply omit the '
                 'declaration.\n'
             )
+            logger.info(msg, str(eindex))
             SE.write(msg % str(eindex))
             continue
 
