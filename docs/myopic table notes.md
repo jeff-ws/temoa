@@ -1,26 +1,18 @@
-Notes on Myopic Tables
-======================
+Notes on Myopic 
+===============
 
-MyopicEfficiency
+MyopicEfficiency Table
 ----------------
 
 - Largely similar to baseline Efficiency table
-- Built sequentially during myopic run from capacity built or not-built in previous period
-  - Note:  Items NOT built in previous myopic windows that do not have a capacity entry are excluded
+- Built sequentially during myopic run from capacity built, not built, or retired in previous period.  This table
+needs to be "actively maintained" during the run because it is the source of filtering for all other model elements. 
+  - Notable actions:  
+    - Items NOT built in previous myopic windows are removed in the subsequent iteration.  During normal model runs,
+    the model will add entries from the normal Efficiency tables for consideration, and then in the subsequent
+    iteration, it will houseclean and remove any that were not selected for build.
+    - Items that become fully retired *during their normal lifespan* are also deleted upon retirement.
 - Uses base-year field (column) as reference to when added, and ``-1`` indicates original existing capacity
-- Adds a computed Lifetime field, which is handy for future computations
+- Adds a computed Lifetime field, which is handy for future computations and used internally to screen active 
+technologies during data loading.
 
-MyopicNetCapacity
-----------------
-
-- Reflects the current net capacity of a technology by period
-- Net capacity = original capacity built net of retirements to date
-- Used as existing capacity in follow-on myopic windows
-- Includes unlimited capacity technologies with an empty entry in the capacity field
-
-MyopicFlowOut
--------------
-
-- Currently duplicates data from the ``Output_VFlow_Out`` table
-  - Note:  Field names are slightly improved over ``Output_VFlow_Out``
-- Used as verification, possibly choose one-or-the-other at later date
