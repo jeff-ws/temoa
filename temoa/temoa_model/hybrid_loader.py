@@ -723,9 +723,8 @@ class HybridLoader:
             previous_period = raw[0]
             # noinspection SqlUnused
             raw = cur.execute(
-                'SELECT region, tech, vintage, capacity FROM main.MyopicNetCapacity '
+                'SELECT region, tech, vintage, capacity FROM main.OutputNetCapacity '
                 ' WHERE period = ? '
-                '  AND tech NOT IN (SELECT tech FROM main.Technology WHERE Technology.unlim_cap > 0)'
                 'UNION '
                 '  SELECT region, tech, vintage, capacity FROM main.ExistingCapacity ',
                 (previous_period,),

@@ -29,15 +29,10 @@ Created on:  1/15/24
 import logging
 import sqlite3
 import sys
-from collections import defaultdict, deque
+from collections import deque
 from pathlib import Path
 from sqlite3 import Connection
 from sys import stderr as SE
-
-from pyomo.core import value
-from temoa.temoa_model.myopic.hybrid_loader import HybridLoader
-from temoa.temoa_model.myopic.myopic_index import MyopicIndex
-from temoa.temoa_model.myopic.myopic_progress_mapper import MyopicProgressMapper
 
 import definitions
 from temoa.extensions.myopic.myopic_index import MyopicIndex
@@ -75,16 +70,12 @@ class MyopicSequencer:
         'OutputRetiredCapacity',
     ]
     tables_without_scenario_reference = [
-        'MyopicNetCapacity',
         'MyopicEfficiency',
     ]
 
     # Tables that may be cleaned by period during myopic run
     # note:  below excludes MyopicEfficiency, which is managed separately
 
-    tables_with_period_no_scneario_ref = [
-        'MyopicNetCapacity',
-    ]
     tables_with_period = [
         'OutputCost',
         'OutputCurtailment',
@@ -173,15 +164,14 @@ class MyopicSequencer:
         # clear out the old riff-raff
         self.clear_old_results()
 
-        # start building the MyopicEfficiency table.  (need to do this prior to data build to get Existing
-        # Capacity accounted for)
+        # start building the MyopicEfficiency table.
         self.initialize_myopic_efficiency_table()
 
         # start the fundamental control loop
         # 1.  get feedback from previous instance execution (optimal/infeasible/...)
         # 2.  decide what to do about it
         # 3.  pull the next instance from the queue (if !empty & if needed)
-        # 4.  Add to the MyopicEfficiency table from what was last built:  needed before pulling the rest of the data
+        # 4.  Update the MyopicEfficiency table (clean up history / add stuff now in visibility)
         # 5.  pull data for next run and filter it with source tracing
         # 6.  build instance
         # 7.  run checks (price check) on the model, if selected
@@ -224,7 +214,7 @@ class MyopicSequencer:
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'load')
 
-            # 4. update the MyopicEfficiency table so it is ready for the data pull.
+            # 4. update the MyopicEfficiency table so it is ready for the upcoming data pull.
             self.update_myopic_efficiency_table(myopic_index=idx, prev_base=last_base_year)
 
             # 5. pull the data
@@ -248,13 +238,13 @@ class MyopicSequencer:
             if self.config.price_check:
                 price_checker(instance)
 
+            # 8.  Run the model and assess solve status
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'solve')
             model, results = run_actions.solve_instance(
                 instance=instance, solver_name=self.config.solver_name, silent=True
             )
 
-            # 8.  Run the model and assess solve status
             optimal, status = run_actions.check_solve_status(results)
             if not optimal:
                 logger.warning('FAILED myopic iteration on %s', idx)
@@ -268,10 +258,9 @@ class MyopicSequencer:
             logger.info('Completed myopic iteration on %s', idx)
 
             # 9, 10.  Update the output tables...
-            # first, clear any results that overlap, we might have been backtracking...
+            # first, clear any possible previous results that overlap, we might have been backtracking...
             self.clear_results_after(idx.base_year)
             # add the new results...
-            self.update_capacity_table(idx, model)
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'report')
             # write results by appending.  We have already cleared necessary items
@@ -280,7 +269,7 @@ class MyopicSequencer:
             # prep next loop
             last_base_year = idx.base_year  # update
 
-            # delete anything in the Output_Objective table, it is nonsensical...
+            # delete anything in the OutputObjective table, it is nonsensical...
             self.output_con.execute('DELETE FROM OutputObjective WHERE 1')
             self.output_con.commit()
 
@@ -330,104 +319,10 @@ class MyopicSequencer:
             res = self.cursor.execute(q2).fetchall()
             print(list(res))
 
-    def update_capacity_table(self, myopic_idx: MyopicIndex, model: TemoaModel) -> None:
-        """
-        Update the MyopicNetCapacity table with whatever was built in this increment
-        :param myopic_idx: the current MyopicIndex
-        :param model: the solved model
-        :return: None
-        """
-        if self.debugging:
-            print('publishing: ', myopic_idx)
-        data = defaultdict(dict)
-        for r, p, t, v in model.V_Capacity:
-            # start at base year, to prevent re-writing existing
-            # stop before step year, which will be written in next iteration
-            if myopic_idx.base_year <= p < myopic_idx.step_year:
-                val = value(model.V_Capacity[r, p, t, v])
-                if val < self.capacity_epsilon:
-                    continue
-                else:
-                    data['V_Capacity'][r, p, t, v] = val
-                    continue
-
-        # Note:  we need to record each period for each vintage because retirements, etc. can reduce the
-        #        capacity over time.
-        for (r, p, t, v), val in data['V_Capacity'].items():
-            lifetime = model.LifetimeProcess[r, t, v]
-            # need to pull the sector...
-            raw = self.cursor.execute(
-                'SELECT sector FROM main.Technology WHERE tech = ?', (t,)
-            ).fetchall()
-            sector = raw[0][0]
-            try:
-                self.cursor.execute(
-                    'INSERT INTO MyopicNetCapacity ' 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                    (myopic_idx.base_year, r, p, sector, t, v, val, lifetime),
-                )
-            except sqlite3.IntegrityError:
-                SE.write(
-                    f'choked updating MyopicNetCapacity on : {myopic_idx.base_year, r, p, t, v, val, lifetime}.\n'
-                    'check clearing process.'
-                )
-        self.output_con.commit()
-
-        # we also need to add in any newly available unrestricted capacity techs, for which there is no V_Capacity
-        # it is probably easier/quicker to filter the model Efficiency data container vs.
-        # pulling data from the old Efficiency table...  This should keep copying forward any
-        # unrestricted capacity process seen up to this point.  They eventually will not show up in
-        # activeFlow after their lifetime and fall out naturally.
-
-        # we need to pull these indices from both the annual and non-annual flow sets
-        # the non-annuals...
-        new_unrestricted_cap_entries = {
-            (r, p, t, v)
-            for r, p, s, d, i, t, v, o in model.activeFlow_rpsditvo
-            if t in model.tech_uncap
-        }
-        # update with the annuals
-        new_unrestricted_cap_entries.update(
-            {(r, p, t, v) for r, p, i, t, v, o in model.activeFlow_rpitvo if t in model.tech_uncap}
-        )
-        count = 0
-        for r, p, t, v in sorted(new_unrestricted_cap_entries):
-            count += 1
-            lifetime = model.LifetimeProcess[r, t, v]
-            # need to pull the sector...
-            raw = self.cursor.execute(
-                'SELECT sector FROM main.Technology WHERE tech = ?', (t,)
-            ).fetchall()
-            sector = raw[0][0]
-            try:
-                self.cursor.execute(
-                    'INSERT INTO MyopicNetCapacity ' 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                    (
-                        myopic_idx.base_year,
-                        r,
-                        p,
-                        sector,
-                        t,
-                        v,
-                        None,
-                        lifetime,
-                    ),
-                )
-            except sqlite3.IntegrityError:
-                SE.write(
-                    f'choked updating MyopicNetCapacity on : {myopic_idx.base_year, r, p, t, v, None, lifetime}'
-                )
-                logger.error(
-                    'Failed to add unrestricted cap tech %s to MyopicNetCapacity in vintage %d',
-                    t,
-                    v,
-                )
-        self.output_con.commit()
-        logger.debug('Added %d unrestricted cap techs to MyopicNetCapacity table ', count)
-
     def update_myopic_efficiency_table(self, myopic_index: MyopicIndex, prev_base: int):
         """
         This function adds to the MyopicEfficiency table in the db with data specific
-        to the MyopicIndex timeframe.
+        to the current MyopicIndex timeframe.  Basically:  prep it for the current iteration.
         :return:
         """
         # Dev Note:  The efficiency table drives the show for the model and is also used
@@ -437,8 +332,15 @@ class MyopicSequencer:
 
         # We already captured the ExistingCapacity efficiency values when the table
         # was initialized, so now we need to incrementally:
-        # 0.  REMOVE anything past the current base year that may have been added
-        # 1.  REMOVE things that were NOT added to the MyopicNetCapacity from the last base year forward (if any)
+        # 0.  Clear from base year forward:
+        #         REMOVE anything past the current base year that may have been added previously
+        # 1.  Correct history from the last iteration:
+        #         REMOVE things that were either:
+        #           (a) NOT built at all or
+        #           (b) were fully retired by the last period prior to this iteration
+        #     We will use the NetCapacity to determine this
+        #     NOTE:  For techs that retire, this means they won't be seen in the table at all after
+        #            this iteration
         # 2.  Add the new stuff that is visible in the current myopic period
 
         base = myopic_index.base_year
@@ -453,32 +355,36 @@ class MyopicSequencer:
         )
         self.output_con.commit()
 
-        # 1.  Clean up stuff not implemented in previous step
-        query = (
-            'DELETE FROM MyopicEfficiency WHERE NOT EXISTS ('
-            '  SELECT * FROM MyopicNetCapacity WHERE '
-            '    MyopicEfficiency.region = MyopicNetCapacity.region AND '
-            '    MyopicEfficiency.tech = MyopicNetCapacity.tech AND '
-            '    MyopicEfficiency.vintage = MyopicNetCapacity.vintage) AND '
-            f'    MyopicEfficiency.vintage >= {prev_base}'
-        )
-
-        if self.debugging:
-            debug_query = (
-                'SELECT * FROM MyopicEfficiency WHERE NOT EXISTS ('
-                '  SELECT * FROM MyopicNetCapacity WHERE '
-                '    MyopicEfficiency.region = MyopicNetCapacity.region AND '
-                '    MyopicEfficiency.tech = MyopicNetCapacity.tech AND '
-                '    MyopicEfficiency.vintage = MyopicNetCapacity.vintage) AND '
-                f'    MyopicEfficiency.vintage >= {prev_base}'
+        # 1.  Clean up stuff not implemented or retired by the last time period in previous step,
+        #     exempting unlim_cap techs (of course...who would forget that?)
+        last_interval_end, flag = self.cursor.execute(
+            'SELECT MAX(period), flag FROM main.TimePeriod WHERE period < ?',
+            (myopic_index.base_year,),
+        ).fetchone()
+        if flag == 'f':  # the prior period should have an OutputNetCapacity entry
+            # Delete anything that doesn't have capacity remaining at the end of last interval
+            delete_qry = (
+                'DELETE FROM MyopicEfficiency '
+                'WHERE (SELECT region, tech, vintage) '
+                '  NOT IN (SELECT region, tech, vintage FROM OutputNetCapacity '
+                '    WHERE period = ?) '
+                'AND tech not in (SELECT tech FROM Technology where unlim_cap > 0)'
             )
-            print('\n\n **** Removing these unused region-tech-vintage combos ****')
-            print(debug_query)
-            removals = self.cursor.execute(debug_query).fetchall()
-            for i, removal in enumerate(removals):
-                print(f'{i}. Removing:  {removal}')
-        self.cursor.execute(query)
-        self.output_con.commit()
+
+            if self.debugging:
+                debug_query = (
+                    'SELECT * FROM MyopicEfficiency '
+                    'WHERE (SELECT region, tech, vintage) '
+                    '  NOT IN (SELECT region, tech, vintage FROM OutputNetCapacity '
+                    '    WHERE period = ?) '
+                    'AND tech not in (SELECT tech FROM Technology where unlim_cap > 0)'
+                )
+                print('\n\n **** Removing these unused region-tech-vintage combos ****')
+                removals = self.cursor.execute(debug_query, (last_interval_end,)).fetchall()
+                for i, removal in enumerate(removals):
+                    print(f'{i}. Removing:  {removal}')
+            self.cursor.execute(delete_qry, (last_interval_end,))
+            self.output_con.commit()
 
         # 2.  Add the new stuff now visible
         # dev note:  the `coalesce()` command is a nested if-else.  The first hit wins, so it is priority:
@@ -609,15 +515,6 @@ class MyopicSequencer:
                 self.cursor.execute(
                     f'DELETE FROM {table} WHERE period >= (?) and scenario = (?)',
                     (period, self.config.scenario),
-                )
-            except sqlite3.OperationalError:
-                SE.write(f'Failed trying to clear periods from table {table}\n')
-                raise sqlite3.OperationalError
-        for table in self.tables_with_period_no_scneario_ref:
-            try:
-                self.cursor.execute(
-                    f'DELETE FROM {table} WHERE period >= (?) ',
-                    (period,),
                 )
             except sqlite3.OperationalError:
                 SE.write(f'Failed trying to clear periods from table {table}\n')
