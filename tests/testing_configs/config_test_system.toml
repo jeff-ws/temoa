@@ -2,7 +2,7 @@
 scenario = "test run"
 scenario_mode = "perfect_foresight"
 
-input_file = "testing_outputs/test_system.sqlite"
+input_database = "testing_outputs/test_system.sqlite"
 output_database = "testing_outputs/test_system.sqlite"
 neos = false
 
@@ -30,7 +30,7 @@ weight = "integer"   # currently supported: [integer, normalized]
 
 [myopic]
 myopic_view = 2  # number of periods seen at one iteration
-keep_myopic_databases = true
+
 
 
 
