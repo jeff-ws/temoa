@@ -407,7 +407,7 @@ except sqlite3.OperationalError:
 if data:
     mby = data[0]
     cur.execute("INSERT OR REPLACE INTO MetaData VALUES ('myopic_base_year', ? , '')", (mby,))
-    print(f'transfered myopic base year: {mby}')
+    print(f'transferred myopic base year: {mby}')
 else:
     print('no myopic base year discovered')
 
@@ -420,7 +420,7 @@ if data:
     cur.execute(
         "INSERT OR REPLACE INTO MetaDataReal VALUES ('global_discount_rate', ?, '')", (rate,)
     )
-    print(f'transfered global discount rate: {rate}')
+    print(f'transferred global discount rate: {rate}')
 else:
     print('no global discount rate discovered')
 

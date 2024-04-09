@@ -166,7 +166,7 @@ class TemoaSequencer:
                     logger.info('Plot commodity network disabled for BUILD_ONLY')
                 if self.config.price_check:
                     logger.info('Price check disabled for BUILD_ONLY')
-                con = sqlite3.connect(self.config.input_file)
+                con = sqlite3.connect(self.config.input_database)
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(data_portal, silent=self.config.silent)
@@ -174,7 +174,7 @@ class TemoaSequencer:
                 return instance
 
             case TemoaMode.CHECK:
-                con = sqlite3.connect(self.config.input_file)
+                con = sqlite3.connect(self.config.input_database)
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(
@@ -190,7 +190,7 @@ class TemoaSequencer:
                 con.close()
 
             case TemoaMode.PERFECT_FORESIGHT:
-                con = sqlite3.connect(self.config.input_file)
+                con = sqlite3.connect(self.config.input_database)
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(

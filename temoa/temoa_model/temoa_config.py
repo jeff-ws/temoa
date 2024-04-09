@@ -34,12 +34,27 @@ class TemoaConfig:
     The overall configuration for a Temoa Scenario
     """
 
-    def __init__(self, scenario: str, scenario_mode: TemoaMode | str, input_database: Path, output_database: Path,
-                 output_path: Path, solver_name: str, neos: bool = False, save_excel: bool = False,
-                 save_duals: bool = False, save_lp_file: bool = False, MGA: dict | None = None,
-                 myopic: dict | None = None, config_file: Path | None = None, silent: bool = False,
-                 stream_output: bool = False, price_check: bool = True, source_trace: bool = False,
-                 plot_commodity_network: bool = False):
+    def __init__(
+        self,
+        scenario: str,
+        scenario_mode: TemoaMode | str,
+        input_database: Path,
+        output_database: Path,
+        output_path: Path,
+        solver_name: str,
+        neos: bool = False,
+        save_excel: bool = False,
+        save_duals: bool = False,
+        save_lp_file: bool = False,
+        MGA: dict | None = None,
+        myopic: dict | None = None,
+        config_file: Path | None = None,
+        silent: bool = False,
+        stream_output: bool = False,
+        price_check: bool = True,
+        source_trace: bool = False,
+        plot_commodity_network: bool = False,
+    ):
         self.scenario = scenario
         # capture the operating mode
         self.scenario_mode: TemoaMode
