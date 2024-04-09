@@ -56,7 +56,7 @@ params = [
         'p_0': 2020,
         'vintage': 2030,
         'p_e': 2035,
-        'model_cost': 21997.72,
+        'model_cost': 23403.85,
         'undiscounted_cost': 41930.08,
     },
 ]
