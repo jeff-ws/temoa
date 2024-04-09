@@ -6,8 +6,6 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-# TODO:  Something with this import is causing logging problems inside of testing modules...
-#        Can we swap over to pandas?
 from pyam import IamDataFrame
 
 
