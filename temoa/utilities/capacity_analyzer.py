@@ -1,5 +1,7 @@
 """
 Quick utility script to analyze the distribution of capacities within a scenario database
+Note:  this uses the MaxCapacity table for analysis, which depending on if/how that table
+is populated will influence the utility of using this method
 """
 
 import itertools
@@ -25,7 +27,7 @@ res = []
 try:
     con = sqlite3.connect(source_db_file)
     cur = con.cursor()
-    cur.execute('SELECT maxcap FROM MaxCapacity')
+    cur.execute('SELECT max_cap  FROM MaxCapacity')
     for row in cur:
         res.append(row)
 
