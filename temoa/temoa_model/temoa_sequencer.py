@@ -35,8 +35,6 @@ from logging import getLogger
 from pathlib import Path
 
 import pyomo.opt
-from temoa.temoa_model.myopic.hybrid_loader import HybridLoader
-from temoa.temoa_model.myopic.myopic_sequencer import MyopicSequencer
 
 from temoa.extensions.myopic.myopic_sequencer import MyopicSequencer
 from temoa.temoa_model.hybrid_loader import HybridLoader
