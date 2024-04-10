@@ -32,13 +32,17 @@ dependencies:
     - xlsxwriter
     - plotly
     - pyam
+    # cbc solver below cannot be installed via Conda on Windows
+    - coincbc
+    - pytest
+    - deprecated
+    - openpyxl
+    - networkx
+    - gravis
+
     # Below required to update documentation
     - sphinx
     - sphinx_rtd_theme
     - sphinxcontrib-htmlhelp
     - sphinxcontrib-serializinghtml
     - sphinxcontrib-bibtex
-    # cbc solver below cannot be installed via Conda on Windows
-    - coincbc
-    - pytest
-

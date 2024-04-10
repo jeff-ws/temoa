@@ -1,120 +1,155 @@
-# Using the Restructured Branch [temporary edit]
+# Getting Started with TEMOA and Version 3
 
-Several changes/features in the current restructured branch:
+## Overview
 
-1. The overall folder structure is slightly modified.  A new `temoa` folder contains all sourcecode for the main components
+The main subdirectories in the project are:
+
+1. `temoa/`
+Contains the core Temoa model
+2. `temoa/temoa_model`
+The core model code necessary to build and solve a Temoa instance
+3. `temoa/data_processing`
+Code for post-processing solved models and working with output
+4. `temoa/extensions`
+Model extensions to solve the model using differing techniques.  Note:  There is some legacy and non-working
+code in these modules that is planned future work.
+
+5. `data_files/`
+Intended to hold input data files and config files.  Examples are included.
+Note that the example file utopia.sql represents a simple system called 'Utopia', which
+is packaged with the MARKAL model generator and has been used
+extensively for benchmarking exercises.
+6. `output_files/`
+The target for run-generated output including log files and other requested products.  Temoa will create
+time-stamped folders to gather output for runs
+4. `docs/`
+Contains the source code for the Temoa project manual, in reStructuredText
+(ReST) format.
+5. `notebooks/`
+jupyter notebooks associated with the project.  Note:  Not all of these are functional at this time, but are
+retained to guide future development
+
+## Guide to Setup
+
+1. Obtain a current copy of Python from the python.org website.  The model has been tested with 3.11 and 3.12.  It will
+fail (raise error) on earlier versions.
 2. A `requirements.txt` file has been included to allow for use of `pip` to populate a virtual environment.  In order to use that the steps are:
-- Ensure you have a copy of python 3.11 installed on your machine ([python.org]())
+- Ensure you have a copy of python 3.11/3.12 installed on your machine ([python.org]())
 - Make and activate a virtual environment using the `venv` package:
 
 ```
 $ python3.11 -m venv venv
-$ source venv/bin/activate   # for linux/osx, windows may differ
+$ source venv/bin/activate   # for linux/osx, windows activation command may differ
 ```
-- After activating the venv, use `pip` within the venv to install everything
+- Verify that you have a prepended indicator on your cursor that you are in the virtual environment (see below)
+- After activating the venv, use `pip` *within* the venv to install everything.  Most IDEs have automated tools to
+help set up and associate this venv with the project.  It is also possible from the command line:
 ```
-$ (venv) pip install -r requirements.txt
+(venv) $ pip install -r requirements.txt
 ```
-
+- For Conda users, an environment.yml file is provided that is not currently fully tested.  Additional installs may 
+be required.
 3. The entry point for regular execution is now at the top level of the project so a "sample" run should be initiated as:
 
 ```
-$ python main.py --config=data_files/my_configs/config_sample.toml
-```
-4. Users are encouraged to either place a copy of the target database in the `output_files` folder to catch all database outputs, 
-which prevents VCS conflicts with the inputs folder contents or to make a copy of any database under source control
-
-5. Developers should be able to run tests by navigating to the tests folder and initiating `pytest` from within the venv
-```
-$ cd tests
-$ python -m pytest . --disable-warnings
+(venv) temoa $ python main.py --config data_files/my_configs/config_sample.toml
 ```
 
-### ~~~ Remainder Below This Line Under Revision ~~~
-# Overview
+## Database Setup
+- Several sample database files in Version 3 format are provided in SQL format for learning/testing.  These are provided in the 
+`data_files/example_dbs` folder.  In order to use them, they must be converted into sqlite database files.  This can 
+be done from the command line using the sqlite3 engine to convert them.  sqlite3 is packaged with Python and should be
+available.  If not, most configuration managers should be able to install it.  The command to make the `.sqlite` file
+is (for Utopia as an example):
+```
+(venv) $ sqlite3 utopia.sqlite < utopia.sql
+```
+- Converting legacy db's to Version 3 can be done with the included database migration tool.  Users who use this
+tool are advised to carefully review the console outputs during conversion to ensure accuracy and check the 
+converted database carefully.  The migration tool will build an empty new Version 3 database and move data from
+the old database, preserving the legacy database in place.  The command can be run from the top level of the 
+project and needs pointers to the target database and the Version 3 schema file.  A typical execution from top level
+should look like:
+
+```
+(venv) $ python temoa/utilities/db_migration_to_v3.py --source data_files/<legacy db>.sqlite  --schema data_files/temoa_schema_v3.sql
+```
+- Users may also create a blank full or minimal version of the database from the two schema files in the `data_files`
+directory as described above using the `sqlite3` command.  The "minimal" version excludes some of the group
+parameters and is recommended as a starting point for entry-level models.  It can be upgraded to the full set of
+tables by executing the full schema SQL command on the resulting database later, which will add the missing tables.
+
+## Config Files
+
+- A configuration (config) file is required to run the model.  The `sample_config.toml` is provided as a reference
+and has all parameters in it.  It can be copied/renamed, etc.
+- Notes on Config Options:
+
+Field | Notes
+---|---
+Scenario Name | A name used in output tables for results
+Temoa Mode | The execution mode.  See note below on currently supported modes
+Input/Output DB | The source (and optionally diffent) output database.  Note for myopic input must be same as output
+Price Checking | Run the "price checker" on the built model to look for costing deficiencies and log them
+Source Tracing | Check the integrity of the commodity flow network in every region-period combination.  Required for Myopic
+Commodity Graphs | Produce HTML (viewable in any browser) displays of the networks built
+Solver | The exact name of the solver executable to call within `pyomo`
+Save Excel | Save core output data to excel files.  Needed if user intends to use the graphviz post-processing modules
+Save LP | Save the created LP model files
+Myopic Settings | The view depth (periods to solve per iteration) and step (periods to step between iterations)
+
+## Currently Supported Modes
+### Check
+Build the model and run the numerous checks on it.  Results will be in the log file.  No solve is attempted.
+### Perfect Foresight
+All-in-one run that solves the entire model at once.  It is possible to run this without source tracing, which will
+use raw data in the model without checking the integrity of the underlying network.  It is highly advised to use
+source tracing for most accurate results.
+### Myopic
+Solve the model sequentially through iterative solves based on Myopic settings.  Source tracing is required to
+accomodate build/no-build decisions made per iteration to ensure follow-on models are well built.
+### Build Only
+Mostly for test/troubleshooting.  This builds/returns an un-solved model
+
+Several other options are possible to pass to the main execution command including changing the logging level to
+`debug` or running silent (no console feedback) which may be best for server runs.  Also, redirecting the output
+products is possible.  To see available options invoke the `main.py` file with the `-h` flag:
+
+```
+(venv) $ python main.py -h
+```
+
+## Typical Run
+1. Prepare a database (or copy of one) as described above.  Runs will fill the output tables and overwrite any data with the 
+same scenario name.
+2. Perepare a config file with paths to the database(s) relative to the top of the project, as in the example
+3. Run the model, using the `main.py` entry point from the top-level of the project:
+```
+(venv) temoa $ python main.py --config data_files/my_configs/config_sample.toml
+```
+4. Review the config display and accept
+5. Review the log file and output products which are automatically placed in a time-stamped folder in `output_files`, 
+unless user has redirected output
+6. Review the data in the Output tables
+
+## Testing
+Users who wish to exercise the `pytest` based test in the test folder can do so from the command line or any IDE.
+Note that many of the tests perform solves on small models using the freely available `cbc` solver, which is
+required to run the testing suite.
+
+The tests should all run and pass (several are currently skipped and reflect in-process work).  Tests should normally
+be run from the top level of the `tests folder`.  If `pytest` is installed it will locate tests within the folder and
+run/report them.  Note the dot '.' below indicating current folder:
+
+```
+(venv) temoa/tests pytest .
+```
+Several of the packages used may currently generate warnings during this testing process, but the tests should all PASS
+with the exception of skipped tests.
+
+## Documentation and Additional Information
 
 
-The four subdirectories are:
-
-1. `temoa_model/`
-Contains the core Temoa model code.
-
-2. `data_files/`
-Contains simple input data (DAT) files for Temoa. Note that the file
-'utopia-15.dat' represents a simple system called 'Utopia', which
-is packaged with the MARKAL model generator and has been used
-extensively for benchmarking exercises.
-
-3. `data_processing/`
-Contains several modules to make output graphs, network diagrams, and
-results spreadsheets.
-
-3. `tools/`
-Contains scripts used to conduct sensitivity and uncertainty analysis.
-See the READMEs inside each subfolder for more information.
-
-4. `docs/`
-Contains the source code for the Temoa project manual, in reStructuredText
-(ReST) format.
-
-## Creating a Temoa Environment
-
-Temoa requires several software elements, and it is most convenient to create
-a conda environment in which to run the model. To begin, you need to have conda
-installed either via miniconda or anaconda. Next, download the environment.yml file,
-and  place in a new directory named 'temoa-py3.' Create this new directory in
-a location where you wish to store the environment. From the command line:
-
-```$ conda env create```
-
-Then activate the environment as follows:
-
-```$ source activate temoa-py3```
-
-This new conda environment contains several elements, including Python 3, a
-compatible version of Pyomo, matplotlib, numpy, scipy, and two free solvers
-(GLPK and CBC). A note for Windows users: the CBC solver is not available for Windows through conda. Thus, in order to install the environment properly, the last line of the 'environment.yml' file specifying 'coincbc' should be deleted.
-
-To download the Temoa source code, either clone the repository or download from GitHub
-as a zip file.
-
-## Running Temoa
-
-To run Temoa, you have a few options. All commands below should be executed from the
-top-level 'temoa' directory.
-
-**Option 1 (full-featured):**
-Invokes python directly, and gives the user access to
-several model features via a configuration file:
-
-```$ python  temoa_model/  --config=temoa_model/config_sample```
-
-Running the model with a config file allows the user to (1) use a sqlite
-database for storing input and output data, (2) create a formatted Excel
-output file, (2) specify the solver to use, (3) return the log file produced during model execution, (4) return the lp file utilized by the solver, and (5) to execute modeling-to-generate alternatives (MGA). Note that if you do not have access to a commercial solver, it may be faster run cplex on the NEOS server. To do so, simply specify cplex as the solver and uncomment the '--neos' flag.
 
 
-**Option 2 (basic):**
-Uses Pyomo's own scripts and provides basic solver output:
 
-```$ pyomo solve --solver=<solver> temoa_model/temoa_model.py  path/to/dat/file```
-
-This option will only work with a text ('DAT') file as input.
-Results are placed in a yml file within the top-level 'temoa' directory.
-
-
-**Option 3 (basic +):**
-Copies the relevant Temoa model files into an executable archive
-(this only needs to be done once):
-
-```$ python create_archive.py```
-
-This makes the model more portable by placing all contents in a
-single zipped file. Now it is possible to execute the model with the
-following simply command:
-
-```$ python temoa.py  path/to/dat/file```
-
-For general help use --help:
-
-```$ python  temoa_model/  --help```
