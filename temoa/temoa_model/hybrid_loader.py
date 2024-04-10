@@ -537,28 +537,28 @@ class HybridLoader:
         # time_exist
         if mi:
             raw = cur.execute(
-                'SELECT period FROM main.TimePeriod WHERE period < ?', (mi.base_year,)
+                'SELECT period FROM main.TimePeriod  WHERE period < ? ORDER BY sequence', (mi.base_year,)
             ).fetchall()
         else:
-            raw = cur.execute("SELECT period FROM main.TimePeriod WHERE flag = 'e'").fetchall()
+            raw = cur.execute("SELECT period FROM main.TimePeriod WHERE flag = 'e' ORDER BY sequence").fetchall()
         load_element(M.time_exist, raw)
 
         # time_future
         if mi:
             raw = cur.execute(
-                'SELECT period FROM main.TimePeriod WHERE ' 'period >= ? AND period <= ?',
+                'SELECT period FROM main.TimePeriod WHERE ' 'period >= ? AND period <= ? ORDER BY sequence',
                 (mi.base_year, mi.last_year),
             ).fetchall()
         else:
-            raw = cur.execute("SELECT period FROM main.TimePeriod WHERE flag = 'f'").fetchall()
+            raw = cur.execute("SELECT period FROM main.TimePeriod WHERE flag = 'f' ORDER BY sequence").fetchall()
         load_element(M.time_future, raw)
 
         # time_of_day
-        raw = cur.execute('SELECT tod FROM main.TimeOfDay').fetchall()
+        raw = cur.execute('SELECT tod FROM main.TimeOfDay ORDER BY sequence').fetchall()
         load_element(M.time_of_day, raw)
 
         # time_season
-        raw = cur.execute('SELECT season FROM main.TimeSeason').fetchall()
+        raw = cur.execute('SELECT season FROM main.TimeSeason ORDER BY sequence').fetchall()
         load_element(M.time_season, raw)
 
         # myopic_base_year
