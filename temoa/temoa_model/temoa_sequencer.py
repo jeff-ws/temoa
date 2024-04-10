@@ -34,18 +34,18 @@ from logging import getLogger
 from pathlib import Path
 
 import pyomo.opt
-
-from temoa.temoa_model import source_check
 from temoa.temoa_model.myopic.hybrid_loader import HybridLoader
 from temoa.temoa_model.myopic.myopic_sequencer import MyopicSequencer
-from temoa.temoa_model.pricing_check import price_checker
+
+from temoa.temoa_model.model_checking import source_check
+from temoa.temoa_model.model_checking.pricing_check import price_checker
+from temoa.temoa_model.model_checking.source_check import source_trace
 from temoa.temoa_model.run_actions import (
     build_instance,
     solve_instance,
     handle_results,
     check_solve_status,
 )
-from temoa.temoa_model.source_check import source_trace
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_mode import TemoaMode

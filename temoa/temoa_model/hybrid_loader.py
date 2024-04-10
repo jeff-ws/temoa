@@ -11,8 +11,8 @@ from typing import Sequence
 import deprecated
 from pyomo.core import Param, Set
 from pyomo.dataportal import DataPortal
-
 from temoa.temoa_model.myopic.myopic_index import MyopicIndex
+
 from temoa.temoa_model.temoa_model import TemoaModel
 
 """
@@ -214,7 +214,8 @@ class HybridLoader:
 
     def _build_eff_table(self):
         """
-        Build the Efficiency Table data without regard for filtering that is done with the myopic build
+        Build the Efficiency Table data without regard for filtering that is done with the myopic build.  This is
+        intended for use in Perfect Foresight and other modes.
         :return:
         """
         cur = self.con.cursor()

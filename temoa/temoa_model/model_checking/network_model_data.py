@@ -28,7 +28,6 @@ Created on:  3/10/24
 import logging
 import sqlite3
 from collections import namedtuple, defaultdict
-from itertools import chain
 
 from pyomo.core import ConcreteModel
 
@@ -56,7 +55,7 @@ class NetworkModelData:
         return (
             f'all commodities: {len(self.all_commodities)}, demand commodities: {len(self.demand_commodities)}, '
             f'source commodities: {len(self.source_commodities)},'
-            f'available techs: {len(tuple(chain(*self.available_techs.values())))}, '
+            f'available techs: {len(self.available_techs)}, '
             f'linked techs: {len(self.available_linked_techs)}'
         )
 
@@ -115,10 +114,7 @@ def _build_from_db(con: sqlite3.Connection) -> NetworkModelData:
     res.source_commodities = {t[0] for t in raw}
     # use Demand to get the region, period specific demand comms
     raw = cur.execute('SELECT regions, periods, demand_comm FROM main.Demand').fetchall()
-    demand_dict = defaultdict(set)
-    for r, p, d in raw:
-        demand_dict[r, p].add(d)
-    res.demand_commodities = demand_dict
+    res.demand_commodities = {(r, p): d for r, p, d in raw}
     # need lifetime to screen techs... :/
     default_lifetime = TemoaModel.default_lifetime_tech
     query = (
@@ -138,23 +134,11 @@ def _build_from_db(con: sqlite3.Connection) -> NetworkModelData:
     raw = cur.execute(query).fetchall()
     periods = cur.execute('SELECT t_periods FROM time_periods').fetchall()
     periods = {t[0] for t in periods}
-    techs = defaultdict(set)
-    for element in raw:
-        for p in periods:
-            (r, ic, tech, v, oc, lifetime) = element
-            if v <= p < v + lifetime:
-                techs[r, p].add(Tech(r, p, ic, tech, v, oc))
-    res.available_techs = techs
-
-    # pick up the linked techs...
-    raw = cur.execute(
-        'SELECT primary_region, primary_tech, emis_comm, linked_tech from main.LinkedTechs'
-    ).fetchall()
-    res.available_linked_techs = {
-        Linked_Tech(region=r, driver=driver, emission=emiss, driven=driven)
-        for (r, driver, emiss, driven) in raw
+    res.techs = {
+        (r, p): Tech(r, p, ic, tech, v, oc)
+        for r, ic, tech, v, oc, lifetime in raw
+        for p in periods
+        if v <= p < v + lifetime
     }
-
-    res.available_linked_techs = []
     logger.debug('built network data: %s', res.__str__())
     return res
