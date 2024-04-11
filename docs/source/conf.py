@@ -8,8 +8,6 @@ import time
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute
 
-# TODO:  There's gotta be a better way to do this.  Seems quite fragile.
-
 # this first import is to provide path the temoa package, which is referenced throughout
 # and must be included separately from path the source files so that it is properly recognized
 sys.path.insert(0, os.path.abspath('../../'))

@@ -441,7 +441,7 @@ class TableWriter:
         # conveniences...
         GDR = value(M.GlobalDiscountRate)
         MPL = M.ModelProcessLife
-        LLN = M.LifetimeLoanProcess
+        LLN = M.LoanLifetimeProcess
 
         exchange_costs = ExchangeTechCostLedger(M)
         entries = defaultdict(dict)

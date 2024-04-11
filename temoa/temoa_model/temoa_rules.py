@@ -48,6 +48,7 @@ def AdjustedCapacity_Constraint(M: 'TemoaModel', r, p, t, v):
     For a given :code:`(r,p,t,v)` index, this constraint sets the capacity equal to
     the amount installed in period :code:`v` and subtracts from it any and all retirements
     that occurred up until the period in question, :code:`p`."""
+    # TODO:  This could use a math expression, probably just for the "else" for dox
     if t not in M.tech_retirement:
         if v in M.time_exist:
             return M.V_Capacity[r, p, t, v] == M.ExistingCapacity[r, t, v]
@@ -276,99 +277,99 @@ previous period's total installed capacity (CAPAVL)
 def TotalCost_rule(M):
     r"""
 
-Using the :code:`FlowOut` and :code:`Capacity` variables, the Temoa objective
-function calculates the cost of energy supply, under the assumption that capital
-costs are paid through loans. This implementation sums up all the costs incurred,
-and is defined as :math:`C_{tot} = C_{loans} + C_{fixed} + C_{variable}`. Each
-term on the right-hand side represents the cost incurred over the model
-time horizon and discounted to the initial year in the horizon (:math:`{P}_0`).
-The calculation of each term is given below.
+    Using the :code:`FlowOut` and :code:`Capacity` variables, the Temoa objective
+    function calculates the cost of energy supply, under the assumption that capital
+    costs are paid through loans. This implementation sums up all the costs incurred,
+    and is defined as :math:`C_{tot} = C_{loans} + C_{fixed} + C_{variable}`. Each
+    term on the right-hand side represents the cost incurred over the model
+    time horizon and discounted to the initial year in the horizon (:math:`{P}_0`).
+    The calculation of each term is given below.
 
-.. math::
-   :label: obj_loan
+    .. math::
+       :label: obj_loan
 
-   C_{loans} = \sum_{r, t, v \in \Theta_{IC}} \left (
-     \left [
-             CI_{r, t, v} \cdot LA_{r, t, v}
-             \cdot \frac{(1 + GDR)^{P_0 - v +1} \cdot (1 - (1 + GDR)^{-LLP_{r, t, v}})}{GDR} \right. \right.
-             \\ \left. \left. \cdot \frac{ 1-(1+GDR)^{-LPA_{r,t,v}} }{ 1-(1+GDR)^{-LTP_{r,t,v}} }
-     \right ]
-     \cdot \textbf{CAP}_{r, t, v}
-     \right )
+       C_{loans} = \sum_{r, t, v \in \Theta_{IC}} \left (
+         \left [
+                 CI_{r, t, v} \cdot LA_{r, t, v}
+                 \cdot \frac{(1 + GDR)^{P_0 - v +1} \cdot (1 - (1 + GDR)^{-LLP_{r, t, v}})}{GDR} \right. \right.
+                 \\ \left. \left. \cdot \frac{ 1-(1+GDR)^{-LPA_{r,t,v}} }{ 1-(1+GDR)^{-LTP_{r,t,v}} }
+         \right ]
+         \cdot \textbf{CAP}_{r, t, v}
+         \right )
 
-Note that capital costs (:math:`{IC}_{r,t,v}`) are handled in several steps. First, each capital cost
-is amortized using the loan rate (i.e., technology-specific discount rate) and loan
-period. Second, the annual stream of payments is converted into a lump sum using
-the global discount rate and loan period. Third, the new lump sum is amortized
-at the global discount rate and technology lifetime. Fourth, loan payments beyond
-the model time horizon are removed and the lump sum recalculated. The terms used
-in Steps 3-4 are :math:`\frac{ GDR }{ 1-(1+GDR)^{-LTP_{r,t,v} } }\cdot
-\frac{ 1-(1+GDR)^{-LPA_{t,v}} }{ GDR }`. The product simplifies to
-:math:`\frac{ 1-(1+GDR)^{-LPA_{r,t,v}} }{ 1-(1+GDR)^{-LTP_{r,t,v}} }`, where
-:math:`LPA_{r,t,v}` represents the active lifetime of process t in region r :math:`(r,t,v)`
-before the end of the model horizon, and :math:`LTP_{r,t,v}` represents the full
-lifetime of a regional process :math:`(r,t,v)`. Fifth, the lump sum is discounted back to the
-beginning of the horizon (:math:`P_0`) using the global discount rate. While an
-explicit salvage term is not included, this approach properly captures the capital
-costs incurred within the model time horizon, accounting for technology-specific
-loan rates and periods.
+    Note that capital costs (:math:`{IC}_{r,t,v}`) are handled in several steps. First, each capital cost
+    is amortized using the loan rate (i.e., technology-specific discount rate) and loan
+    period. Second, the annual stream of payments is converted into a lump sum using
+    the global discount rate and loan period. Third, the new lump sum is amortized
+    at the global discount rate and technology lifetime. Fourth, loan payments beyond
+    the model time horizon are removed and the lump sum recalculated. The terms used
+    in Steps 3-4 are :math:`\frac{ GDR }{ 1-(1+GDR)^{-LTP_{r,t,v} } }\cdot
+    \frac{ 1-(1+GDR)^{-LPA_{t,v}} }{ GDR }`. The product simplifies to
+    :math:`\frac{ 1-(1+GDR)^{-LPA_{r,t,v}} }{ 1-(1+GDR)^{-LTP_{r,t,v}} }`, where
+    :math:`LPA_{r,t,v}` represents the active lifetime of process t in region r :math:`(r,t,v)`
+    before the end of the model horizon, and :math:`LTP_{r,t,v}` represents the full
+    lifetime of a regional process :math:`(r,t,v)`. Fifth, the lump sum is discounted back to the
+    beginning of the horizon (:math:`P_0`) using the global discount rate. While an
+    explicit salvage term is not included, this approach properly captures the capital
+    costs incurred within the model time horizon, accounting for technology-specific
+    loan rates and periods.
 
-.. math::
-   :label: obj_fixed
+    .. math::
+       :label: obj_fixed
 
-   C_{fixed} = \sum_{r, p, t, v \in \Theta_{CF}} \left (
-     \left [
-             CF_{r, p, t, v}
-       \cdot \frac{(1 + GDR)^{P_0 - p +1} \cdot (1 - (1 + GDR)^{-{MPL}_{r, t, v}})}{GDR}
-     \right ]
-     \cdot \textbf{CAP}_{r, t, v}
-     \right )
+       C_{fixed} = \sum_{r, p, t, v \in \Theta_{CF}} \left (
+         \left [
+                 CF_{r, p, t, v}
+           \cdot \frac{(1 + GDR)^{P_0 - p +1} \cdot (1 - (1 + GDR)^{-{MPL}_{r, t, v}})}{GDR}
+         \right ]
+         \cdot \textbf{CAP}_{r, t, v}
+         \right )
 
-.. math::
-   :label: obj_variable
+    .. math::
+       :label: obj_variable
 
-    &C_{variable} = \\ &\quad \sum_{r, p, t, v \in \Theta_{CV}} \left (
-           CV_{r, p, t, v}
-     \cdot
-     \frac{
-       (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
-     }{
-       GDR
-     }\cdot \sum_{S,D,I, O} \textbf{FO}_{r, p, s, d,i, t, v, o}
-     \right ) \\ &\quad + \sum_{r, p, t \not \in T^{a}, v \in \Theta_{VC}} \left (
-           CV_{r, p, t, v}
-     \cdot
-     \frac{
-       (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
-     }{
-       GDR
-     }
-     \cdot \sum_{I, O} \textbf{FOA}_{r, p,i, t \in T^{a}, v, o}
-     \right )
+        &C_{variable} = \\ &\quad \sum_{r, p, t, v \in \Theta_{CV}} \left (
+               CV_{r, p, t, v}
+         \cdot
+         \frac{
+           (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
+         }{
+           GDR
+         }\cdot \sum_{S,D,I, O} \textbf{FO}_{r, p, s, d,i, t, v, o}
+         \right ) \\ &\quad + \sum_{r, p, t \not \in T^{a}, v \in \Theta_{VC}} \left (
+               CV_{r, p, t, v}
+         \cdot
+         \frac{
+           (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
+         }{
+           GDR
+         }
+         \cdot \sum_{I, O} \textbf{FOA}_{r, p,i, t \in T^{a}, v, o}
+         \right )
 
-.. math::
-    :label: obj_emissions
+    .. math::
+        :label: obj_emissions
 
-    &C_{emissions} = \\ &\quad \sum_{r, p, t, v \in \Theta_{CV}} \left (
-           CE_{r, p, c} \cdot EAC_{r,e,i,t,v,o}
-     \cdot
-     \frac{
-       (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
-     }{
-       GDR
-     }\cdot \sum_{S,D,I, O} \textbf{FO}_{r, p, s, d,i, t, v, o}
-     \right ) \\ &\quad + \sum_{r, p, t \not \in T^{a}, v \in \Theta_{CE}} \left (
-           CE_{r, p, c} \cdot EAC_{r,e,i,t,v,o}
-     \cdot
-     \frac{
-       (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
-     }{
-       GDR
-     }
-     \cdot \sum_{I, O} \textbf{FOA}_{r, p,i, t \in T^{a}, v, o}
-     \right )
+        &C_{emissions} = \\ &\quad \sum_{r, p, t, v \in \Theta_{CV}} \left (
+               CE_{r, p, c} \cdot EAC_{r,e,i,t,v,o}
+         \cdot
+         \frac{
+           (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
+         }{
+           GDR
+         }\cdot \sum_{S,D,I, O} \textbf{FO}_{r, p, s, d,i, t, v, o}
+         \right ) \\ &\quad + \sum_{r, p, t \not \in T^{a}, v \in \Theta_{CE}} \left (
+               CE_{r, p, c} \cdot EAC_{r,e,i,t,v,o}
+         \cdot
+         \frac{
+           (1 + GDR)^{P_0 - p + 1} \cdot (1 - (1 + GDR)^{-{MPL}_{r,p,t,v}})
+         }{
+           GDR
+         }
+         \cdot \sum_{I, O} \textbf{FOA}_{r, p,i, t \in T^{a}, v, o}
+         \right )
 
-"""
+    """
 
     return sum(PeriodCost_rule(M, p) for p in M.time_optimize)
 
@@ -465,7 +466,7 @@ def PeriodCost_rule(M: 'TemoaModel', p):
             M.V_NewCapacity[r, S_t, S_v],
             M.CostInvest[r, S_t, S_v],
             M.LoanAnnualize[r, S_t, S_v],
-            value(M.LifetimeLoanProcess[r, S_t, S_v]),
+            value(M.LoanLifetimeProcess[r, S_t, S_v]),
             P_0,
             P_e,
             GDR,
@@ -1765,7 +1766,7 @@ a database we may not know the peak demand before running the model, therefore,
 we write this equation for all the time-slices defined in the database in each region.
 
 .. math::
-   :label: reserve_margin
+    :label: reserve_margin
 
        \sum_{t \in T^{res} \setminus T^{e}} {
        CC_{t,r} \cdot
@@ -1774,25 +1775,23 @@ we write this equation for all the time-slices defined in the database in each r
        \sum_{t \in T^{res} \cap T^{e}} {
        CC_{t,r_i-r} \cdot
        \textbf{CAPAVL}_{p,t} \cdot
-       SEG_{s^*,d^*} \cdot C2A_{r_i-r,t} } -
+       SEG_{s^*,d^*} \cdot C2A_{r_i-r,t} }\\ -
        \sum_{t \in T^{res} \cap T^{e}} {
        CC_{t,r-r_i} \cdot
        \textbf{CAPAVL}_{p,t} \cdot
        SEG_{s^*,d^*} \cdot C2A_{r_i-r,t} }
        \geq
-       {
+       \begin{multline}\left [ {
        \sum_{ t \in T^{res} \setminus T^{e},V,I,O }
-           \textbf{FO}_{r, p, s, d, i, t, v, o}  +
+           \textbf{FO}_{r, p, s, d, i, t, v, o} } \\ {+
        \sum_{ t \in T^{res} \cap T^{e},V,I,O }
            \textbf{FO}_{r_i-r, p, s, d, i, t, v, o}  -
         \sum_{ t \in T^{res} \cap T^{e},V,I,O }
             \textbf{FI}_{r-r_i, p, s, d, i, t, v, o} -
         \sum_{ t \in T^{res} \cap T^{s},V,I,O }
             \textbf{FI}_{r, p, s, d, i, t, v, o}
-        }
+        } \right ] \end{multline}
            \cdot (1 + PRM_r)
-       }
-
        \\
        \forall \{r, p, s, d\} \in \Theta_{\text{ReserveMargin}}
        \text{and} \forall r_i \in R
@@ -3074,7 +3073,7 @@ def loan_annualization_rate(loan_rate: float | None, loan_life: int | float) -> 
 
 def ParamLoanAnnualize_rule(M: 'TemoaModel', r, t, v):
     dr = value(M.LoanRate[r, t, v])
-    lln = value(M.LifetimeLoanProcess[r, t, v])
+    lln = value(M.LoanLifetimeProcess[r, t, v])
     annualized_rate = loan_annualization_rate(dr, lln)
     return annualized_rate
 

@@ -638,7 +638,7 @@ def CreateSparseDicts(M: 'TemoaModel'):
             pindex = (r, p, t, v)
 
             if v in M.time_optimize:
-                l_loan_life = value(M.LifetimeLoanProcess[l_process])
+                l_loan_life = value(M.LoanLifetimeProcess[l_process])
                 if v + l_loan_life >= p:
                     M.processLoans[pindex] = True
 

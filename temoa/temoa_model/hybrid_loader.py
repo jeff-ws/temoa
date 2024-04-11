@@ -537,20 +537,26 @@ class HybridLoader:
         # time_exist
         if mi:
             raw = cur.execute(
-                'SELECT period FROM main.TimePeriod  WHERE period < ? ORDER BY sequence', (mi.base_year,)
+                'SELECT period FROM main.TimePeriod  WHERE period < ? ORDER BY sequence',
+                (mi.base_year,),
             ).fetchall()
         else:
-            raw = cur.execute("SELECT period FROM main.TimePeriod WHERE flag = 'e' ORDER BY sequence").fetchall()
+            raw = cur.execute(
+                "SELECT period FROM main.TimePeriod WHERE flag = 'e' ORDER BY sequence"
+            ).fetchall()
         load_element(M.time_exist, raw)
 
         # time_future
         if mi:
             raw = cur.execute(
-                'SELECT period FROM main.TimePeriod WHERE ' 'period >= ? AND period <= ? ORDER BY sequence',
+                'SELECT period FROM main.TimePeriod WHERE '
+                'period >= ? AND period <= ? ORDER BY sequence',
                 (mi.base_year, mi.last_year),
             ).fetchall()
         else:
-            raw = cur.execute("SELECT period FROM main.TimePeriod WHERE flag = 'f' ORDER BY sequence").fetchall()
+            raw = cur.execute(
+                "SELECT period FROM main.TimePeriod WHERE flag = 'f' ORDER BY sequence"
+            ).fetchall()
         load_element(M.time_future, raw)
 
         # time_of_day
@@ -794,9 +800,9 @@ class HybridLoader:
         ).fetchall()
         load_element(M.LifetimeProcess, raw, self.viable_rtv, val_loc=(0, 1, 2))
 
-        # LifetimeLoanTech
+        # LoanLifetimeTech
         raw = cur.execute('SELECT region, tech, lifetime FROM main.LoanLifetimeTech').fetchall()
-        load_element(M.LifetimeLoanTech, raw, self.viable_rt, (0, 1))
+        load_element(M.LoanLifetimeTech, raw, self.viable_rt, (0, 1))
 
         # TechInputSplit
         if mi:

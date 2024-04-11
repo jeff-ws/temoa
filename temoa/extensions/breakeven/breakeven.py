@@ -8,7 +8,6 @@ import cplex
 import pandas as pd
 from matplotlib import pyplot as plt
 from openpyxl import Workbook
-from pyomo.core.base import Var, Constraint, Objective, maximize, minimize
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
 from pyomo.repn import generate_canonical_repn
@@ -82,7 +81,7 @@ def coef_IC(instance, target_tech, target_year):
     P_e = instance.time_future.last()
     GDR = value(instance.GlobalDiscountRate)
     MPL = instance.ModelProcessLife
-    LLN = instance.LifetimeLoanProcess
+    LLN = instance.LoanLifetimeProcess
     x = 1 + GDR  # convenience variable, nothing more.
     period_available = set()
     for p in instance.time_future:
@@ -107,7 +106,7 @@ def coef_FC(instance, target_tech, target_year):
     P_e = instance.time_future.last()
     GDR = value(instance.GlobalDiscountRate)
     MPL = instance.ModelProcessLife
-    LLN = instance.LifetimeLoanProcess
+    LLN = instance.LoanLifetimeProcess
     x = 1 + GDR  # convenience variable, nothing more.
     period_available = set()
     for p in instance.time_future:
@@ -174,7 +173,7 @@ def sensitivity(dat, techs):
         P_0 = min(instance.time_optimize)
         GDR = value(instance.GlobalDiscountRate)
         MPL = instance.ModelProcessLife
-        LLN = instance.LifetimeLoanProcess
+        LLN = instance.LoanLifetimeProcess
         x = 1 + GDR  # convenience variable, nothing more.
 
         bic_s[t] = list()
