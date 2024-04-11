@@ -117,11 +117,12 @@ class TemoaConfig:
         self.stream_output = stream_output
         self.price_check = price_check
         self.source_trace = source_trace
-        self.plot_commodity_network = plot_commodity_network & self.source_trace
-        logger.warning(
-            'Commodity Network plotting was selected, but Source Check was not selected.  '
-            'Both are required to produce plots.'
-        )
+        if plot_commodity_network and not self.source_trace:
+            logger.warning(
+                'Commodity Network plotting was selected, but Source Trace was not selected.  '
+                'Both are required to produce plots.'
+            )
+        self.plot_commodity_network = plot_commodity_network and self.source_trace
 
         # warn if output db != input db
         if self.input_database.suffix == self.output_database.suffix:  # they are both .db/.sqlite

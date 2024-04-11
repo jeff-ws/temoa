@@ -258,6 +258,7 @@ class TableWriter:
             FlowType.OUT: 'OutputFlowOut',
             FlowType.IN: 'OutputFlowIn',
             FlowType.CURTAIL: 'OutputCurtailment',
+            FlowType.FLEX: 'OutputCurtailment',
         }
 
         for flow_type, table_name in table_associations.items():
@@ -275,12 +276,22 @@ class TableWriter:
             if fi.t in M.tech_storage:
                 continue
 
+            # some conveniences for the players...
             fin = flows[fi][FlowType.IN]
             fout = flows[fi][FlowType.OUT]
-            # TODO:  Follow up WRT curtailment flows.  Currently, they are not related to input
-            # fcurt = flows[fi][FlowType.CURTAIL]
+            fcurt = flows[fi][FlowType.CURTAIL]
+            fflex = flows[fi][FlowType.FLEX]
             flost = flows[fi][FlowType.LOST]
-            deltas[fi] = fin - fout - flost  # - fcurt
+            # some identifiers
+            tech = fi.t
+            var_tech = fi.t in M.tech_variable
+            flex_tech = fi.t in M.tech_flex
+            annual_tech = fi.t in M.tech_annual
+
+            #  ----- flow balance equation -----
+            deltas[fi] = fin - fout - flost - fflex
+            # dev note:  in constraint, flex is taken out of flow_out, but in output processing,
+            #            we are treating flow out as "net of flex" so this is not double-counting
 
             if (
                 flows[fi][FlowType.IN] != 0 and abs(deltas[fi] / flows[fi][FlowType.IN]) > 0.02
@@ -288,6 +299,21 @@ class TableWriter:
                 all_good = False
                 logger.warning(
                     'Flow balance check failed for index: %s, delta: %0.2f', fi, deltas[fi]
+                )
+                logger.info(
+                    'Tech: %s, Var: %s, Flex: %s, Annual: %s',
+                    tech,
+                    var_tech,
+                    flex_tech,
+                    annual_tech,
+                )
+                logger.info(
+                    'IN: %0.6f, OUT: %0.6f, LOST: %0.6f, CURT: %0.6f, FLEX: %0.6f',
+                    fin,
+                    fout,
+                    flost,
+                    fcurt,
+                    fflex,
                 )
             elif flows[fi][FlowType.IN] == 0 and abs(deltas[fi]) > 0.02:
                 all_good = False
@@ -334,19 +360,14 @@ class TableWriter:
             if abs(val) < self.epsilon:
                 continue
             res[fi][FlowType.CURTAIL] = val
-            # calculate input required to support this curtailment flow
 
-            # TODO:  Follow up WRT curtailment flows.  Currently, they are not related to input
-            # res[fi][FlowType.IN] = (res[fi][FlowType.OUT] + val) / value(M.Efficiency[ritvo(fi)])
-            res[fi][FlowType.LOST] = (1 - value(M.Efficiency[ritvo(fi)])) * res[fi][FlowType.IN]
-
-        # flex techs.  This will subtract the flex from their output flow
+        # flex techs.  This will subtract the flex from their output flow IOT make OUT the "net"
         for key in M.V_Flex:
             fi = FI(*key)
             flow = value(M.V_Flex[fi])
             if abs(flow) < self.epsilon:
                 continue
-            res[fi][FlowType.CURTAIL] = flow
+            res[fi][FlowType.FLEX] = flow
             res[fi][FlowType.OUT] -= flow
 
         # ---- annual ----
@@ -361,7 +382,9 @@ class TableWriter:
                         continue
                     res[fi][FlowType.OUT] = flow
                     res[fi][FlowType.IN] = flow / value(M.Efficiency[ritvo(fi)])
-                    res[fi][FlowType.LOST] = (1 - value(M.Efficiency[ritvo(fi)])) * flow
+                    res[fi][FlowType.LOST] = (1 - value(M.Efficiency[ritvo(fi)])) * res[fi][
+                        FlowType.IN
+                    ]
 
         # flex annual
         for r, p, i, t, v, o in M.V_FlexAnnual:
@@ -371,7 +394,7 @@ class TableWriter:
                     flow = value(M.V_FlexAnnual[fi]) * value(M.SegFrac[s, d])
                     if abs(flow) < self.epsilon:
                         continue
-                    res[fi][FlowType.CURTAIL] = flow
+                    res[fi][FlowType.FLEX] = flow
                     res[fi][FlowType.OUT] -= flow
 
         return res

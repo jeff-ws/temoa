@@ -372,7 +372,10 @@ print(f'updating {len(data)} curtailable technologies')
 for row in data:
     tech = row[0]
     cur.execute('UPDATE Technology SET curtail = 1 WHERE tech = ?', (tech,))
-data = con_old.execute('SELECT tech from tech_retirement').fetchall()
+try:
+    data = con_old.execute('SELECT tech from tech_retirement').fetchall()
+except sqlite3.OperationalError:
+    data = []
 print(f'updating {len(data)} retirement technologies')
 for row in data:
     tech = row[0]
