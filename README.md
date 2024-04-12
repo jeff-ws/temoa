@@ -34,7 +34,7 @@ retained to guide future development
 1. Obtain a current copy of Python from the python.org website.  The model has been tested with 3.11 and 3.12.  It will
 fail (raise error) on earlier versions.
 2. A `requirements.txt` file has been included to allow for use of `pip` to populate a virtual environment.  In order to use that the steps are:
-- Ensure you have a copy of python 3.11/3.12 installed on your machine ([python.org]())
+- Ensure you have a copy of python 3.11/3.12 installed on your machine ([python.org](https://www.python.org))
 - Make and activate a virtual environment using the `venv` package:
 
 ```
@@ -148,6 +148,8 @@ Several of the packages used may currently generate warnings during this testing
 with the exception of skipped tests.
 
 ## Documentation and Additional Information
+
+The full Temoa documentation can be built by following the build README file in the Documentation folder.
 
 
 
