@@ -29,20 +29,19 @@ The purpose of this module is to perform top-level control over an MGA model run
 import logging
 import queue
 import sqlite3
-import time
 from collections.abc import Sequence
 from datetime import datetime
 from logging import getLogger
 from multiprocessing import Queue
 from queue import Empty
 
-# import pyomo.contrib.appsi as pyomo_appsi
+import pyomo.contrib.appsi as pyomo_appsi
 import pyomo.environ as pyo
-import toml
-# from pyomo.contrib.appsi.base import Results
+from pyomo.contrib.appsi.base import Results
 from pyomo.core import Expression
 from pyomo.dataportal import DataPortal
 
+# from temoa.extensions.modeling_to_generate_alternatives.worker import Worker
 from temoa.extensions.modeling_to_generate_alternatives.manager_factory import get_manager
 from temoa.extensions.modeling_to_generate_alternatives.mga_constants import MgaAxis, MgaWeighting
 from temoa.extensions.modeling_to_generate_alternatives.vector_manager import VectorManager
@@ -64,6 +63,7 @@ class MgaSequencer:
         if not config.input_database == config.output_database:
             raise NotImplementedError('MGA assumes input and output databases are same')
         self.con = sqlite3.connect(config.input_database)
+
         if not config.source_trace:
             logger.warning(
                 'Performing MGA runs without source trace.  '
@@ -80,20 +80,11 @@ class MgaSequencer:
             config.save_excel = False
         self.config = config
 
-        # read in the options
-        try:
-            with open('solver_options.toml', 'r') as f:
-                all_options = toml.load(f.read())
-            s_options = all_options.get(self.config.solver_name, {})
-            logger.info('Using solver options: %s', s_options)
-
-        except FileNotFoundError:
-            logger.warning('Unable to find solver options toml file.  Using default options.')
-            s_options = {}
-
         # get handle on solver instance
+        # TODO:  Check that solver is a persistent solver
         if self.config.solver_name == 'appsi_highs':
-            self.opt = pyo.SolverFactory('appsi_highs')
+            self.opt = pyomo_appsi.solvers.highs.Highs()
+            self.std_opt = pyo.SolverFactory('appsi_highs')
         elif self.config.solver_name == 'gurobi':
             # self.opt = pyomo_appsi.solvers.Gurobi()
             self.opt = pyo.SolverFactory('gurobi')
@@ -105,17 +96,17 @@ class MgaSequencer:
             #     # 'Crossover': 0,  # disabled
             #     # 'Method': 2,  # Barrier ONLY
             # }
-            self.solver_options = {
+            self.options = {
                 'Method': 2,  # Barrier ONLY
-                'Threads': 20,
-                'FeasibilityTol': 1e-2,  # pretty 'loose'
+                'Threads': 30,
+                'FeasibilityTol': 1e-3,  # pretty 'loose'
                 'Crossover': 0,  # Disabled
-                'TimeLimit': 3600 * 5,  # 5 hrs
+                'TimeLimit': 3600 * 3,  # 3 hrs
             }
-            self.opt.gurobi_options = s_options
-        else:
-            self.opt = pyo.SolverFactory(self.config.solver_name)
-            self.solver_options = {}
+            self.opt.gurobi_options = self.options
+        elif self.config.solver_name == 'cbc':
+            self.opt = pyo.SolverFactory('cbc')
+            self.options = {}
 
         # some defaults, etc.
         self.internal_stop = False
@@ -128,7 +119,7 @@ class MgaSequencer:
         if not self.mga_weighting:
             logger.warning('No MGA Weighting specified.  Using default: Hull Expansion')
             self.mga_weighting = MgaWeighting.HULL_EXPANSION
-        self.iteration_limit = config.mga_inputs.get('iteration_limit', 30)
+        self.iteration_limit = config.mga_inputs.get('iteration_limit', 20)
         self.time_limit_hrs = config.mga_inputs.get('time_limit_hrs', 12)
         self.cost_epsilon = config.mga_inputs.get('cost_epsilon', 0.05)
 
@@ -220,8 +211,8 @@ class MgaSequencer:
         # listener.start()
         # make workers
         workers = []
-        kwargs = {'solver_name': self.config.solver_name, 'solver_options': self.solver_options}
-        num_workers = 6
+        kwargs = {'solver_name': self.config.solver_name, 'solver_options': self.options}
+        num_workers = 4
         for i in range(num_workers):
             w = Worker(
                 model_queue=work_queue,
@@ -240,80 +231,67 @@ class MgaSequencer:
         instance_generator = vector_manager.instance_generator(self.config)
         instance = next(instance_generator)
         while not vector_manager.stop_resolving() and not self.internal_stop:
+            # print(
+            #     f'iter {self.solve_count}:',
+            #     f'vecs_avail: {vector_manager.input_vectors_available()}',
+            # )
+
             try:
-                # print('trying to load work queue')
-                work_queue.put(instance, block=False)  # put a log on the fire, if room
-                logger.info('Putting an instance in the work queue')
-                instance = next(instance_generator)
+                if instance != 'waiting':  # sentinel for waiting for more solves to be done
+                    # print('trying to load work queue')
+                    work_queue.put(instance, block=False)  # put a log on the fire, if room
+                    instance = next(instance_generator)
+                    logger.info('Putting an instance in the work queue')
             except queue.Full:
                 # print('work queue is full')
                 pass
             try:
-                next_result = result_queue.get_nowait()
+                next_result = result_queue.get(timeout=10)
             except Empty:
                 next_result = None
-                # print('no result')
             if next_result is not None:
                 vector_manager.process_results(M=next_result)
                 self.process_solve_results(next_result)
-                logger.info('Solve count: %d', self.solve_count)
+
                 self.solve_count += 1
-                print(f'Solve count: {self.solve_count}')
+                print(self.solve_count)
+                logger.info('Completed solve # %d', self.solve_count)
                 if self.solve_count >= self.iteration_limit:
                     self.internal_stop = True
-
-            while True:
-                try:
-                    record = log_queue.get_nowait()
-                    process_logger = getLogger(record.name)
-                    process_logger.handle(record)
-                    # logger.handle(record)
-                except Empty:
-                    break
-            time.sleep(1)  # prevent hyperactivity...
 
         # 7. Shut down the workers and then the logging queue
         print('shutting it down')
         for w in workers:
-            work_queue.put('ZEBRA')
+            work_queue.put(None)
+        # print(f'work queue: {work_queue.qsize()}')
+        # print(f'result queue size: {result_queue.qsize()}')
+        # try flushing queues
+        # try:
+        #     while True:
+        #         work_queue.get_nowait()
+        #         print('popped work queue')
+        # except queue.Empty:
+        #     pass
+        # try:
+        #     while True:
+        #         result_queue.get_nowait()
+        #         print('popped result queue')
+        # except queue.Empty:
+        #     pass
+        # try:
+        #     while True:
+        #         log_queue.get_nowait()
+        # except queue.Empty:
+        #     log_queue.close()
 
-        # 7b.  Keep pulling results from the queue to empty it out
-        empty = 0
-        while True:
-            try:
-                next_result = result_queue.get_nowait()
-                if next_result == 'COYOTE':
-                    empty += 1
-            except Empty:
-                next_result = None
-                # print('no result')
-            if next_result is not None and next_result != 'COYOTE':
-                logger.debug('bagged a result post-shutdown')
-                vector_manager.process_results(M=next_result)
-                self.process_solve_results(next_result)
-                logger.info('Solve count: %d', self.solve_count)
-                self.solve_count += 1
-                print(self.solve_count)
-                if self.solve_count >= self.iteration_limit:
-                    self.internal_stop = True
-            while True:
-                try:
-                    record = log_queue.get_nowait()
-                    process_logger = getLogger(record.name)
-                    process_logger.handle(record)
-                except Empty:
-                    break
-            if empty == num_workers:
-                break
-
-        # for w in workers:
-        #     print(w.worker_number, w.is_alive())
+        for w in workers:
+            print(w.worker_number, w.is_alive())
         for w in workers:
             w.join()
-            logger.info('worker wrapped up...')
-        # for w in workers:
-        #     print(w.worker_number, w.is_alive())
-        log_queue.put_nowait(None)  # sentinel to shut down the log listener
+            print('worker wrapped up...')
+        for w in workers:
+            print(w.worker_number, w.is_alive())
+        # log_queue.put_nowait(None)  # sentinel to shut down the log listener
         log_queue.close()
         # log_queue.join_thread()
         print('log queue closed')
@@ -388,13 +366,8 @@ class MgaSequencer:
 # This is the listener process top-level loop: wait for logging events
 # (LogRecords)on the queue and handle them, quit when you get a None for a
 # LogRecord.
-
-registered_loggers = {}
-
-
 def listener_process(queue):
     # configurer()
-    # logger = getLogger(__name__)
     while True:
         try:
             record = queue.get(timeout=5)
