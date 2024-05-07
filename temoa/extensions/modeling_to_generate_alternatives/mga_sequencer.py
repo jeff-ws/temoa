@@ -235,7 +235,7 @@ class MgaSequencer:
             #     f'iter {self.solve_count}:',
             #     f'vecs_avail: {vector_manager.input_vectors_available()}',
             # )
-
+            logger.info('Putting an instance in the work queue')
             try:
                 if instance != 'waiting':  # sentinel for waiting for more solves to be done
                     # print('trying to load work queue')
