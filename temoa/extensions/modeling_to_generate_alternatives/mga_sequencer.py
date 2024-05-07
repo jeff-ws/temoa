@@ -203,8 +203,8 @@ class MgaSequencer:
 
         # 5.  Set up the Workers
 
-        work_queue = Queue(5)  # restrict the queue to hold just 2 models in it max
-        result_queue = Queue(5)
+        work_queue = Queue(1)  # restrict the queue to hold just 2 models in it max
+        result_queue = Queue(2)
         log_queue = Queue(50)
         # start the logging listener
         # listener = Process(target=listener_process, args=(log_queue,))
@@ -212,7 +212,7 @@ class MgaSequencer:
         # make workers
         workers = []
         kwargs = {'solver_name': self.config.solver_name, 'solver_options': self.options}
-        num_workers = 6
+        num_workers = 3
         for i in range(num_workers):
             w = Worker(
                 model_queue=work_queue,
@@ -242,7 +242,7 @@ class MgaSequencer:
                     work_queue.put(instance, block=False)  # put a log on the fire, if room
                     instance = next(instance_generator)
             except queue.Full:
-                print('work queue is full')
+                # print('work queue is full')
                 pass
             try:
                 next_result = result_queue.get()
