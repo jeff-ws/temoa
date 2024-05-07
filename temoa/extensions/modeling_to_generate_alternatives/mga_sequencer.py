@@ -203,8 +203,8 @@ class MgaSequencer:
 
         # 5.  Set up the Workers
 
-        work_queue = Queue(5)  # restrict the queue
-        result_queue = Queue(5)
+        work_queue = Queue(1)  # restrict the queue to hold just 2 models in it max
+        result_queue = Queue(2)
         log_queue = Queue(50)
         # start the logging listener
         # listener = Process(target=listener_process, args=(log_queue,))
@@ -212,7 +212,7 @@ class MgaSequencer:
         # make workers
         workers = []
         kwargs = {'solver_name': self.config.solver_name, 'solver_options': self.options}
-        num_workers = 6
+        num_workers = 4
         for i in range(num_workers):
             w = Worker(
                 model_queue=work_queue,
@@ -235,17 +235,18 @@ class MgaSequencer:
             #     f'iter {self.solve_count}:',
             #     f'vecs_avail: {vector_manager.input_vectors_available()}',
             # )
-            logger.info('Putting an instance in the work queue')
+
             try:
                 if instance != 'waiting':  # sentinel for waiting for more solves to be done
                     # print('trying to load work queue')
                     work_queue.put(instance, block=False)  # put a log on the fire, if room
                     instance = next(instance_generator)
+                    logger.info('Putting an instance in the work queue')
             except queue.Full:
-                print('work queue is full')
+                # print('work queue is full')
                 pass
             try:
-                next_result = result_queue.get()
+                next_result = result_queue.get(timeout=10)
             except Empty:
                 next_result = None
             if next_result is not None:
@@ -254,6 +255,7 @@ class MgaSequencer:
 
                 self.solve_count += 1
                 print(self.solve_count)
+                logger.info('Completed solve # %d', self.solve_count)
                 if self.solve_count >= self.iteration_limit:
                     self.internal_stop = True
 
