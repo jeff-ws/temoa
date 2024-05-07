@@ -237,8 +237,7 @@ class TechActivityVectors(VectorManager):
 
         # verify a unit vector
         err = abs(abs(sum(coeffs)) - 1)
-
-        assert err < 1e-6, 'some problem with unit vector'
+        assert err < 1e-6, 'unit vector size error'
         expr = sum(c * v for v, c in zip(vars, coeffs) if c != 0)
         return expr
 
