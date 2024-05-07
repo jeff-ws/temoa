@@ -97,11 +97,11 @@ class MgaSequencer:
             #     # 'Method': 2,  # Barrier ONLY
             # }
             self.options = {
-                'Method': 2,  # Barrier ONLY
-                'Threads': 30,
-                'FeasibilityTol': 1e-3,  # pretty 'loose'
-                'Crossover': 0,  # Disabled
-                'TimeLimit': 3600 * 3,  # 3 hrs
+                # 'Method': 2,  # Barrier ONLY
+                'Threads': 4,
+                # 'FeasibilityTol': 1e-3,  # pretty 'loose'
+                # 'Crossover': 0,  # Disabled
+                'TimeLimit': 3600 * 2,  # 2 hrs
             }
             self.opt.gurobi_options = self.options
         elif self.config.solver_name == 'cbc':
@@ -212,7 +212,7 @@ class MgaSequencer:
         # make workers
         workers = []
         kwargs = {'solver_name': self.config.solver_name, 'solver_options': self.options}
-        num_workers = 4
+        num_workers = 3
         for i in range(num_workers):
             w = Worker(
                 model_queue=work_queue,
@@ -235,18 +235,17 @@ class MgaSequencer:
             #     f'iter {self.solve_count}:',
             #     f'vecs_avail: {vector_manager.input_vectors_available()}',
             # )
-
+            logger.info('Putting an instance in the work queue')
             try:
                 if instance != 'waiting':  # sentinel for waiting for more solves to be done
                     # print('trying to load work queue')
                     work_queue.put(instance, block=False)  # put a log on the fire, if room
                     instance = next(instance_generator)
-                    logger.info('Putting an instance in the work queue')
             except queue.Full:
                 # print('work queue is full')
                 pass
             try:
-                next_result = result_queue.get(timeout=10)
+                next_result = result_queue.get()
             except Empty:
                 next_result = None
             if next_result is not None:
@@ -255,7 +254,6 @@ class MgaSequencer:
 
                 self.solve_count += 1
                 print(self.solve_count)
-                logger.info('Completed solve # %d', self.solve_count)
                 if self.solve_count >= self.iteration_limit:
                     self.internal_stop = True
 
