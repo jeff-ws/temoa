@@ -203,7 +203,7 @@ class MgaSequencer:
 
         # 5.  Set up the Workers
 
-        work_queue = Queue(5)  # restrict the queue
+        work_queue = Queue(5)  # restrict the queue to hold just 2 models in it max
         result_queue = Queue(5)
         log_queue = Queue(50)
         # start the logging listener
