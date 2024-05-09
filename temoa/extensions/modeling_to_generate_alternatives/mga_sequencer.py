@@ -246,7 +246,7 @@ class MgaSequencer:
                 print('work queue is full')
                 pass
             try:
-                next_result = result_queue.get()
+                next_result = result_queue.get(block=False)
             except Empty:
                 next_result = None
             if next_result is not None:
@@ -265,7 +265,7 @@ class MgaSequencer:
                     process_logger.handle(record)
                 except Empty:
                     break
-            time.sleep(0.10)  # prevent hyperactivity...
+            time.sleep(10)  # prevent hyperactivity...
 
         # 7. Shut down the workers and then the logging queue
         print('shutting it down')
