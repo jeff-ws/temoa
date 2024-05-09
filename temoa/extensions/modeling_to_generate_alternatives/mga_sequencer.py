@@ -205,7 +205,7 @@ class MgaSequencer:
         # 5.  Set up the Workers
 
         work_queue = Queue(1)  # restrict the queue to hold just 2 models in it max
-        result_queue = Queue(1)
+        result_queue = Queue(2)
         log_queue = Queue(50)
         # start the logging listener
         # listener = Process(target=listener_process, args=(log_queue,))
@@ -232,29 +232,25 @@ class MgaSequencer:
         instance_generator = vector_manager.instance_generator(self.config)
         instance = next(instance_generator)
         while not vector_manager.stop_resolving() and not self.internal_stop:
-            # print(
-            #     f'iter {self.solve_count}:',
-            #     f'vecs_avail: {vector_manager.input_vectors_available()}',
-            # )
-            logger.info('Putting an instance in the work queue')
             try:
-                if instance != 'waiting':  # sentinel for waiting for more solves to be done
-                    # print('trying to load work queue')
-                    work_queue.put(instance, block=False)  # put a log on the fire, if room
-                    instance = next(instance_generator)
+                # print('trying to load work queue')
+                work_queue.put(instance, block=False)  # put a log on the fire, if room
+                logger.info('Putting an instance in the work queue')
+                instance = next(instance_generator)
             except queue.Full:
-                print('work queue is full')
+                # print('work queue is full')
                 pass
             try:
-                next_result = result_queue.get(block=False)
+                next_result = result_queue.get_nowait()
             except Empty:
                 next_result = None
+                # print('no result')
             if next_result is not None:
                 vector_manager.process_results(M=next_result)
                 self.process_solve_results(next_result)
                 logger.info('Solve count: %d', self.solve_count)
                 self.solve_count += 1
-                print(self.solve_count)
+                print(f'Solve count: {self.solve_count}')
                 if self.solve_count >= self.iteration_limit:
                     self.internal_stop = True
 
@@ -265,40 +261,49 @@ class MgaSequencer:
                     process_logger.handle(record)
                 except Empty:
                     break
-            time.sleep(10)  # prevent hyperactivity...
+            time.sleep(1)  # prevent hyperactivity...
 
         # 7. Shut down the workers and then the logging queue
         print('shutting it down')
         for w in workers:
-            work_queue.put(None)
-        # print(f'work queue: {work_queue.qsize()}')
-        # print(f'result queue size: {result_queue.qsize()}')
-        # try flushing queues
-        # try:
-        #     while True:
-        #         work_queue.get_nowait()
-        #         print('popped work queue')
-        # except queue.Empty:
-        #     pass
-        # try:
-        #     while True:
-        #         result_queue.get_nowait()
-        #         print('popped result queue')
-        # except queue.Empty:
-        #     pass
-        # try:
-        #     while True:
-        #         log_queue.get_nowait()
-        # except queue.Empty:
-        #     log_queue.close()
+            work_queue.put('ZEBRA')
 
-        for w in workers:
-            print(w.worker_number, w.is_alive())
+        # 7b.  Keep pulling results from the queue to empty it out
+        empty = 0
+        while True:
+            try:
+                next_result = result_queue.get_nowait()
+                if next_result == 'COYOTE':
+                    empty += 1
+            except Empty:
+                next_result = None
+                # print('no result')
+            if next_result is not None and next_result != 'COYOTE':
+                logger.debug('bagged a result post-shutdown')
+                vector_manager.process_results(M=next_result)
+                self.process_solve_results(next_result)
+                logger.info('Solve count: %d', self.solve_count)
+                self.solve_count += 1
+                print(self.solve_count)
+                if self.solve_count >= self.iteration_limit:
+                    self.internal_stop = True
+            while True:
+                try:
+                    record = log_queue.get_nowait()
+                    process_logger = getLogger(record.name)
+                    process_logger.handle(record)
+                except Empty:
+                    break
+            if empty == num_workers:
+                break
+
+        # for w in workers:
+        #     print(w.worker_number, w.is_alive())
         for w in workers:
             w.join()
-            print('worker wrapped up...')
-        for w in workers:
-            print(w.worker_number, w.is_alive())
+            logger.info('worker wrapped up...')
+        # for w in workers:
+        #     print(w.worker_number, w.is_alive())
         log_queue.put_nowait(None)  # sentinel to shut down the log listener
         log_queue.close()
         # log_queue.join_thread()
