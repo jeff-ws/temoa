@@ -156,8 +156,10 @@ class TechActivityVectors(VectorManager):
             obj_vector = self._make_basis_objective_vector(new_model)
         # if asking for more, we *should* have enough data to create a good hull now...
 
-        while self.comleted_solves <= 2 * len(self.category_mapping) * 0.9:
-            yield 'waiting'  # sentinel that there are no currently available instances
+        while self.comleted_solves <= 2 * len(self.category_mapping):
+            # some of the basis vectors must have "crashed" or timed out...
+            # supply random vectors until good
+            yield self.random_model()
 
         if len(self.hull_points) < 1.5 * len(self.category_mapping):
             # we are at risk of not having enough solves to make a hull.  We should have 2x category_mapping
