@@ -70,15 +70,21 @@ class Worker(Process):
         logger.info('Worker %d spun up', self.worker_number)
         while True:
             model: TemoaModel = self.model_queue.get()
-            if model is None:
+            if model == 'ZEBRA':
+                print(f'worker {self.worker_number} got ZEBRA')
                 logger.info('Worker %d received shutdown signal', self.worker_number)
+                self.results_queue.put('COYOTE')
                 break
             tic = datetime.now()
             try:
                 # sleep(model)
                 res: SolverResults = self.opt.solve(model)
+                # if random() < 0.1:
+                #     res = 'some bad data'
+                #     raise RuntimeError('fake bad solve')
             except Exception as e:
-                self.logger.warning(
+                print('bad solve')
+                logger.warning(
                     'Worker %d failed to solve model: %s... skipping.  Exception: %s',
                     self.worker_number,
                     model.name,
@@ -87,17 +93,21 @@ class Worker(Process):
 
             toc = datetime.now()
 
-            good_solve = check_optimal_termination(res)
-            if good_solve:
-                self.results_queue.put(model)
-                logger.info(
-                    'Worker %d solved a model in %0.2f minutes',
-                    self.worker_number,
-                    (toc - tic).total_seconds() / 60,
-                )
-                print(f'victory for worker {self.worker_number}')
-            else:
-                status = res['Solver'].termination_condition
-                logger.info(
-                    'Worker %d did not solve.  Results status: %s', self.worker_number, status
-                )
+            # guard against a bad "res" object...
+            try:
+                good_solve = check_optimal_termination(res)
+                if good_solve:
+                    self.results_queue.put(model)
+                    logger.info(
+                        'Worker %d solved a model in %0.2f minutes',
+                        self.worker_number,
+                        (toc - tic).total_seconds() / 60,
+                    )
+                    print(f'victory for worker {self.worker_number}')
+                else:
+                    status = res['Solver'].termination_condition
+                    logger.info(
+                        'Worker %d did not solve.  Results status: %s', self.worker_number, status
+                    )
+            except Exception as e:
+                pass
