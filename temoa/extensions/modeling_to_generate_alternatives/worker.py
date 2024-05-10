@@ -31,9 +31,11 @@ import logging.handlers
 from datetime import datetime
 from logging import getLogger
 from multiprocessing import Process, Queue
+from pathlib import Path
 
 from pyomo.opt import SolverFactory, SolverResults, check_optimal_termination
 
+from definitions import PROJECT_ROOT
 from temoa.temoa_model.temoa_model import TemoaModel
 
 
@@ -61,6 +63,7 @@ class Worker(Process):
         self.opt = SolverFactory(self.solver_name, options=self.solver_options)
         self.log_queue = log_queue
         self.root_logger_name = log_root_name
+        self.solve_count = 0
 
     def run(self):
         logger = getLogger('.'.join((self.root_logger_name, 'worker', str(self.worker_number))))
@@ -68,7 +71,18 @@ class Worker(Process):
         handler = logging.handlers.QueueHandler(self.log_queue)
         logger.addHandler(handler)
         logger.info('Worker %d spun up', self.worker_number)
+
+        # update the solver options to pass in a log location
         while True:
+            log_location = Path(
+                PROJECT_ROOT,
+                'output_files',
+                'solve_logs',
+                f'gurobi_{str(self.worker_number)}_{self.solve_count}.log',
+            )
+            log_location = str(log_location)
+            self.solver_options.update({'LogFile': log_location})
+            self.opt.options = self.solver_options
             model: TemoaModel = self.model_queue.get()
             if model == 'ZEBRA':
                 print(f'worker {self.worker_number} got ZEBRA')
@@ -78,6 +92,7 @@ class Worker(Process):
             tic = datetime.now()
             try:
                 # sleep(model)
+                self.solve_count += 1
                 res: SolverResults = self.opt.solve(model)
                 # if random() < 0.1:
                 #     res = 'some bad data'
