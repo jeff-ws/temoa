@@ -99,10 +99,10 @@ class MgaSequencer:
             # }
             self.options = {
                 'Method': 2,  # Barrier ONLY
-                'Threads': 60,
-                'FeasibilityTol': 1e-3,  # pretty 'loose'
+                'Threads': 20,
+                'FeasibilityTol': 1e-2,  # pretty 'loose'
                 'Crossover': 0,  # Disabled
-                'TimeLimit': 3600 * 3,  # 3 hrs
+                'TimeLimit': 3600 * 5,  # 5 hrs
             }
             self.opt.gurobi_options = self.options
         elif self.config.solver_name == 'cbc':
@@ -120,7 +120,7 @@ class MgaSequencer:
         if not self.mga_weighting:
             logger.warning('No MGA Weighting specified.  Using default: Hull Expansion')
             self.mga_weighting = MgaWeighting.HULL_EXPANSION
-        self.iteration_limit = config.mga_inputs.get('iteration_limit', 20)
+        self.iteration_limit = config.mga_inputs.get('iteration_limit', 30)
         self.time_limit_hrs = config.mga_inputs.get('time_limit_hrs', 12)
         self.cost_epsilon = config.mga_inputs.get('cost_epsilon', 0.05)
 
@@ -213,7 +213,7 @@ class MgaSequencer:
         # make workers
         workers = []
         kwargs = {'solver_name': self.config.solver_name, 'solver_options': self.options}
-        num_workers = 2
+        num_workers = 6
         for i in range(num_workers):
             w = Worker(
                 model_queue=work_queue,
@@ -259,6 +259,7 @@ class MgaSequencer:
                     record = log_queue.get_nowait()
                     process_logger = getLogger(record.name)
                     process_logger.handle(record)
+                    # logger.handle(record)
                 except Empty:
                     break
             time.sleep(1)  # prevent hyperactivity...
