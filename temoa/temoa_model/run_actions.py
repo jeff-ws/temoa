@@ -47,6 +47,7 @@ from pyomo.environ import (
 )
 from pyomo.opt import SolverResults
 
+from temoa.data_processing.DB_to_Excel import make_excel
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
@@ -327,33 +328,35 @@ def check_solve_status(result: SolverResults) -> tuple[bool, str]:
         return False, f'{soln.Status} was returned from solve'
 
 
-def handle_results(instance: TemoaModel, results, options: TemoaConfig):
+def handle_results(instance: TemoaModel, results, config: TemoaConfig):
     hack = time()
-    if not options.silent:
+    if not config.silent:
         msg = '[        ] Calculating reporting variables and formatting results.'
         # yield 'Calculating reporting variables and formatting results.'
         SE.write(msg)
         SE.flush()
 
-    # output_stream = pformat_results(instance, results, options)
-    table_writer = TableWriter(config=options)
-    if options.save_duals:
+    # output_stream = pformat_results(instance, results, config)
+    table_writer = TableWriter(config=config)
+    if config.save_duals:
         table_writer.write_results(M=instance, results=results)
     else:
         table_writer.write_results(M=instance)
 
-    if not options.silent:
+    if not config.silent:
         SE.write('\r[%8.2f] Results processed.\n' % (time() - hack))
         SE.flush()
 
-    # if options.stream_output:
+    if config.save_excel:
+        temp_scenario = set()
+        temp_scenario.add(config.scenario)
+        # make_excel function imported near the top
+        excel_filename = config.output_path / config.scenario
+        make_excel(str(config.output_database), excel_filename, temp_scenario)
+
+    # if config.stream_output:
     #     print(output_stream.getvalue())
     # normal (non-MGA) run will have a TotalCost as the OBJ:
     if hasattr(instance, 'TotalCost'):
         logger.info('TotalCost value: %0.2f', value(instance.TotalCost))
-    # MGA runs should have either a FirstObj or SecondObj
-    if hasattr(instance, 'FirstObj'):
-        logger.info('MGA First Obj value: %0.2f', value(instance.FirstObj))
-    elif hasattr(instance, 'SecondObj'):
-        logger.info('MGA Second Obj value: %0.2f', value(instance.SecondObj))
     return
