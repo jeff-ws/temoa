@@ -1,0 +1,18 @@
+# A container for solver options
+# the top level solver name in brackets should align with the solver name in the config.toml
+
+num_workers = 6
+
+[gurobi]
+
+Method= 2  # Barrier ONLY
+Threads= 20  # per solver instance
+FeasibilityTol= 1e-2  # pretty loose
+Crossover= 0  # Disabled
+TimeLimit= 18000  # 5 hrs
+
+[cbc]
+# tbd
+
+[appsi_highs]
+# tbd

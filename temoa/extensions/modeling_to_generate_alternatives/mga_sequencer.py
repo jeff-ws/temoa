@@ -36,13 +36,13 @@ from logging import getLogger
 from multiprocessing import Queue
 from queue import Empty
 
-import pyomo.contrib.appsi as pyomo_appsi
+# import pyomo.contrib.appsi as pyomo_appsi
 import pyomo.environ as pyo
-from pyomo.contrib.appsi.base import Results
+import toml
+# from pyomo.contrib.appsi.base import Results
 from pyomo.core import Expression
 from pyomo.dataportal import DataPortal
 
-# from temoa.extensions.modeling_to_generate_alternatives.worker import Worker
 from temoa.extensions.modeling_to_generate_alternatives.manager_factory import get_manager
 from temoa.extensions.modeling_to_generate_alternatives.mga_constants import MgaAxis, MgaWeighting
 from temoa.extensions.modeling_to_generate_alternatives.vector_manager import VectorManager
@@ -64,7 +64,6 @@ class MgaSequencer:
         if not config.input_database == config.output_database:
             raise NotImplementedError('MGA assumes input and output databases are same')
         self.con = sqlite3.connect(config.input_database)
-
         if not config.source_trace:
             logger.warning(
                 'Performing MGA runs without source trace.  '
@@ -81,11 +80,20 @@ class MgaSequencer:
             config.save_excel = False
         self.config = config
 
+        # read in the options
+        try:
+            with open('solver_options.toml', 'r') as f:
+                all_options = toml.load(f.read())
+            s_options = all_options.get(self.config.solver_name, {})
+            logger.info('Using solver options: %s', s_options)
+
+        except FileNotFoundError:
+            logger.warning('Unable to find solver options toml file.  Using default options.')
+            s_options = {}
+
         # get handle on solver instance
-        # TODO:  Check that solver is a persistent solver
         if self.config.solver_name == 'appsi_highs':
-            self.opt = pyomo_appsi.solvers.highs.Highs()
-            self.std_opt = pyo.SolverFactory('appsi_highs')
+            self.opt = pyo.SolverFactory('appsi_highs')
         elif self.config.solver_name == 'gurobi':
             # self.opt = pyomo_appsi.solvers.Gurobi()
             self.opt = pyo.SolverFactory('gurobi')
@@ -97,17 +105,17 @@ class MgaSequencer:
             #     # 'Crossover': 0,  # disabled
             #     # 'Method': 2,  # Barrier ONLY
             # }
-            self.options = {
+            self.solver_options = {
                 'Method': 2,  # Barrier ONLY
                 'Threads': 20,
                 'FeasibilityTol': 1e-2,  # pretty 'loose'
                 'Crossover': 0,  # Disabled
                 'TimeLimit': 3600 * 5,  # 5 hrs
             }
-            self.opt.gurobi_options = self.options
-        elif self.config.solver_name == 'cbc':
-            self.opt = pyo.SolverFactory('cbc')
-            self.options = {}
+            self.opt.gurobi_options = s_options
+        else:
+            self.opt = pyo.SolverFactory(self.config.solver_name)
+            self.solver_options = {}
 
         # some defaults, etc.
         self.internal_stop = False
@@ -212,7 +220,7 @@ class MgaSequencer:
         # listener.start()
         # make workers
         workers = []
-        kwargs = {'solver_name': self.config.solver_name, 'solver_options': self.options}
+        kwargs = {'solver_name': self.config.solver_name, 'solver_options': self.solver_options}
         num_workers = 6
         for i in range(num_workers):
             w = Worker(
