@@ -35,8 +35,9 @@ from pathlib import Path
 
 from pyomo.opt import SolverFactory, SolverResults, check_optimal_termination
 
-from definitions import PROJECT_ROOT
 from temoa.temoa_model.temoa_model import TemoaModel
+
+verbose = True  # for T/S or monitoring...
 
 
 class Worker(Process):
@@ -46,10 +47,10 @@ class Worker(Process):
         self,
         model_queue: Queue,
         results_queue: Queue,
-        configurer,
         log_root_name,
         log_queue,
         log_level,
+        solver_log_path: Path | None = None,
         **kwargs,
     ):
         super(Worker, self).__init__()
@@ -62,50 +63,51 @@ class Worker(Process):
         self.solver_options = kwargs['solver_options']
         self.opt = SolverFactory(self.solver_name, options=self.solver_options)
         self.log_queue = log_queue
+        self.log_level = log_level
         self.root_logger_name = log_root_name
+        self.solver_log_path = solver_log_path
         self.solve_count = 0
 
     def run(self):
         logger = getLogger('.'.join((self.root_logger_name, 'worker', str(self.worker_number))))
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(self.log_level)
         handler = logging.handlers.QueueHandler(self.log_queue)
         logger.addHandler(handler)
         logger.info('Worker %d spun up', self.worker_number)
 
         # update the solver options to pass in a log location
         while True:
-            log_location = Path(
-                PROJECT_ROOT,
-                'output_files',
-                'solve_logs',
-                f'gurobi_{str(self.worker_number)}_{self.solve_count}.log',
-            )
-            log_location = str(log_location)
-            self.solver_options.update({'LogFile': log_location})
-            self.opt.options = self.solver_options
+            if self.solver_log_path:
+                # add the solver log path to options, if one is provided
+                log_location = Path(
+                    self.solver_log_path,
+                    f'gurobi_{str(self.worker_number)}_{self.solve_count}.log',
+                )
+                log_location = str(log_location)
+                self.solver_options.update({'LogFile': log_location})
+            self.opt.solver_options = self.solver_options
             model: TemoaModel = self.model_queue.get()
-            if model == 'ZEBRA':
-                print(f'worker {self.worker_number} got ZEBRA')
+            if model == 'ZEBRA':  # shutdown signal
+                if verbose:
+                    print(f'worker {self.worker_number} got shutdown signal')
                 logger.info('Worker %d received shutdown signal', self.worker_number)
                 self.results_queue.put('COYOTE')
                 break
             tic = datetime.now()
             try:
-                # sleep(model)
                 self.solve_count += 1
-                res: SolverResults = self.opt.solve(model)
-                # if random() < 0.1:
-                #     res = 'some bad data'
-                #     raise RuntimeError('fake bad solve')
+                res: SolverResults | None = self.opt.solve(model)
+
             except Exception as e:
-                print('bad solve')
+                if verbose:
+                    print('bad solve')
                 logger.warning(
                     'Worker %d failed to solve model: %s... skipping.  Exception: %s',
                     self.worker_number,
                     model.name,
                     e,
                 )
-
+                res = None
             toc = datetime.now()
 
             # guard against a bad "res" object...
@@ -118,11 +120,12 @@ class Worker(Process):
                         self.worker_number,
                         (toc - tic).total_seconds() / 60,
                     )
-                    print(f'victory for worker {self.worker_number}')
+                    if verbose:
+                        print(f'victory for worker {self.worker_number}')
                 else:
                     status = res['Solver'].termination_condition
                     logger.info(
                         'Worker %d did not solve.  Results status: %s', self.worker_number, status
                     )
-            except Exception as e:
+            except AttributeError:
                 pass
