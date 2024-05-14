@@ -6,11 +6,13 @@ import sys
 from collections import defaultdict, namedtuple
 from enum import Enum, unique
 from logging import getLogger
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pyomo.core import value, Objective
 from pyomo.opt import SolverResults
 
+from definitions import PROJECT_ROOT
 from temoa.temoa_model import temoa_rules
 from temoa.temoa_model.exchange_tech_cost_ledger import CostType, ExchangeTechCostLedger
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -53,7 +55,7 @@ Note:  This file borrows heavily from the legacy pformat_results.py, and is some
 
 logger = getLogger(__name__)
 
-all_output_tables = [
+basic_output_tables = [
     'OutputBuiltCapacity',
     'OutputCost',
     'OutputCurtailment',
@@ -65,6 +67,13 @@ all_output_tables = [
     'OutputObjective',
     'OutputRetiredCapacity',
 ]
+optional_output_tables = [
+    'OutputFlowOutSummary',
+]
+
+flow_summary_file_loc = Path(
+    PROJECT_ROOT, 'temoa/extensions/modeling_to_generate_alternatives/make_flow_summary_table.sql'
+)
 
 
 def _marks(num: int) -> str:
@@ -118,11 +127,11 @@ class TableWriter:
             sys.exit(-1)
 
     def write_results(
-        self, M: TemoaModel, results: SolverResults | None = None, append=False
+        self, M: TemoaModel, results_with_duals: SolverResults | None = None, append=False
     ) -> None:
         """
         Write results to output database
-        :param results: if provided, this will trigger the writing of dual variables, pulled from the SolverResults
+        :param results_with_duals: if provided, this will trigger the writing of dual variables, pulled from the SolverResults
         :param M: the model
         :param append: append whatever is already in the tables.  If False (default), clear existing tables by scenario name
         :return:
@@ -141,8 +150,8 @@ class TableWriter:
         self.flow_register = self.calculate_flows(M)
         self.check_flow_balance(M)
         self.write_flow_tables()
-        if results:  # write the duals
-            self.write_dual_variables(results)
+        if results_with_duals:  # write the duals
+            self.write_dual_variables(results_with_duals)
         # catch-all
         self.con.commit()
         self.con.execute('VACUUM')
@@ -155,18 +164,12 @@ class TableWriter:
 
     def clear_scenario(self):
         cur = self.con.cursor()
-        for table in all_output_tables:
+        for table in basic_output_tables:
             cur.execute(f'DELETE FROM {table} WHERE scenario = ?', (self.config.scenario,))
+        for table in optional_output_tables:
+            cur.execute(f'DROP TABLE IF EXISTS {table}')
         self.con.commit()
         self.clear_iterative_runs()
-
-    def clear_indexed_scenarios(self):
-        cur = self.con.cursor()
-        for table in all_output_tables:
-            cur.execute(
-                f'DELETE FROM {table} WHERE 1',
-            )
-        self.con.commit()
 
     def clear_iterative_runs(self):
         """
@@ -176,7 +179,7 @@ class TableWriter:
         """
         target = self.config.scenario + '-%'  # the dash followed by wildcard for anything after
         cur = self.con.cursor()
-        for table in all_output_tables:
+        for table in basic_output_tables:
             cur.execute(f'DELETE FROM {table} WHERE scenario like ?', (target,))
         self.con.commit()
 
@@ -260,7 +263,7 @@ class TableWriter:
 
         self.con.commit()
 
-    def write_flow_tables(self, iteration: int | None = None) -> None:
+    def write_flow_tables(self) -> None:
         """Write the flow tables"""
         if not self.tech_sectors:
             raise RuntimeError('tech sectors not available... code error')
@@ -269,8 +272,6 @@ class TableWriter:
         # sort the flows
         flows_by_type: dict[FlowType, list[tuple]] = defaultdict(list)
         scenario = self.config.scenario
-        if iteration:
-            scenario = scenario + f'-{iteration}'
         for fi in self.flow_register:
             sector = self.tech_sectors.get(fi.t)
             for flow_type in self.flow_register[fi]:
@@ -290,6 +291,55 @@ class TableWriter:
         for flow_type, table_name in table_associations.items():
             qry = f'INSERT INTO {table_name} VALUES {_marks(11)}'
             self.con.executemany(qry, flows_by_type[flow_type])
+
+        self.con.commit()
+
+    def write_summary_flow(self, M: TemoaModel, iteration: int | None = None):
+        """
+        Create (if required) and write to the summary flow table.  This is normally called from MGA (other?)
+        iterative solves where capturing the annual summary of flow out is desired vs. flows by season, tod for
+        single instances
+        :param iteration: the number of the sequential iteration
+        :param M: The solved model
+        :return: None
+        """
+        if not self.tech_sectors:
+            raise RuntimeError('tech sectors not available... code error')
+
+        # make the additional output table, if needed...
+        self.execute_script(flow_summary_file_loc)
+        # must recalculate flows from the model
+        self.flow_register = self.calculate_flows(M)
+        if isinstance(iteration, int):
+            scenario = self.config.scenario + f'-{iteration}'
+        elif iteration is None:
+            scenario = self.config.scenario
+        else:
+            raise ValueError(f'Illegal (non integer) value received for iteration: {iteration}')
+
+        # iterate through all elements of the flow register, look for output flows only,
+        # and gather the total by index (region, period, input_comm, tech, vintage, output_comm)
+        output_flows = defaultdict(float)
+        for fi in self.flow_register:
+            sector = self.tech_sectors.get(fi.t)
+            # get the output flow for this index, if it exists...
+            flow_out_value = self.flow_register[fi].get(FlowType.OUT, None)
+            if flow_out_value:
+                idx = (fi.r, fi.p, fi.i, fi.t, fi.v, fi.o)
+                output_flows[idx] += flow_out_value
+
+        # convert to entries, if the sum is non-negligible
+        entries = []
+        for idx, flow in output_flows.items():
+            if abs(flow) < self.epsilon:
+                continue
+            # need to wedge in scenario and sector.... ugh.
+            full_idx = (scenario, idx[0], sector, *idx[1:])
+            entry = (*full_idx, flow)
+            entries.append(entry)
+
+        qry = f'INSERT INTO OutputFlowOutSummary VALUES {_marks(9)}'
+        self.con.executemany(qry, entries)
 
         self.con.commit()
 
@@ -751,3 +801,15 @@ class TableWriter:
     def __del__(self):
         if self.con:
             self.con.close()
+
+    def execute_script(self, script_file: str):
+        """
+        A utility to execute a sql script on the current db connection
+        :return:
+        """
+        with open(script_file, 'r') as table_script:
+            sql_commands = table_script.read()
+        logger.debug('Executing sql from file: %s ', script_file)
+
+        self.con.executescript(sql_commands)
+        self.con.commit()

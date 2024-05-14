@@ -125,7 +125,7 @@ class MgaSequencer:
 
         # output handling
         self.writer = TableWriter(self.config)
-        self.writer.clear_indexed_scenarios()
+        self.writer.clear_scenario()
         self.verbose = False  # for troubleshooting
 
         logger.info(
@@ -169,6 +169,7 @@ class MgaSequencer:
 
         # record the 0-solve in all tables
         self.writer.write_results(instance)
+        self.writer.write_summary_flow(instance, iteration=0)
 
         # 3a. Capture cost and make it a constraint
         tot_cost = pyo.value(instance.TotalCost)
@@ -339,8 +340,9 @@ class MgaSequencer:
         return status == pyo.TerminationCondition.optimal
 
     def process_solve_results(self, instance):
-        # cheap label...
+        """write the results as required"""
         self.writer.write_capacity_tables(M=instance, iteration=self.solve_count)
+        self.writer.write_summary_flow(instance, iteration=self.solve_count)
 
     def __del__(self):
         self.con.close()
