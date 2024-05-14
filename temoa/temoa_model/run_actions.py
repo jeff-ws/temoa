@@ -339,7 +339,7 @@ def handle_results(instance: TemoaModel, results, config: TemoaConfig):
     # output_stream = pformat_results(instance, results, config)
     table_writer = TableWriter(config=config)
     if config.save_duals:
-        table_writer.write_results(M=instance, results=results)
+        table_writer.write_results(M=instance, results_with_duals=results)
     else:
         table_writer.write_results(M=instance)
 
