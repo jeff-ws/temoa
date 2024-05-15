@@ -42,7 +42,7 @@ from pyomo.contrib.solver.results import Results
 from pyomo.dataportal import DataPortal
 from pyomo.opt import check_optimal_termination
 
-from definitions import get_OUTPUT_PATH
+from definitions import get_OUTPUT_PATH, PROJECT_ROOT
 from temoa.extensions.modeling_to_generate_alternatives.manager_factory import get_manager
 from temoa.extensions.modeling_to_generate_alternatives.mga_constants import MgaAxis, MgaWeighting
 from temoa.extensions.modeling_to_generate_alternatives.vector_manager import VectorManager
@@ -55,6 +55,10 @@ from temoa.temoa_model.temoa_model import TemoaModel
 from temoa.temoa_model.temoa_rules import TotalCost_rule
 
 logger = getLogger(__name__)
+
+path_to_options_file = Path(
+    PROJECT_ROOT, 'temoa/extensions/modeling_to_generate_alternatives/solver_options.toml'
+)
 
 
 class MgaSequencer:
@@ -82,8 +86,8 @@ class MgaSequencer:
 
         # read in the options
         try:
-            with open('solver_options.toml', 'r') as f:
-                all_options = toml.load(f.read())
+            with open(path_to_options_file, 'r') as f:
+                all_options = toml.load(f)
             s_options = all_options.get(self.config.solver_name, {})
             logger.info('Using solver options: %s', s_options)
 
@@ -112,7 +116,7 @@ class MgaSequencer:
             logger.warning('No/bad MGA Weighting specified.  Using default: Hull Expansion')
             self.mga_weighting = MgaWeighting.HULL_EXPANSION
 
-        self.iteration_limit = config.mga_inputs.get('iteration_limit', 30)
+        self.iteration_limit = config.mga_inputs.get('iteration_limit', 20)
         logger.info('Set MGA iteration limit to: %d', self.iteration_limit)
         self.time_limit_hrs = config.mga_inputs.get('time_limit_hrs', 12)
         logger.info('Set MGA time limit hours to: %f:0.1', self.time_limit_hrs)
