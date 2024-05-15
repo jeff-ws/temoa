@@ -339,8 +339,11 @@ class TechActivityVectorManager(VectorManager):
         return q
 
     def tracker(self):
-        """A little function to track the size of the hull, after it is built initially"""
-        if len(self.hull_points) > 10:
+        """
+        A little function to track the size of the hull, after it is built initially
+        Note:  This hull is a "throw away" and only used for volume calc, but it is pretty quick
+        """
+        if self.hull is not None:
             hull = Hull(self.hull_points)
             volume = hull.volume
             logger.info(f'Tracking hull at {volume}')

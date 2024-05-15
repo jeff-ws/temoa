@@ -81,20 +81,18 @@ class Worker(Process):
                 # add the solver log path to options, if one is provided
                 log_location = Path(
                     self.solver_log_path,
-                    f'gurobi_{str(self.worker_number)}_{self.solve_count}.log',
+                    f'solver_log_{str(self.worker_number)}_{self.solve_count}.log',
                 )
                 log_location = str(log_location)
-                self.solver_options.update({'LogFile': log_location})
+                match self.solver_name:
+                    case 'gurobi':
+                        self.solver_options.update({'LogFile': log_location})
+                    # case 'appsi_highs':
+                    #     self.solver_options.update({'log_file': log_location})
+                    case _:
+                        pass
+
             self.opt.options = self.solver_options
-            # log_location = Path(
-            #     PROJECT_ROOT,
-            #     'output_files',
-            #     'solve_logs',
-            #     f'gurobi_{str(self.worker_number)}_{self.solve_count}.log',
-            # )
-            # log_location = str(log_location)
-            # self.solver_options.update({'LogFile': log_location})
-            # self.opt.options = self.solver_options
 
             model: TemoaModel = self.model_queue.get()
             if model == 'ZEBRA':  # shutdown signal

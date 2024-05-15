@@ -33,6 +33,7 @@ from logging import getLogger
 
 import pyomo.contrib.appsi as pyomo_appsi
 import pyomo.environ as pyo
+from deprecated.classic import deprecated
 from pyomo.contrib.appsi.base import Results
 from pyomo.core import Expression
 from pyomo.dataportal import DataPortal
@@ -50,6 +51,7 @@ logger = getLogger(__name__)
 
 
 class WarmStarter:
+    @deprecated('Not currently supported.')
     def __init__(self, config: TemoaConfig):
         # PRELIMINARIES...
         # let's start with the assumption that input db = output db...  this may change?
