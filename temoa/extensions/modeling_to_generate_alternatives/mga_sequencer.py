@@ -30,6 +30,7 @@ import logging
 import queue
 import sqlite3
 import time
+import tomllib
 from datetime import datetime
 from logging import getLogger
 from multiprocessing import Queue
@@ -37,7 +38,6 @@ from pathlib import Path
 from queue import Empty
 
 import pyomo.environ as pyo
-import toml
 from pyomo.contrib.solver.results import Results
 from pyomo.dataportal import DataPortal
 from pyomo.opt import check_optimal_termination
@@ -86,14 +86,15 @@ class MgaSequencer:
 
         # read in the options
         try:
-            with open(path_to_options_file, 'r') as f:
-                all_options = toml.load(f)
+            with open(path_to_options_file, 'rb') as f:
+                all_options = tomllib.load(f)
             s_options = all_options.get(self.config.solver_name, {})
             logger.info('Using solver options: %s', s_options)
 
         except FileNotFoundError:
             logger.warning('Unable to find solver options toml file.  Using default options.')
             s_options = {}
+            all_options = {}
 
         # get handle on solver instance
         self.opt = pyo.SolverFactory(self.config.solver_name)
@@ -115,7 +116,8 @@ class MgaSequencer:
         except ValueError:
             logger.warning('No/bad MGA Weighting specified.  Using default: Hull Expansion')
             self.mga_weighting = MgaWeighting.HULL_EXPANSION
-
+        self.num_workers = all_options.get('num_workers', 1)
+        logger.info('MGA workers are set to %s', self.num_workers)
         self.iteration_limit = config.mga_inputs.get('iteration_limit', 20)
         logger.info('Set MGA iteration limit to: %d', self.iteration_limit)
         self.time_limit_hrs = config.mga_inputs.get('time_limit_hrs', 12)
@@ -208,7 +210,7 @@ class MgaSequencer:
             'solver_name': self.config.solver_name,
             'solver_options': self.worker_solver_options,
         }
-        num_workers = 6
+        num_workers = self.num_workers
         # construct path for the solver logs
         s_path = Path(get_OUTPUT_PATH(), 'solver_logs')
         if not s_path.exists():
@@ -249,8 +251,8 @@ class MgaSequencer:
                 self.process_solve_results(next_result)
                 logger.info('Solve count: %d', self.solve_count)
                 self.solve_count += 1
-                if self.verbose:
-                    print(f'Solve count: {self.solve_count}')
+                if self.verbose or not self.config.silent:
+                    print(f'MGA Solve count: {self.solve_count}')
                 if self.solve_count >= self.iteration_limit:
                     logger.info('Starting shutdown process based on MGA iteration limit')
                     self.internal_stop = True
@@ -292,8 +294,8 @@ class MgaSequencer:
                 self.process_solve_results(next_result)
                 logger.info('Solve count: %d', self.solve_count)
                 self.solve_count += 1
-                if self.verbose:
-                    print(f'Solve count: {self.solve_count}')
+                if self.verbose or not self.config.silent:
+                    print(f'MGA Solve count: {self.solve_count}')
             while True:
                 try:
                     record = log_queue.get_nowait()
