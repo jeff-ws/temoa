@@ -53,7 +53,7 @@ class Worker(Process):
         solver_log_path: Path | None = None,
         **kwargs,
     ):
-        super(Worker, self).__init__()
+        super(Worker, self).__init__(daemon=True)
         # self.logger = configurer(log_root_name, log_queue, log_level)
         self.worker_number = Worker.worker_idx
         Worker.worker_idx += 1
@@ -85,7 +85,17 @@ class Worker(Process):
                 )
                 log_location = str(log_location)
                 self.solver_options.update({'LogFile': log_location})
-            self.opt.solver_options = self.solver_options
+            self.opt.options = self.solver_options
+            # log_location = Path(
+            #     PROJECT_ROOT,
+            #     'output_files',
+            #     'solve_logs',
+            #     f'gurobi_{str(self.worker_number)}_{self.solve_count}.log',
+            # )
+            # log_location = str(log_location)
+            # self.solver_options.update({'LogFile': log_location})
+            # self.opt.options = self.solver_options
+
             model: TemoaModel = self.model_queue.get()
             if model == 'ZEBRA':  # shutdown signal
                 if verbose:
