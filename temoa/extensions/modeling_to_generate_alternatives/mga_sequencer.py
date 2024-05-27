@@ -123,7 +123,7 @@ class MgaSequencer:
         self.time_limit_hrs = config.mga_inputs.get('time_limit_hrs', 12)
         logger.info('Set MGA time limit hours to: %f:0.1', self.time_limit_hrs)
         self.cost_epsilon = config.mga_inputs.get('cost_epsilon', 0.05)
-        logger.info('Set MGA cost epsilon to: %f', self.cost_epsilon)
+        logger.info('Set MGA cost (relaxation) epsilon to: %f', self.cost_epsilon)
 
         # internal records
         self.solve_count = 0
@@ -175,6 +175,7 @@ class MgaSequencer:
 
         # record the 0-solve in all tables
         self.writer.write_results(instance)
+        self.writer.make_summary_flow_table()  # make the flow summary table, if it doesn't exist
         self.writer.write_summary_flow(instance, iteration=0)
 
         # 3a. Capture cost and make it a constraint
@@ -201,7 +202,7 @@ class MgaSequencer:
         )
 
         # 5.  Set up the Workers
-        work_queue = Queue(1)  # restrict the queue to hold just 2 models in it max
+        work_queue = Queue(1)  # restrict the queue to hold just 1 models in it max
         result_queue = Queue(2)
         log_queue = Queue(50)
         # make workers
@@ -260,9 +261,9 @@ class MgaSequencer:
             while True:
                 try:
                     record = log_queue.get_nowait()
-                    process_logger = getLogger(record.name)
-                    process_logger.handle(record)
-                    # logger.handle(record)
+                    # process_logger = getLogger(record.name)
+                    # process_logger.handle(record)
+                    logger.handle(record)
                 except Empty:
                     break
             time.sleep(0.1)  # prevent hyperactivity...
@@ -308,7 +309,7 @@ class MgaSequencer:
 
         for w in workers:
             w.join()
-            logger.info('worker wrapped up...')
+            logger.debug('worker wrapped up...')
 
         log_queue.close()
         log_queue.join_thread()

@@ -296,7 +296,7 @@ class TableWriter:
 
     def write_summary_flow(self, M: TemoaModel, iteration: int | None = None):
         """
-        Create (if required) and write to the summary flow table.  This is normally called from MGA (other?)
+        This is normally called from MGA (other?)
         iterative solves where capturing the annual summary of flow out is desired vs. flows by season, tod for
         single instances
         :param iteration: the number of the sequential iteration
@@ -306,8 +306,6 @@ class TableWriter:
         if not self.tech_sectors:
             raise RuntimeError('tech sectors not available... code error')
 
-        # make the additional output table, if needed...
-        self.execute_script(flow_summary_file_loc)
         # must recalculate flows from the model
         self.flow_register = self.calculate_flows(M)
         if isinstance(iteration, int):
@@ -802,7 +800,11 @@ class TableWriter:
         if self.con:
             self.con.close()
 
-    def execute_script(self, script_file: str):
+    def make_summary_flow_table(self):
+        # make the additional output table, if needed...
+        self.execute_script(flow_summary_file_loc)
+
+    def execute_script(self, script_file: str|Path):
         """
         A utility to execute a sql script on the current db connection
         :return:
