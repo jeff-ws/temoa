@@ -11,7 +11,7 @@ dependencies:
     # Requirements for core model functionality
     - python=3.12
     - pyomo=6.7
-    - pyomo.extras
+#    - pyomo.extras
     - xlwt
     - ipython
     - matplotlib
