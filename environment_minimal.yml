@@ -34,11 +34,12 @@ dependencies:
     - pyam
     # cbc solver below cannot be installed via Conda on Windows
 #    - coincbc
-#    - pytest
+    - pytest
     - deprecated
     - openpyxl
     - networkx
     - gravis
+    - gurobi
 
     # Below required to update documentation
 #    - sphinx

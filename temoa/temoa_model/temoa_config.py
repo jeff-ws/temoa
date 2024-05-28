@@ -55,6 +55,11 @@ class TemoaConfig:
         source_trace: bool = False,
         plot_commodity_network: bool = False,
     ):
+        if '-' in scenario:
+            raise ValueError(
+                'Scenario name must not contain "-".  Dashes are used internally to indicate iterative '
+                'runs.  Please rename scenario'
+            )
         self.scenario = scenario
         # capture the operating mode
         self.scenario_mode: TemoaMode
