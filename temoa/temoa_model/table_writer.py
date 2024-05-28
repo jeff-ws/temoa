@@ -676,7 +676,11 @@ class TableWriter:
         self._write_cost_rows(exchange_costs.get_entries())
 
     def _gather_emission_costs_and_flows(self, M: 'TemoaModel'):
-        """there are 5 'flavors' of emission costs.  So, we need to gather the base and then decide on each"""
+        """Gather all emission flows and price them"""
+
+        # UPDATE:  older versions brought forward had some accounting errors here for flex/curtailed emissions
+        #          see the note on emissions in the Cost function in temoa_rules
+
         GDR = value(M.GlobalDiscountRate)
         MPL = M.ModelProcessLife
         if self.config.scenario_mode == TemoaMode.MYOPIC:
@@ -704,30 +708,14 @@ class TableWriter:
         flows: dict[EI, float] = defaultdict(float)
         # iterate through the normal and annual and accumulate flow values
         for r, p, e, s, d, i, t, v, o in normal:
-            if t in M.tech_curtailment:
-                flows[EI(r, p, t, v, e)] += (
-                    value(M.V_Curtailment[r, p, s, d, i, t, v, o])
-                    * M.EmissionActivity[r, e, i, t, v, o]
-                )
-            elif t in M.tech_flex:
-                flows[EI(r, p, t, v, e)] += (
-                    value(M.V_Flex[r, p, s, d, i, t, v, o]) * M.EmissionActivity[r, e, i, t, v, o]
-                )
-            else:
-                flows[EI(r, p, t, v, e)] += (
-                    value(M.V_FlowOut[r, p, s, d, i, t, v, o])
-                    * M.EmissionActivity[r, e, i, t, v, o]
-                )
+            flows[EI(r, p, t, v, e)] += (
+                value(M.V_FlowOut[r, p, s, d, i, t, v, o]) * M.EmissionActivity[r, e, i, t, v, o]
+            )
+
         for r, p, e, i, t, v, o in annual:
-            if t in M.tech_flex and o in M.flex_commodities:
-                flows[EI(r, p, t, v, e)] += (
-                    value(M.V_FlexAnnual[r, p, i, t, v, o]) * M.EmissionActivity[r, e, i, t, v, o]
-                )
-            else:
-                flows[EI(r, p, t, v, e)] += (
-                    value(M.V_FlowOutAnnual[r, p, i, t, v, o])
-                    * M.EmissionActivity[r, e, i, t, v, o]
-                )
+            flows[EI(r, p, t, v, e)] += (
+                value(M.V_FlowOutAnnual[r, p, i, t, v, o]) * M.EmissionActivity[r, e, i, t, v, o]
+            )
 
         # gather costs
         ud_costs = defaultdict(float)
