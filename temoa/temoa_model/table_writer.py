@@ -469,7 +469,7 @@ class TableWriter:
             for s in M.time_season:
                 for d in M.time_of_day:
                     fi = FI(r, p, s, d, i, t, v, o)
-                    flow = value(M.V_FlexAnnual[fi]) * value(M.SegFrac[s, d])
+                    flow = value(M.V_FlexAnnual[r, p, i, t, v, o]) * value(M.SegFrac[s, d])
                     if abs(flow) < self.epsilon:
                         continue
                     res[fi][FlowType.FLEX] = flow
