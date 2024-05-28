@@ -104,16 +104,16 @@ class MgaSequencer:
         self.internal_stop = False
         axis_label = config.mga_inputs.get('axis', '').upper()
         try:
-            self.mga_axis = MgaAxis(axis_label)
-            logger.info('MGA axis is set to "%s".', self.mga_axis.name)
-        except ValueError:
-            logger.warning('No/bad MGA Axis specified.  Using default:  Activity by Tech Category')
+            self.mga_axis = MgaAxis[axis_label]
+            logger.info('MGA axis is set to %s.', self.mga_axis.name)
+        except KeyError:
+            logger.warning('No/bad MGA Axis specified.  Using default: Activity by Tech Category')
             self.mga_axis = MgaAxis.TECH_CATEGORY_ACTIVITY
         weighting_label = config.mga_inputs.get('weighting', '').upper()
         try:
-            self.mga_weighting = MgaWeighting(weighting_label)
+            self.mga_weighting = MgaWeighting[weighting_label]
             logger.info('MGA weighting set to %s', self.mga_weighting.name)
-        except ValueError:
+        except KeyError:
             logger.warning('No/bad MGA Weighting specified.  Using default: Hull Expansion')
             self.mga_weighting = MgaWeighting.HULL_EXPANSION
         self.num_workers = all_options.get('num_workers', 1)
@@ -121,12 +121,13 @@ class MgaSequencer:
         self.iteration_limit = config.mga_inputs.get('iteration_limit', 20)
         logger.info('Set MGA iteration limit to: %d', self.iteration_limit)
         self.time_limit_hrs = config.mga_inputs.get('time_limit_hrs', 12)
-        logger.info('Set MGA time limit hours to: %f:0.1', self.time_limit_hrs)
+        logger.info('Set MGA time limit hours to: %0.1f', self.time_limit_hrs)
         self.cost_epsilon = config.mga_inputs.get('cost_epsilon', 0.05)
-        logger.info('Set MGA cost (relaxation) epsilon to: %f', self.cost_epsilon)
+        logger.info('Set MGA cost (relaxation) epsilon to: %0.3f', self.cost_epsilon)
 
         # internal records
         self.solve_count = 0
+        self.seen_instance_indices = set()
         self.orig_label = self.config.scenario
 
         # output handling
@@ -157,6 +158,8 @@ class MgaSequencer:
         instance: TemoaModel = build_instance(
             loaded_portal=data_portal, model_name=self.config.scenario, silent=self.config.silent
         )
+        # tag the instance by name, so we can sort out the multiple results...
+        instance.name = '-'.join((self.config.scenario, '0'))
 
         # 2. Base solve
         tic = datetime.now()
@@ -174,7 +177,7 @@ class MgaSequencer:
             raise RuntimeError('Baseline MGA solve failed.  Terminating run.')
 
         # record the 0-solve in all tables
-        self.writer.write_results(instance)
+        self.writer.write_results(instance, iteration=0)
         self.writer.make_summary_flow_table()  # make the flow summary table, if it doesn't exist
         self.writer.write_summary_flow(instance, iteration=0)
 
@@ -261,9 +264,8 @@ class MgaSequencer:
             while True:
                 try:
                     record = log_queue.get_nowait()
-                    # process_logger = getLogger(record.name)
-                    # process_logger.handle(record)
-                    logger.handle(record)
+                    process_logger = getLogger(record.name)
+                    process_logger.handle(record)
                 except Empty:
                     break
             time.sleep(0.1)  # prevent hyperactivity...
@@ -277,7 +279,7 @@ class MgaSequencer:
         # 7. Shut down the workers and then the logging queue
         if self.verbose:
             print('shutting it down')
-        for w in workers:
+        for _ in workers:
             work_queue.put('ZEBRA')  # shutdown signal
 
         # 7b.  Keep pulling results from the queue to empty it out
@@ -328,14 +330,10 @@ class MgaSequencer:
         vector_manager.finalize_tracker()
 
     def solve_instance(self, instance: TemoaModel) -> bool:
-        # instance.obj = pyo.Objective(expr=vector)
-        # self.opt.set_objective(instance.obj)
-        # instance.obj.display()
         tic = datetime.now()
         res = self.opt.solve(instance)
         toc = datetime.now()
         elapsed = toc - tic
-        # status = res.termination_condition
         status = res['Solver'].termination_condition
         logger.info(
             'Solve #%d time: %0.4f.  Status: %s',
@@ -343,13 +341,21 @@ class MgaSequencer:
             elapsed.total_seconds(),
             status.name,
         )
-        # need to load vars here else we see repeated stale value of objective
         return status == pyo.TerminationCondition.optimal
 
-    def process_solve_results(self, instance):
+    def process_solve_results(self, instance: TemoaModel):
         """write the results as required"""
-        self.writer.write_capacity_tables(M=instance, iteration=self.solve_count)
-        self.writer.write_summary_flow(instance, iteration=self.solve_count)
+        # get the instance number from the model name, if provided
+        if '-' not in instance.name:
+            raise ValueError(
+                'Instance name does not appear to contain a -idx value.  The manager should be tagging/updating this'
+            )
+        idx = int(instance.name.split('-')[-1])
+        if idx in self.seen_instance_indices:
+            raise ValueError('Instance index already seen.  Likely coding error')
+        self.seen_instance_indices.add(idx)
+        self.writer.write_capacity_tables(M=instance, iteration=idx)
+        self.writer.write_summary_flow(instance, iteration=idx)
 
     def __del__(self):
         self.con.close()

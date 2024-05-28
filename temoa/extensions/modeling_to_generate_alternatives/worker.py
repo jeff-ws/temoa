@@ -37,7 +37,7 @@ from pyomo.opt import SolverFactory, SolverResults, check_optimal_termination
 
 from temoa.temoa_model.temoa_model import TemoaModel
 
-verbose = True  # for T/S or monitoring...
+verbose = False  # for T/S or monitoring...
 
 
 class Worker(Process):
@@ -54,7 +54,6 @@ class Worker(Process):
         **kwargs,
     ):
         super(Worker, self).__init__(daemon=True)
-        # self.logger = configurer(log_root_name, log_queue, log_level)
         self.worker_number = Worker.worker_idx
         Worker.worker_idx += 1
         self.model_queue: Queue = model_queue
@@ -71,6 +70,9 @@ class Worker(Process):
     def run(self):
         logger = getLogger('.'.join((self.root_logger_name, 'worker', str(self.worker_number))))
         logger.setLevel(self.log_level)
+        logger.propagate = (
+            False  # not propagating up the chain fixes issue on TRACE where we were getting dupes.
+        )
         handler = logging.handlers.QueueHandler(self.log_queue)
         logger.addHandler(handler)
         logger.info('Worker %d spun up', self.worker_number)
@@ -129,7 +131,7 @@ class Worker(Process):
                         (toc - tic).total_seconds() / 60,
                     )
                     if verbose:
-                        print(f'victory for worker {self.worker_number}')
+                        print(f'Worker {self.worker_number} completed a successful solve')
                 else:
                     status = res['Solver'].termination_condition
                     logger.info(

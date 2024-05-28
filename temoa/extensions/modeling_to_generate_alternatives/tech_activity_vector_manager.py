@@ -78,6 +78,7 @@ class TechActivityVectorManager(VectorManager):
         self.base_model = base_model
         self.optimal_cost = optimal_cost
         self.cost_relaxation = cost_relaxation
+        self.generation_index = 1  # index of how many models generated to couple inputs-outputs
 
         # {category : [technology, ...]}
         # the number of keys in this are the dimension of the hull
@@ -150,6 +151,7 @@ class TechActivityVectorManager(VectorManager):
 
     def random_input_vector_model(self) -> TemoaModel:
         new_model = self.base_model.clone()
+        new_model.name = self.new_model_name()
         var_vec = self.var_vector(new_model)
         coeffs = np.random.random(len(var_vec))
         coeffs /= sum(coeffs)
@@ -167,6 +169,7 @@ class TechActivityVectorManager(VectorManager):
         obj_vector = self._make_basis_objective_vector(new_model)
         while obj_vector is not None:
             new_model.obj = Objective(expr=obj_vector)
+            new_model.name = self.new_model_name()
             yield new_model
             new_model = self.base_model.clone()
             obj_vector = self._make_basis_objective_vector(new_model)
@@ -185,11 +188,19 @@ class TechActivityVectorManager(VectorManager):
         # now we can run until told to quit or fail to make a new vector
         while True:
             new_model = self.base_model.clone()
+            new_model.name = self.new_model_name()
             v = self._next_objective_vector(M=new_model)
             if v is None:
                 yield None
             new_model.obj = Objective(expr=v)
             yield new_model
+
+    def new_model_name(self) -> str:
+        """produce a new name with updated index suffix"""
+        base_name = self.base_model.name.split('-')[0]
+        new_name = '-'.join((base_name, str(self.generation_index)))
+        self.generation_index += 1
+        return new_name
 
     def process_results(self, M: TemoaModel):
         """
@@ -343,7 +354,7 @@ class TechActivityVectorManager(VectorManager):
         A little function to track the size of the hull, after it is built initially
         Note:  This hull is a "throw away" and only used for volume calc, but it is pretty quick
         """
-        if self.hull is not None:
+        if self.hull is not None:  # don't try until after first hull is built
             hull = Hull(self.hull_points)
             volume = hull.volume
             logger.info(f'Tracking hull at {volume}')
@@ -354,4 +365,6 @@ class TechActivityVectorManager(VectorManager):
         pts = sorted(self.perf_data.keys())
         y = [self.perf_data[pt] for pt in pts]
         plt.plot(pts, y)
+        plt.xlabel('Iteration')
+        plt.ylabel('N-Dimensional Hull Volume')
         plt.savefig(str(fout))

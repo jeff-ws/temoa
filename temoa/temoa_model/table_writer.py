@@ -127,10 +127,15 @@ class TableWriter:
             sys.exit(-1)
 
     def write_results(
-        self, M: TemoaModel, results_with_duals: SolverResults | None = None, append=False
+        self,
+        M: TemoaModel,
+        results_with_duals: SolverResults | None = None,
+        append=False,
+        iteration: int | None = None,
     ) -> None:
         """
         Write results to output database
+        :param iteration: An interation count for repeated runs, to be passed to tables that support it
         :param results_with_duals: if provided, this will trigger the writing of dual variables, pulled from the SolverResults
         :param M: the model
         :param append: append whatever is already in the tables.  If False (default), clear existing tables by scenario name
@@ -141,7 +146,7 @@ class TableWriter:
         if not self.tech_sectors:
             self._get_tech_sectors()
         self.write_objective(M)
-        self.write_capacity_tables(M)
+        self.write_capacity_tables(M, iteration=iteration)
         # analyze the emissions to get the costs and flows
         e_costs, e_flows = self._gather_emission_costs_and_flows(M)
         self.emission_register = e_flows
@@ -317,13 +322,14 @@ class TableWriter:
 
         # iterate through all elements of the flow register, look for output flows only,
         # and gather the total by index (region, period, input_comm, tech, vintage, output_comm)
+        # this is summing across season, tod
         output_flows = defaultdict(float)
         for fi in self.flow_register:
             sector = self.tech_sectors.get(fi.t)
             # get the output flow for this index, if it exists...
             flow_out_value = self.flow_register[fi].get(FlowType.OUT, None)
             if flow_out_value:
-                idx = (fi.r, fi.p, fi.i, fi.t, fi.v, fi.o)
+                idx = (scenario, fi.r, sector, fi.p, fi.i, fi.t, fi.v, fi.o)
                 output_flows[idx] += flow_out_value
 
         # convert to entries, if the sum is non-negligible
@@ -331,9 +337,7 @@ class TableWriter:
         for idx, flow in output_flows.items():
             if abs(flow) < self.epsilon:
                 continue
-            # need to wedge in scenario and sector.... ugh.
-            full_idx = (scenario, idx[0], sector, *idx[1:])
-            entry = (*full_idx, flow)
+            entry = (*idx, flow)
             entries.append(entry)
 
         qry = f'INSERT INTO OutputFlowOutSummary VALUES {_marks(9)}'
@@ -804,7 +808,7 @@ class TableWriter:
         # make the additional output table, if needed...
         self.execute_script(flow_summary_file_loc)
 
-    def execute_script(self, script_file: str|Path):
+    def execute_script(self, script_file: str | Path):
         """
         A utility to execute a sql script on the current db connection
         :return:
