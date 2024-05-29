@@ -285,7 +285,7 @@ class HybridLoader:
                 case Set():
                     if not screened:  # no available values
                         data[c.name] = []
-                    if len(screened[0]) == 1:  # set of individual values
+                    elif len(screened[0]) == 1:  # set of individual values
                         data[c.name] = [t[0] for t in screened]
                     else:  # set of tuples, pass directly...
                         data[c.name] = screened
