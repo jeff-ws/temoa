@@ -73,6 +73,8 @@ def refresh_databases() -> None:
         ('test_system.sql', 'test_system.sqlite'),
         ('storageville.sql', 'storageville.sqlite'),
         ('mediumville.sql', 'mediumville.sqlite'),
+        ('simple_emissions.sql', 'simple_emissions.sqlite'),
+        ('emissions.sql', 'emissions.sqlite'),
     )
     for src, db in databases:
         if Path.exists(data_output_path / db):
@@ -87,9 +89,9 @@ def refresh_databases() -> None:
 refresh_databases()
 
 
-@pytest.fixture()
+@pytest.fixture(scope='module')
 def system_test_run(
-    request, tmp_path
+    request, tmp_path_factory
 ) -> tuple[Any, SolverResults | None, TemoaModel | None, TemoaSequencer]:
     """
     spin up the model, solve it, and hand over the model and result for inspection
@@ -99,7 +101,7 @@ def system_test_run(
     filename = request.param['filename']
     options = {'silent': True, 'debug': True}
     config_file = Path(PROJECT_ROOT, 'tests', 'testing_configs', filename)
-
+    tmp_path = tmp_path_factory.mktemp('data')
     sequencer = TemoaSequencer(
         config_file=config_file,
         output_path=tmp_path,
