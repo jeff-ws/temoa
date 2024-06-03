@@ -1661,7 +1661,11 @@ portion of the electricity production counts towards the target, and there is
 no way to distinguish it from the useful production. Including an explicit
 curtailment term addresses the issue.  Curtailment in the model is simply
 the production activity that is not used in the model and is reported as
-such in the OutputCurtailment table.
+such in the OutputCurtailment table.  Note:  Outputs presented in the
+`OutputCurtailment` table for curtailment (the table separately includes
+flex outputs) are limited by Capacity Factor.  Meaning:  if a tech has a
+capacity of 10 units, and a CF of 0.8 and a usage of 5 units, then the reported
+curtailment is 3 units (0.8 x 10 - 5).
 
 
 V_FlowInStorage

@@ -18,6 +18,8 @@ OUTPUT_PATH = None
 
 
 def get_OUTPUT_PATH():
+    if OUTPUT_PATH is None:
+        raise RuntimeError('Output path not yet defined')
     return OUTPUT_PATH
 
 
