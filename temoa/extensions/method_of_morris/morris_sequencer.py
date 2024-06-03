@@ -35,6 +35,7 @@ import csv
 import logging
 import multiprocessing
 import sqlite3
+import sys
 import tomllib
 from logging.handlers import QueueListener
 from pathlib import Path
@@ -122,20 +123,26 @@ class MorrisSequencer:
             self.trajectories = traj
             logger.info('Morris trajectories: %d', self.trajectories)
         else:
-            self.trajectories = 10  # number of morris trajectories to generate
+            self.trajectories = 4  # number of morris trajectories to generate
             logger.warning(
                 'No value received for trajectories, using default: %d', self.trajectories
             )
         # Note:  Problem size (in general) is (Groups + 1) * trajectories see the SALib Dox (which aren't super)
 
-        self.seed = config.morris_inputs.get('seed')
+        seed = config.morris_inputs.get('seed')
+        self.seed = seed if seed else None
         logger.info('Morris Seed (None indicates system generated): %s', self.seed)
 
         self.conf_level = 0.95  # confidence level for mu_star analysis
-        logger.info('Initialized Morris sequencer')
+
+        self.num_cores = config.morris_inputs.get('cores', 0)
+        if self.num_cores == 0:
+            self.num_cores = multiprocessing.cpu_count()
+        logger.info('Morris number of cores: %d', self.num_cores)
+        logger.info('Initialized Morris Sequencer')
         logger.info(
             'Currently, MM only logs ERROR level messages during model build, which is done repeatedly.'
-            '  If there are issues building the model, run Temoa in CHECK to get more detail.'
+            '  If there are issues building the model, run Temoa in CHECK separately to get more detail on the model.'
         )
 
     def start(self):
@@ -183,8 +190,12 @@ class MorrisSequencer:
         log_listener.start()
 
         # 5.  Run the processing:
-        num_cores = multiprocessing.cpu_count()
-        morris_results = Parallel(n_jobs=num_cores)(
+        if not self.config.silent:
+            msg = f'Starting {len(mm_samples)} MM runs on {self.num_cores} cores.\n'
+            sys.stdout.write(msg)
+            sys.stdout.write('=' * (len(msg) - 1) + '\n')
+            sys.stdout.flush()
+        morris_results = Parallel(n_jobs=self.num_cores)(
             delayed(evaluate)(
                 param_names, mm_samples[i, :], data, i, self.config, log_queue, log_level
             )
@@ -193,7 +204,10 @@ class MorrisSequencer:
         log_listener.stop()
 
         # 6.  Process results
-        self.process_results(problem, mm_samples, morris_results)
+        cost_mu_star = self.process_results(problem, mm_samples, morris_results)
+
+        # 7.  Return the cost objective Mu_Star for testing purposes...
+        return cost_mu_star
 
     def process_results(self, problem, mm_samples, morris_results):
         """
@@ -264,6 +278,7 @@ class MorrisSequencer:
                         analysis[category]['sigma'][j],
                     )
                     writer.writerow(row)
+        return analysis['cost']
 
     def gather_parameters(self):
         """

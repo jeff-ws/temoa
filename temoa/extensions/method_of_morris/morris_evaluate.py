@@ -29,6 +29,7 @@ of class) to enable parallelization.
 """
 import logging
 import sqlite3
+import sys
 from logging.handlers import QueueHandler
 
 from pyomo.dataportal import DataPortal
@@ -68,7 +69,7 @@ def evaluate(param_info, mm_sample, data, i, config: TemoaConfig, log_queue, log
     """
     # get the logger configured...
     logger = configure_worker_logger(log_queue, log_level)
-    logger.info('Starting MM evaluation # %d', i)
+    logger.info('Starting MM evaluation # %d', i + 1)
     log_entry = ['']
     for j in range(0, len(mm_sample)):
         param_name, *set_idx, _ = param_info[j]
@@ -80,7 +81,7 @@ def evaluate(param_info, mm_sample, data, i, config: TemoaConfig, log_queue, log
             raise ValueError('index mismatch from data read-in')
         data[param_name][set_idx] = mm_sample[j]
         setting_entry = 'run # %d:  Setting param %s[%s] to value:  %f' % (
-            i,
+            i + 1,
             param_name,
             set_idx,
             mm_sample[j],
@@ -125,5 +126,8 @@ def evaluate(param_info, mm_sample, data, i, config: TemoaConfig, log_queue, log
     else:
         Y_CumulativeCO2 = output_query[0][0]
     morris_objectives = [float(Y_OF), float(Y_CumulativeCO2)]
-    logger.info('Finished MM evaluation # %d with OBJ value: %0.2f ', i, Y_OF)
+    logger.info('Finished MM evaluation # %d with OBJ value: %0.2f ', i + 1, Y_OF)
+    if not config.silent:
+        sys.stdout.write(f'Completed MM run {i+1}\n')
+        sys.stdout.flush()
     return morris_objectives
