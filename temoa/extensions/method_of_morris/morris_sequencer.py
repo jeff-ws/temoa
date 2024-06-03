@@ -27,6 +27,9 @@ jeff@westernspark.us
 https://westernspark.us
 Created on:  5/30/24
 
+An event sequencer to control the flow of a Method of Morris calculation.  This code uses multiprocessing via
+the joblib library
+
 """
 import csv
 import logging
@@ -34,7 +37,6 @@ import multiprocessing
 import sqlite3
 import tomllib
 from logging.handlers import QueueListener
-from multiprocessing import Queue
 from pathlib import Path
 
 from SALib.analyze import morris
@@ -60,7 +62,7 @@ class MorrisSequencer:
         # PRELIMINARIES...
         # let's start with the assumption that input db = output db...  this may change?
         if not config.input_database == config.output_database:
-            raise NotImplementedError('MGA assumes input and output databases are same')
+            raise NotImplementedError('MM assumes input and output databases are same')
         self.con = sqlite3.connect(config.input_database)
 
         if config.save_lp_file:
@@ -85,29 +87,8 @@ class MorrisSequencer:
             logger.warning('Unable to find solver options toml file.  Using default options.')
             s_options = {}
 
-        # get handle on solver instance
-        # self.opt = pyo.SolverFactory(self.config.solver_name)
-        # self.worker_solver_options = s_options
-
-        # some defaults, etc.
-
-        # self.num_workers = all_options.get('num_workers', 1)
-        # logger.info('MGA workers are set to %s', self.num_workers)
-        # self.iteration_limit = config.mga_inputs.get('iteration_limit', 20)
-        # logger.info('Set MGA iteration limit to: %d', self.iteration_limit)
-        # self.time_limit_hrs = config.mga_inputs.get('time_limit_hrs', 12)
-        # logger.info('Set MGA time limit hours to: %0.1f', self.time_limit_hrs)
-        # self.cost_epsilon = config.mga_inputs.get('cost_epsilon', 0.05)
-        # logger.info('Set MGA cost (relaxation) epsilon to: %0.3f', self.cost_epsilon)
-
-        # internal records
-        self.solve_count = 0
-        self.orig_label = self.config.scenario
-
         # output handling
-        self.writer = TableWriter(self.config)
-        self.writer.clear_scenario()
-        self.verbose = True  # for troubleshooting
+        self.verbose = False  # for troubleshooting
         self.mm_output_folder = get_OUTPUT_PATH() / 'MM_outputs'
         self.mm_output_folder.mkdir(exist_ok=True)
         self.param_file: Path = self.mm_output_folder / 'params.csv'
@@ -119,13 +100,13 @@ class MorrisSequencer:
         )
         self.trajectories = 10  # number of morris trajectories to generate
         # Note:  Problem size (in general) is (Groups + 1) * trajectories see the SALib Dox (which aren't super)
-        self.seed = 42  # for reproducible results, if desired
+        self.seed = 42  # for reproducible results, if desired.
+        self.conf_level = 0.95  # confidence level for mu_star analysis
         logger.info('Initialized Morris sequencer')
-
-        # hookups
-        global global_con, global_config
-        global_con = self.con
-        global_config = self.config
+        logger.info(
+            'Currently, MM only logs ERROR level messages during model build, which is done repeatedly.'
+            '  If there are issues building the model, run Temoa in CHECK to get more detail.'
+        )
 
     def start(self):
         """
@@ -134,6 +115,9 @@ class MorrisSequencer:
         1.  gather the parameters from items marked in the DB
         2.  build a data portal as a basis
         3.  use SALib to construct the sample
+        4.  set up logging to cover the multiprocessing phase
+        5.  run the evaluation of all instances in the mm_samples
+        6.  use SALib to analyze the outputs
         :return:
         """
         # 0.  clear the scenario
@@ -160,13 +144,15 @@ class MorrisSequencer:
             local_optimization=False,
             seed=self.seed,
         )
-        # 3.  Set up logging for workers
-        log_queue = Queue()
+        # 4.  Set up logging for workers
+        m = multiprocessing.Manager()
+        log_queue = m.Queue()  # Queue()
+
         log_listener = QueueListener(log_queue, *logging.root.handlers)
         log_level = logger.getEffectiveLevel()
         log_listener.start()
 
-        # 4.  Run the processing:
+        # 5.  Run the processing:
         num_cores = multiprocessing.cpu_count()
         morris_results = Parallel(n_jobs=num_cores)(
             delayed(evaluate)(
@@ -176,65 +162,78 @@ class MorrisSequencer:
         )
         log_listener.stop()
 
-        # 5.  Process results
+        # 6.  Process results
         self.process_results(problem, mm_samples, morris_results)
 
-    def process_results(self, problem, mm_sample, morris_results):
+    def process_results(self, problem, mm_samples, morris_results):
+        """
+        Process the results of the runs on the mm_samples
+        :param problem: the problem structure
+        :param mm_samples: the n samples used for the runs
+        :param morris_results: n * 2 array of results for the 2 objectives tracked
+        :return:
+        """
         morris_objectives = array(morris_results)
-        print(morris_objectives)
-        Si_OF = morris.analyze(
+        analysis = {}
+        analysis['cost'] = morris.analyze(
             problem,
-            mm_sample,
+            mm_samples,
             morris_objectives[:, 0],
-            conf_level=0.95,
+            conf_level=self.conf_level,
             print_to_console=False,
             num_levels=self.num_levels,
             num_resamples=1000,
-            seed=self.seed + 1,
+            seed=self.seed + 1 if self.seed else None,
         )
 
-        Si_CumulativeCO2 = morris.analyze(
+        analysis['co2'] = morris.analyze(
             problem,
-            mm_sample,
+            mm_samples,
             morris_objectives[:, 1],
-            conf_level=0.95,
+            conf_level=self.conf_level,
             print_to_console=False,
             num_levels=self.num_levels,
             num_resamples=1000,
-            seed=self.seed + 2,
+            seed=self.seed + 2 if self.seed else None,
         )
         groups, unique_group_names = compute_groups_matrix(problem['groups'])
         number_of_groups = len(unique_group_names)
-        print(
-            '{0:<30} {1:>10} {2:>10} {3:>15} {4:>10}'.format(
-                'Parameter', 'Mu_Star', 'Mu', 'Mu_Star_Conf', 'Sigma'
-            )
-        )
-        for j in list(range(number_of_groups)):
-            print(
-                '{0:30} {1:10.3f} {2:10.3f} {3:15.3f} {4:10.3f}'.format(
-                    Si_OF['names'][j],
-                    Si_OF['mu_star'][j],
-                    Si_OF['mu'][j],
-                    Si_OF['mu_star_conf'][j],
-                    Si_OF['sigma'][j],
+        mu_star_conf_label = f'Mu_Star_Conf[{self.conf_level}]'
+        if not self.config.silent:
+            for category in analysis.keys():
+                print(f'\nAnalysis of {category}:')
+                print(
+                    '{0:<30} {1:>10} {2:>10} {3:>20} {4:>10}'.format(
+                        'Parameter', 'Mu_Star', 'Mu', mu_star_conf_label, 'Sigma'
+                    )
                 )
-            )
+                for j in list(range(number_of_groups)):
+                    print(
+                        '{0:30} {1:10.3f} {2:10.3f} {3:20.3f} {4:10.3f}'.format(
+                            analysis[category]['names'][j],
+                            analysis[category]['mu_star'][j],
+                            analysis[category]['mu'][j],
+                            analysis[category]['mu_star_conf'][j],
+                            analysis[category]['sigma'][j],
+                        )
+                    )
 
-        line1 = Si_OF['mu_star']
-        line2 = Si_OF['mu_star_conf']
-        line3 = Si_CumulativeCO2['mu_star']
-        line4 = Si_CumulativeCO2['mu_star_conf']
-        with open('MMResults.csv', 'w') as f:
-            writer = csv.writer(f, delimiter=',')
-            writer.writerow(unique_group_names)
-            writer.writerow(b'Objective Function')
-            writer.writerow(line1)
-            writer.writerow(line2)
-            writer.writerow(b'Cumulative CO2 Emissions')
-            writer.writerow(line3)
-            writer.writerow(line4)
-        f.close()
+        header = ('param', 'mu', 'mu_star', mu_star_conf_label, 'sigma')
+        for category in analysis.keys():
+            f_name = f'{category}_analysis.csv'
+            output_file_path = self.mm_output_folder / f_name
+            with open(output_file_path, 'w') as f:
+                writer = csv.writer(f, delimiter=',')
+                writer.writerow(header)
+                for j in list(range(number_of_groups)):
+                    row = (
+                        analysis[category]['names'][j],
+                        analysis[category]['mu'][j],
+                        analysis[category]['mu_star'][j],
+                        analysis[category]['mu_star_conf'][j],
+                        analysis[category]['sigma'][j],
+                    )
+                    writer.writerow(row)
 
     def gather_parameters(self):
         """

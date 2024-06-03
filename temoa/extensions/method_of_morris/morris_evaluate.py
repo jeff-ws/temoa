@@ -44,7 +44,12 @@ def configure_worker_logger(log_queue, log_level):
     if not worker_logger.hasHandlers():
         h = QueueHandler(log_queue)
         worker_logger.addHandler(h)
+    root_logger = logging.root
+    if not root_logger.hasHandlers():
+        h = QueueHandler(log_queue)
+        root_logger.addHandler(h)
     worker_logger.setLevel(log_level)
+    root_logger.setLevel(logging.WARNING)
     return worker_logger
 
 
@@ -63,8 +68,8 @@ def evaluate(param_info, mm_sample, data, i, config: TemoaConfig, log_queue, log
     """
     # get the logger configured...
     logger = configure_worker_logger(log_queue, log_level)
-    logger.error(f'Booyah {i}')
-
+    logger.info('Starting MM evaluation # %d', i)
+    log_entry = ['']
     for j in range(0, len(mm_sample)):
         param_name, *set_idx, _ = param_info[j]
         set_idx = tuple(set_idx)
@@ -74,6 +79,14 @@ def evaluate(param_info, mm_sample, data, i, config: TemoaConfig, log_queue, log
         if data[param_name].get(set_idx) is None:
             raise ValueError('index mismatch from data read-in')
         data[param_name][set_idx] = mm_sample[j]
+        setting_entry = 'run # %d:  Setting param %s[%s] to value:  %f' % (
+            i,
+            param_name,
+            set_idx,
+            mm_sample[j],
+        )
+        log_entry.append(setting_entry)
+    logger.debug('\n  '.join(log_entry))
 
     dp = DataPortal(data_dict={None: data})
     instance = run_actions.build_instance(loaded_portal=dp, silent=True)
@@ -112,5 +125,5 @@ def evaluate(param_info, mm_sample, data, i, config: TemoaConfig, log_queue, log
     else:
         Y_CumulativeCO2 = output_query[0][0]
     morris_objectives = [float(Y_OF), float(Y_CumulativeCO2)]
-
+    logger.info('Finished MM evaluation # %d with OBJ value: %0.2f ', i, Y_OF)
     return morris_objectives
