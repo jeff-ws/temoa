@@ -36,6 +36,7 @@ from pathlib import Path
 
 import pyomo.opt
 
+from temoa.extensions.method_of_morris.morris_sequencer import MorrisSequencer
 from temoa.extensions.modeling_to_generate_alternatives.mga_sequencer import MgaSequencer
 from temoa.extensions.myopic.myopic_sequencer import MyopicSequencer
 from temoa.temoa_model.hybrid_loader import HybridLoader
@@ -226,5 +227,10 @@ class TemoaSequencer:
             case TemoaMode.MGA:
                 mga_sequencer = MgaSequencer(config=self.config)
                 mga_sequencer.start()
+
+            case TemoaMode.METHOD_OF_MORRIS:
+                mm_sequencer = MorrisSequencer(config=self.config)
+                mm_sequencer.start()
+
             case _:
                 raise NotImplementedError('not yet built')
