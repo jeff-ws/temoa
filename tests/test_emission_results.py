@@ -84,18 +84,31 @@ def test_emissions(solved_connection):
     emis = con.cursor().execute(f"SELECT SUM(emission) FROM main.OutputEmission WHERE tech LIKE '{tech}'").fetchone()[0]
     assert emis == pytest.approx(emis_target), f"{name} emissions were incorrect. Should be {emis_target}, got {emis}"
 
-# Emission costs
+# Emission costs undiscounted
 @pytest.mark.parametrize(
     'solved_connection', argvalues=emissions_tests, indirect=True, ids=[t['name'] for t in emissions_tests]
 )
-def test_emissions_costs(solved_connection):
+def test_emissions_costs_undiscounted(solved_connection):
+    """
+    Test that the emission costs from each technology archetype are correct, and check total emissions
+    """
+    con, name, tech, emis_target = solved_connection
+    ec = con.cursor().execute(f"SELECT SUM(emiss) FROM main.OutputCost WHERE tech LIKE '{tech}'").fetchone()[0]
+    cost_target = 0.7 * emis_target * 5 # emission cost x emissions x 5y
+    assert ec == pytest.approx(cost_target), f"{name} undiscounted emission costs were incorrect. Should be {cost_target}, got {ec}"
+
+# Emission costs discounted
+@pytest.mark.parametrize(
+    'solved_connection', argvalues=emissions_tests, indirect=True, ids=[t['name'] for t in emissions_tests]
+)
+def test_emissions_costs_discounted(solved_connection):
     """
     Test that the emission costs from each technology archetype are correct, and check total emissions
     """
     con, name, tech, emis_target = solved_connection
     ec = con.cursor().execute(f"SELECT SUM(d_emiss) FROM main.OutputCost WHERE tech LIKE '{tech}'").fetchone()[0]
     cost_target = 0.7 * emis_target * 4.32947667063082 * 1.05 # emission cost x emissions x P/A(5%, 5y, 1) [x F/P(5%, 1y) legacy bug?]
-    assert ec == pytest.approx(cost_target), f"{name} emission costs were incorrect. Should be {cost_target}, got {ec}"
+    assert ec == pytest.approx(cost_target), f"{name} discounted emission costs were incorrect. Should be {cost_target}, got {ec}"
 
 
 
@@ -113,5 +126,5 @@ curtailment_tests = [
 )
 def test_curtailment(solved_connection):
     con, name, tech, curt_target = solved_connection
-    ec = con.cursor().execute(f"SELECT SUM(curtailment) FROM main.OutputCurtailment WHERE tech LIKE '{tech}'").fetchone()[0]
-    assert ec == pytest.approx(curt_target), f"{name} curtailment was incorrect. Should be {curt_target}, got {ec}"
+    curt = con.cursor().execute(f"SELECT SUM(curtailment) FROM main.OutputCurtailment WHERE tech LIKE '{tech}'").fetchone()[0]
+    assert curt == pytest.approx(curt_target), f"{name} curtailment was incorrect. Should be {curt_target}, got {curt}"
