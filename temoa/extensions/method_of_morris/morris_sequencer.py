@@ -53,7 +53,9 @@ from temoa.temoa_model.temoa_config import TemoaConfig
 
 logger = logging.getLogger(__name__)
 
-path_to_options_file = Path(PROJECT_ROOT, 'temoa/extensions/method_of_morris/solver_options.toml')
+solver_options_file = Path(
+    PROJECT_ROOT, 'temoa/extensions/method_of_morris/morris_solver_options.toml'
+)
 
 
 class MorrisSequencer:
@@ -78,7 +80,7 @@ class MorrisSequencer:
 
         # read in the options
         try:
-            with open(path_to_options_file, 'rb') as f:
+            with open(solver_options_file, 'rb') as f:
                 all_options = tomllib.load(f)
             s_options = all_options.get(self.config.solver_name, {})
             logger.info('Using solver options: %s', s_options)
@@ -94,13 +96,41 @@ class MorrisSequencer:
         self.param_file: Path = self.mm_output_folder / 'params.csv'
 
         # MM Options
-        self.mm_perturbation = 0.10  # tha amount to perturb the marked params
-        self.num_levels = (
-            8  # the number of levels to divide the param range into (must be even number)
-        )
-        self.trajectories = 10  # number of morris trajectories to generate
+        # the amount to perturb the marked params
+        pert = config.morris_inputs.get('perturbation')
+        if pert:
+            self.mm_perturbation = pert
+            logger.info('Morris perturbation: %0.2f', self.mm_perturbation)
+        else:
+            self.mm_perturbation = 0.10
+            logger.warning(
+                'No value received for perturbation, using default: %0.2f', self.mm_perturbation
+            )
+
+        levels = config.morris_inputs.get('levels')
+        if levels:
+            self.num_levels = levels
+            logger.info('Morris levels: %d', self.num_levels)
+        else:
+            self.num_levels = (
+                8  # the number of levels to divide the param range into (must be even number)
+            )
+            logger.warning('No value received for levels, using default: %d', self.num_levels)
+
+        traj = config.morris_inputs.get('trajectories')
+        if traj:
+            self.trajectories = traj
+            logger.info('Morris trajectories: %d', self.trajectories)
+        else:
+            self.trajectories = 10  # number of morris trajectories to generate
+            logger.warning(
+                'No value received for trajectories, using default: %d', self.trajectories
+            )
         # Note:  Problem size (in general) is (Groups + 1) * trajectories see the SALib Dox (which aren't super)
-        self.seed = 42  # for reproducible results, if desired.
+
+        self.seed = config.morris_inputs.get('seed')
+        logger.info('Morris Seed (None indicates system generated): %s', self.seed)
+
         self.conf_level = 0.95  # confidence level for mu_star analysis
         logger.info('Initialized Morris sequencer')
         logger.info(
