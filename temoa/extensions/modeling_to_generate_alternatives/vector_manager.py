@@ -54,12 +54,12 @@ class VectorManager(ABC):
     @property
     @abstractmethod
     def groups(self) -> Iterable[str]:
-        """The main groups of the axis"""
+        """The main group labels of the axis"""
         raise NotImplementedError()
 
     @abstractmethod
     def group_members(self, group) -> list[str]:
-        """The members in the group"""
+        """The members (by string name) in the group"""
         raise NotImplementedError()
 
     @property

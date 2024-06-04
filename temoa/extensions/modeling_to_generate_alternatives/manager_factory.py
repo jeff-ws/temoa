@@ -44,6 +44,10 @@ def get_manager(
 ) -> VectorManager:
     match axis:
         case MgaAxis.TECH_CATEGORY_ACTIVITY:
+            if weighting != MgaWeighting.HULL_EXPANSION:
+                raise NotImplementedError(
+                    'TECH_CATEGORY_ACTIVITY is only implemented for HULL_EXPANSION'
+                )
             return TechActivityVectorManager(
                 base_model=model, conn=con, weighting=weighting, **kwargs
             )

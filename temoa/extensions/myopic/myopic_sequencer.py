@@ -35,7 +35,6 @@ from sqlite3 import Connection
 from sys import stderr as SE
 
 import definitions
-# from temoa.data_processing.DB_to_Excel import make_excel
 from temoa.extensions.myopic.myopic_index import MyopicIndex
 from temoa.extensions.myopic.myopic_progress_mapper import MyopicProgressMapper
 from temoa.temoa_model import run_actions
