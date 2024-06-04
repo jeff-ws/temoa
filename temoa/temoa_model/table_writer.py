@@ -145,19 +145,39 @@ class TableWriter:
             self.clear_scenario()
         if not self.tech_sectors:
             self._get_tech_sectors()
-        self.write_objective(M)
+        self.write_objective(M, iteration=iteration)
         self.write_capacity_tables(M, iteration=iteration)
         # analyze the emissions to get the costs and flows
         e_costs, e_flows = self._gather_emission_costs_and_flows(M)
         self.emission_register = e_flows
-        self.write_emissions()
+        self.write_emissions(iteration=iteration)
         self.write_costs(M, emission_entries=e_costs)
         self.flow_register = self.calculate_flows(M)
         self.check_flow_balance(M)
-        self.write_flow_tables()
+        self.write_flow_tables(iteration=iteration)
         if results_with_duals:  # write the duals
             self.write_dual_variables(results_with_duals)
         # catch-all
+        self.con.commit()
+        self.con.execute('VACUUM')
+
+    def write_mm_results(self, M: TemoaModel, iteration: int):
+        """
+        tailored writer function for Method of Morris which:
+        (a) appends data (so scenario needs to be cleared elsewhere
+        (b) requires an iteration number to separate results
+        (c) only writes to MM required tables (obj, emissions right now)
+        :param M: solved model
+        :param iteration: an iteration index for scenario labeling
+        :return:
+        """
+        if not self.tech_sectors:
+            self._get_tech_sectors()
+        self.write_objective(M, iteration=iteration)
+        # analyze the emissions to get the costs and flows
+        e_costs, e_flows = self._gather_emission_costs_and_flows(M)
+        self.emission_register = e_flows
+        self.write_emissions(iteration=iteration)
         self.con.commit()
         self.con.execute('VACUUM')
 
@@ -188,7 +208,7 @@ class TableWriter:
             cur.execute(f'DELETE FROM {table} WHERE scenario like ?', (target,))
         self.con.commit()
 
-    def write_objective(self, M: TemoaModel) -> None:
+    def write_objective(self, M: TemoaModel, iteration=None) -> None:
         """Write the value of all ACTIVE objectives to the DB"""
         objs: list[Objective] = list(M.component_data_objects(Objective))
         active_objs = [obj for obj in objs if obj.active]
@@ -197,20 +217,29 @@ class TableWriter:
                 'Multiple active objectives found for scenario: %s.  All will be logged in db',
                 self.config.scenario,
             )
+        scenario_name = (
+            self.config.scenario + f'-{iteration}'
+            if iteration is not None
+            else self.config.scenario
+        )
         for obj in active_objs:
             obj_name, obj_value = obj.getname(fully_qualified=True), value(obj)
             qry = 'INSERT INTO OutputObjective VALUES (?, ?, ?)'
-            data = (self.config.scenario, obj_name, obj_value)
+            data = (scenario_name, obj_name, obj_value)
             self.con.execute(qry, data)
             self.con.commit()
 
-    def write_emissions(self):
+    def write_emissions(self, iteration=None) -> None:
         """Write the emission table to the DB"""
         if not self.tech_sectors:
             raise RuntimeError('tech sectors not available... code error')
 
         data = []
-        scenario = self.config.scenario
+        scenario = (
+            self.config.scenario + f'-{iteration}'
+            if iteration is not None
+            else self.config.scenario
+        )
         for ei in self.emission_register:
             sector = self.tech_sectors[ei.t]
             val = self.emission_register[ei]
@@ -268,7 +297,7 @@ class TableWriter:
 
         self.con.commit()
 
-    def write_flow_tables(self) -> None:
+    def write_flow_tables(self, iteration=None) -> None:
         """Write the flow tables"""
         if not self.tech_sectors:
             raise RuntimeError('tech sectors not available... code error')
@@ -276,7 +305,11 @@ class TableWriter:
             raise RuntimeError('flow_register not available... code error')
         # sort the flows
         flows_by_type: dict[FlowType, list[tuple]] = defaultdict(list)
-        scenario = self.config.scenario
+        scenario = (
+            self.config.scenario + f'-{iteration}'
+            if iteration is not None
+            else self.config.scenario
+        )
         for fi in self.flow_register:
             sector = self.tech_sectors.get(fi.t)
             for flow_type in self.flow_register[fi]:

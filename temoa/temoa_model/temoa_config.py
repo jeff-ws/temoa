@@ -48,6 +48,7 @@ class TemoaConfig:
         save_lp_file: bool = False,
         MGA: dict | None = None,
         myopic: dict | None = None,
+        morris: dict | None = None,
         config_file: Path | None = None,
         silent: bool = False,
         stream_output: bool = False,
@@ -118,6 +119,7 @@ class TemoaConfig:
 
         self.mga_inputs = MGA
         self.myopic_inputs = myopic
+        self.morris_inputs = morris
         self.silent = silent
         self.stream_output = stream_output
         self.price_check = price_check

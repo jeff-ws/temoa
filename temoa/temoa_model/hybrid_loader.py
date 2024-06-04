@@ -94,6 +94,9 @@ class HybridLoader:
         self.viable_rtt: ViableSet | None = None  # to support scanning LinkedTech
         self.efficiency_values: list[tuple] = []
 
+        # container for loaded data
+        self.data: dict | None = None
+
     def source_trace_only(self, make_plots: bool = False, myopic_index: MyopicIndex | None = None):
         if myopic_index and not isinstance(myopic_index, MyopicIndex):
             raise ValueError('myopic_index must be an instance of MyopicIndex')
@@ -1050,7 +1053,7 @@ class HybridLoader:
         # capture the parameter indexing sets
         set_data = self.load_param_idx_sets(data=data)
         data.update(set_data)
-
+        self.data = data
         # pyomo namespace format has data[namespace][idx]=value
         # the default namespace is None, thus...
         namespace = {None: data}
