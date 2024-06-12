@@ -47,6 +47,7 @@ from pyomo.environ import (
 )
 from pyomo.opt import SolverResults
 
+from temoa.data_processing.DB_to_Excel import make_excel
 # from temoa.data_processing.DB_to_Excel import make_excel
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -347,13 +348,12 @@ def handle_results(instance: TemoaModel, results, config: TemoaConfig):
         SE.write('\r[%8.2f] Results processed.\n' % (time() - hack))
         SE.flush()
 
-    # TODO:  Temporarily disabled while we sort out the import problem with pyam module
-    # if config.save_excel:
-    #     temp_scenario = set()
-    #     temp_scenario.add(config.scenario)
-    #     # make_excel function imported near the top
-    #     excel_filename = config.output_path / config.scenario
-    #     make_excel(str(config.output_database), excel_filename, temp_scenario)
+    if config.save_excel:
+        temp_scenario = set()
+        temp_scenario.add(config.scenario)
+        # make_excel function imported near the top
+        excel_filename = config.output_path / config.scenario
+        make_excel(str(config.output_database), excel_filename, temp_scenario)
 
     # if config.stream_output:
     #     print(output_stream.getvalue())
