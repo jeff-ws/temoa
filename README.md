@@ -85,19 +85,19 @@ tables by executing the full schema SQL command on the resulting database later,
 and has all parameters in it.  It can be copied/renamed, etc.
 - Notes on Config Options:
 
-Field | Notes
----|---
-Scenario Name | A name used in output tables for results (cannot contain dash '-' symbol)
-Temoa Mode | The execution mode.  See note below on currently supported modes
-Input/Output DB | The source (and optionally diffent) output database.  Note for myopic, MGA input must be same as output
-Price Checking | Run the "price checker" on the built model to look for costing deficiencies and log them
-Source Tracing | Check the integrity of the commodity flow network in every region-period combination.  Required for Myopic
-Plot Commodity Network | Produce HTML (viewable in any browser) displays of the networks built (see note at bottom)
-Solver | The exact name of the solver executable to call
-Save Excel | Save core output data to excel files.  Needed if user intends to use the graphviz post-processing modules
-Save LP | Save the created LP model files
-Save Duals | Save the values of the Dual Variables in the Output Tables.  (Only supported by some solvers)
-Mode Specific Settings | See the README files within mode folders for up-to-date values
+| Field                  | Notes                                                                                                      |
+|------------------------|------------------------------------------------------------------------------------------------------------|
+| Scenario Name          | A name used in output tables for results (cannot contain dash '-' symbol)                                  |
+| Temoa Mode             | The execution mode.  See note below on currently supported modes                                           |
+| Input/Output DB        | The source (and optionally diffent) output database.  Note for myopic, MGA input must be same as output    |
+| Price Checking         | Run the "price checker" on the built model to look for costing deficiencies and log them                   |
+| Source Tracing         | Check the integrity of the commodity flow network in every region-period combination.  Required for Myopic |
+| Plot Commodity Network | Produce HTML (viewable in any browser) displays of the networks built (see note at bottom)                 |
+| Solver                 | The exact name of the solver executable to call                                                            |
+| Save Excel             | Save core output data to excel files.  Needed if user intends to use the graphviz post-processing modules  |
+| Save LP                | Save the created LP model files                                                                            |
+| Save Duals             | Save the values of the Dual Variables in the Output Tables.  (Only supported by some solvers)              |
+| Mode Specific Settings | See the README files within mode folders for up-to-date values                                             |
 
 ## Currently Supported Modes
 ### Check
