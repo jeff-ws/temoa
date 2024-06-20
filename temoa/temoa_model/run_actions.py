@@ -48,7 +48,6 @@ from pyomo.environ import (
 from pyomo.opt import SolverResults
 
 from temoa.data_processing.DB_to_Excel import make_excel
-# from temoa.data_processing.DB_to_Excel import make_excel
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
