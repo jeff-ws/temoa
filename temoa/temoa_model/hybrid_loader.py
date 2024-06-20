@@ -364,7 +364,9 @@ class HybridLoader:
         raw = cur.execute('SELECT region FROM main.Region').fetchall()
         load_element(M.regions, raw)
 
-        # region-groups  (these are the R1+R2, R1+R4+R6 type region labels)
+        # region-groups  (these are the R1+R2, R1+R4+R6 type region labels) AND regular region names
+        # currently, we just load all the indices from the tables that could employ them.
+        # the validator is used to ensure they are legit.  (see temoa_model)
         regions_and_groups = set()
         for table, field_name in tables_with_regional_groups.items():
             if self.table_exists(table):
@@ -372,13 +374,12 @@ class HybridLoader:
                 regions_and_groups.update({t[0] for t in raw})
                 if None in regions_and_groups:
                     raise ValueError('Table %s appears to have an empty entry for region.' % table)
-        # filter to those that contain "+" and sort (for deterministic pyomo behavior)
-        # TODO:  RN, this set contains all regular regions, interconnects, AND groups, so we don't filter ... yet
-        list_of_groups = sorted((t,) for t in regions_and_groups)  # if "+" in t or t=='global')
+        # sort (for deterministic pyomo behavior)
+        list_of_groups = sorted((t,) for t in regions_and_groups)
         load_element(M.RegionalGlobalIndices, list_of_groups)
 
         # region-exchanges
-        # TODO:  Perhaps tease the exchanges out of the efficiency table...?  RN, they are all auto-generated.
+        # auto-generated
 
         #  === TECH SETS ===
 
@@ -558,7 +559,7 @@ class HybridLoader:
         load_element(M.Demand, raw)
 
         # RescourceBound
-        # TODO:  later, it isn't used RN anyhow.
+        # Not currently implemented
 
         # CapacityToActivity
         raw = cur.execute('SELECT region, tech, c2a FROM main.CapacityToActivity ').fetchall()
@@ -1044,11 +1045,20 @@ class HybridLoader:
             load_element(M.StorageDuration, raw, self.viable_rt, (0, 1))
 
         # StorageInit
-        # TODO:  DB table is busted / removed now... defer!
+        # Not currently supported -- odd behavior and not region-indexed
+        if self.table_exists('StorageInit'):
+            raw = cur.execute('SELECT * FROM main.StorageInit').fetchall()
+            if len(raw) > 0:
+                logger.warning(
+                    'Initialization of storage values currently NOT supported.'
+                    '  Values in StorageInit table will be ignored, and storage init value'
+                    ' will be optimized.'
+                )
 
         # For T/S:  dump the size of all data elements into the log
-        # temp = '\n'.join((f'{k} : {len(v)}' for k, v in data.items()))
-        # logger.info(temp)
+        if self.debugging:
+            temp = '\n'.join((f'{k} : {len(v)}' for k, v in data.items()))
+            logger.info(temp)
 
         # capture the parameter indexing sets
         set_data = self.load_param_idx_sets(data=data)

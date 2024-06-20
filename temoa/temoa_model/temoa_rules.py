@@ -48,7 +48,6 @@ def AdjustedCapacity_Constraint(M: 'TemoaModel', r, p, t, v):
     For a given :code:`(r,p,t,v)` index, this constraint sets the capacity equal to
     the amount installed in period :code:`v` and subtracts from it any and all retirements
     that occurred up until the period in question, :code:`p`."""
-    # TODO:  This could use a math expression, probably just for the "else" for dox
     if t not in M.tech_retirement:
         if v in M.time_exist:
             return M.V_Capacity[r, p, t, v] == M.ExistingCapacity[r, t, v]
@@ -67,35 +66,35 @@ def AdjustedCapacity_Constraint(M: 'TemoaModel', r, p, t, v):
 
 def Capacity_Constraint(M: 'TemoaModel', r, p, s, d, t, v):
     r"""
-This constraint ensures that the capacity of a given process is sufficient
-to support its activity across all time periods and time slices. The calculation
-on the left hand side of the equality is the maximum amount of energy a process
-can produce in the timeslice :code:`(s,d)`. Note that the curtailment variable
-shown below only applies to technologies that are members of the curtailment set.
-Curtailment is necessary to track explicitly in scenarios that include a high
-renewable target. Without it, the model can generate more activity than is used
-to meet demand, and have all activity (including the portion curtailed) count
-towards the target. Tracking activity and curtailment separately prevents this
-possibility.
+    This constraint ensures that the capacity of a given process is sufficient
+    to support its activity across all time periods and time slices. The calculation
+    on the left hand side of the equality is the maximum amount of energy a process
+    can produce in the timeslice :code:`(s,d)`. Note that the curtailment variable
+    shown below only applies to technologies that are members of the curtailment set.
+    Curtailment is necessary to track explicitly in scenarios that include a high
+    renewable target. Without it, the model can generate more activity than is used
+    to meet demand, and have all activity (including the portion curtailed) count
+    towards the target. Tracking activity and curtailment separately prevents this
+    possibility.
 
-.. math::
-   :label: Capacity
+    .. math::
+       :label: Capacity
 
-       \left (
-               \text{CFP}_{r, t, v}
-         \cdot \text{C2A}_{r, t}
-         \cdot \text{SEG}_{s, d}
-         \cdot \text{PLF}_{r, p, t, v}
-       \right )
-       \cdot \textbf{CAP}_{r, t, v}
-       =
-       \sum_{I, O} \textbf{FO}_{r, p, s, d, i, t, v, o}
-       +
-       \sum_{I, O} \textbf{CUR}_{r, p, s, d, i, t, v, o}
+           \left (
+                   \text{CFP}_{r, t, v}
+             \cdot \text{C2A}_{r, t}
+             \cdot \text{SEG}_{s, d}
+             \cdot \text{PLF}_{r, p, t, v}
+           \right )
+           \cdot \textbf{CAP}_{r, t, v}
+           =
+           \sum_{I, O} \textbf{FO}_{r, p, s, d, i, t, v, o}
+           +
+           \sum_{I, O} \textbf{CUR}_{r, p, s, d, i, t, v, o}
 
-   \\
-   \forall \{r, p, s, d, t, v\} \in \Theta_{\text{FO}}
-"""
+       \\
+       \forall \{r, p, s, d, t, v\} \in \Theta_{\text{FO}}
+    """
     if t in M.tech_storage:
         return Constraint.Skip
     # The expressions below are defined in-line to minimize the amount of
@@ -780,7 +779,6 @@ reduces computational burden.
         for S_o in M.ProcessOutputsByInput[r, p, S_t, S_v, c]
     )
 
-    # TODO:  This needs CURTAILMENT in the numerator
     vflow_in_ToNonStorage = sum(
         M.V_FlowOut[r, p, s, d, c, S_t, S_v, S_o] / value(M.Efficiency[r, c, S_t, S_v, S_o])
         for S_t, S_v in M.commodityDStreamProcess[r, p, c]
@@ -1385,11 +1383,14 @@ capacity could lead to more expensive solutions.
       \\
       \forall \{r, t, v\} \in \Theta_{\text{StorageInit}}
 """
-    # TODO:  This is invalid with the "for p..." construct
+    # dev note:  This constraint is not currently accessible and needs close review.
+    #            the hybrid loader currently screens out inputs for this to keep
+    #            it idle.
+    raise NotImplementedError('This constraint needs overhaul...')
     s = M.time_season.first()
-    vintage_period = (
-        v  # the only capacity of concern here is for the vintage year for initialization
-    )
+    # the only capacity of concern here is for the vintage year for initialization
+    vintage_period = s
+
     # devnote:  storage techs are currently excluded from the tech_retirements, so no change in
     #           capacity should ever occur
     energy_capacity = (
@@ -3000,18 +3001,6 @@ def LinkedEmissionsTech_Constraint(M: 'TemoaModel', r, p, s, d, t, v, e):
     the primary region corresponds to the linked technology as well. The lifetimes
     of the primary and linked technologies should be specified and identical."""
     linked_t = M.LinkedTechs[r, t, e]
-    # TODO:  Move this check.  We should QA the LifetimeProcess of the techs separately to prevent many unnecessary
-    #  executions here.
-    # if (r, t, v) in M.LifetimeProcess_final.keys() and M.LifetimeProcess_final[r, linked_t, v] != M.LifetimeProcess_final[r, t, v]:
-    #     msg = ('the LifetimeProcess values of the primary and linked technologies '
-    #            'in the LinkedTechs table have to be specified and identical')
-    #     raise Exception(msg)
-
-    # TODO:  Verify that the below is not needed.  All Lifetime data is in LifetimeProcess_final
-    # if (r, t) in M.LifetimeTech.keys() and M.LifetimeTech[r, linked_t] != M.LifetimeTech[r, t]:
-    #     msg = ('the LifetimeTech values of the primary and linked technologies '
-    #            'in the LinkedTechs table have to be specified and identical')
-    #     raise Exception(msg)
 
     primary_flow = sum(
         M.V_FlowOut[r, p, s, d, S_i, t, v, S_o] * M.EmissionActivity[r, e, S_i, t, v, S_o]
@@ -3025,5 +3014,4 @@ def LinkedEmissionsTech_Constraint(M: 'TemoaModel', r, p, s, d, t, v, e):
         for S_o in M.ProcessOutputsByInput[r, p, linked_t, v, S_i]
     )
 
-    # expr = -primary_flow == linked_flow
     return -primary_flow == linked_flow

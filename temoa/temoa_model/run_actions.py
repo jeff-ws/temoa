@@ -212,7 +212,6 @@ def solve_instance(
     :param instance: the instance to solve
     :return: loaded instance
     """
-    # TODO:  Type the solver in signature
 
     # QA the solver name and get a handle on solver
     if not solver_name:
@@ -258,10 +257,11 @@ def solve_instance(
             optimizer.options['barrier convergetol'] = 1.0e-5
             optimizer.options['feasopt tolerance'] = 1.0e-6
 
-        elif solver_name == 'appsi_highs':
+        elif solver_name == 'gurobi':
             pass
 
-        # TODO: still need to add gurobi parameters?  (and move them all to .toml...?)
+        elif solver_name == 'appsi_highs':
+            pass
 
         # dev note:  The handling of suffixes is pretty weak.  As of today 4/4/2024, highspy crashes if
         #            the keyword suffixes is passed in (regardless if there are any requested).  CBC only
@@ -279,11 +279,9 @@ def solve_instance(
                 )
         else:
             solver_suffixes = []
+        result: SolverResults | None = None
         try:
-            if solver_name == 'appsi_highs' and not solver_suffixes:
-                result: SolverResults = optimizer.solve(instance)
-            else:  # we can try it...
-                result: SolverResults = optimizer.solve(instance, suffixes=solver_suffixes)
+            result = optimizer.solve(instance, suffixes=solver_suffixes)
         except RuntimeError as error:
             logger.error('Solver failed to solve and returned an error: %s', error)
             logger.error(

@@ -226,9 +226,9 @@ class TemoaModel(AbstractModel):
         M.Demand = Param(M.regions, M.time_optimize, M.commodity_demand)
         M.initialize_Demands = BuildAction(rule=CreateDemands)
 
-        # TODO:  Revive this with the DB schema and refactor the associated constraint
         M.ResourceConstraint_rpr = Set(within=M.regions * M.time_optimize * M.commodity_physical)
 
+        # Dev Note:  This parameter is currently NOT implemented.  Preserved for later refactoring
         M.ResourceBound = Param(M.ResourceConstraint_rpr)
 
         # Define technology performance parameters
@@ -236,7 +236,8 @@ class TemoaModel(AbstractModel):
 
         M.ExistingCapacity = Param(M.RegionalIndices, M.tech_with_capacity, M.vintage_exist)
 
-        # temporarily useful for passing down to validator to find set violations
+        # Dev Note:  The below is temporarily useful for passing down to validator to find set violations
+        #            Uncomment this assignment, and comment out the orig below it...
         # M.Efficiency = Param(
         #     Any, Any, Any, Any, Any,
         #     within=NonNegativeReals, validate=validate_Efficiency
@@ -352,9 +353,7 @@ class TemoaModel(AbstractModel):
 
         M.MaxResourceConstraint_rt = Set(within=M.RegionalIndices * M.tech_all)
         M.MaxResource = Param(M.MaxResourceConstraint_rt)
-        # TODO:  Both of the below sets are obsolete and can be removed w/ tests updated
-        # M.MinCapacitySum = Param(M.time_optimize)  # for techs in tech_capacity
-        # M.MaxCapacitySum = Param(M.time_optimize)  # for techs in tech_capacity
+
         M.MaxActivityConstraint_rpt = Set(
             within=M.RegionalGlobalIndices * M.time_optimize * M.tech_all
         )

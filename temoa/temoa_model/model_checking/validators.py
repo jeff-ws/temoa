@@ -47,11 +47,8 @@ def validate_linked_tech(M: 'TemoaModel') -> bool:
     :return:
     """
     logger.debug('Starting to validate linked techs.')
-    # gather the tech-linked_tech pairs
-    tech_pairs = {
-        (k[0], k[1], v) for (k, v) in M.LinkedTechs.items() if v in M.time_optimize
-    }  # (r, t,
-    # linked_tech) tuples
+    # gather the (r, tech, linked_tech) tuples
+    tech_pairs = {(k[0], k[1], v) for (k, v) in M.LinkedTechs.items() if v in M.time_optimize}
 
     # get the lifetimes by (r, t) and v for comparison
     lifetimes: dict[tuple, dict] = defaultdict(dict)
@@ -177,9 +174,9 @@ def tech_groups_set_check(M: 'TemoaModel', rg, g, t) -> bool:
 
 
 # TODO:  Several of these param checkers below are not in use because the params cannot
-# accept new values for the indexing sets that aren't in a recognized set.  Now that we are
-# making the GlobalRegionalIndices, we can probably come back and employ them instead of using
-# the buildAction approach
+#        accept new values for the indexing sets that aren't in an already-constructed set.  Now that we are
+#        making the GlobalRegionalIndices, we can probably come back and employ them instead of using
+#        the buildAction approach
 
 
 def activity_param_check(M: 'TemoaModel', val, rg, p, t) -> bool:
@@ -316,7 +313,6 @@ def check_flex_curtail(M: 'TemoaModel'):
     return True
 
 
-# M.TechInputSplit = Param(M.regions, M.time_optimize, M.commodity_physical, M.tech_all)
 def validate_tech_input_split(M: 'TemoaModel', val, r, p, c, t):
     if all(
         (

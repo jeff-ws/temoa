@@ -286,8 +286,7 @@ class MorrisSequencer:
         in the parameters file.  Also capture the names in the param_info data
         structure for use in pulling data
         """
-        # TODO:  Consider hijacking the iter entry below, which is the 'name' when problem is created to
-        #        contain the db descriptor to alleviate need for the param_info dict?
+
         param_names = {}
         cur = self.con.cursor()
         with open(self.param_file, 'w') as f:

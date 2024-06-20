@@ -41,7 +41,7 @@ def evaluate(param_names, param_values, data: dict, k):
     mdl, res = run_actions.solve_instance(instance=instance, solver_name=config.solver_name)
     status = run_actions.check_solve_status(res)
     if not status:
-        raise RuntimeError('bad solve')  # TODO:  do something else here
+        raise RuntimeError('Bad solve during Method of Morris')
     table_writer = TableWriter(config)
     table_writer.write_results(M=mdl)
 

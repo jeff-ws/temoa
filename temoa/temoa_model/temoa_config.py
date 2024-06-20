@@ -210,11 +210,7 @@ class TemoaConfig:
         width = 25
         spacer = '\n' + '-' * width + '\n'
         msg = spacer
-        # for i in self.dot_dat:
-        #     if self.dot_dat.index(i) == 0:
-        #         msg += '{:>{}s}: {}\n'.format('Input file', width, i)
-        #     else:
-        #         msg += '{:>25s}  {}\n'.format(' ', i)
+
         msg += '{:>{}s}: {}\n'.format('Scenario', width, self.scenario)
         msg += '{:>{}s}: {}\n'.format('Scenario mode', width, self.scenario_mode.name)
         msg += '{:>{}s}: {}\n'.format('Config file', width, self.config_file)
@@ -236,8 +232,6 @@ class TemoaConfig:
         msg += '{:>{}s}: {}\n'.format('Pyomo LP write status', width, self.save_lp_file)
         msg += '{:>{}s}: {}\n'.format('Save duals to output db', width, self.save_duals)
 
-        # TODO:  conditionally add in the mode options
-
         if self.scenario_mode == TemoaMode.MYOPIC:
             msg += spacer
             msg += '{:>{}s}: {}\n'.format(
@@ -247,16 +241,36 @@ class TemoaConfig:
                 'Myopic step size', width, self.myopic_inputs.get('step_size')
             )
 
-        # msg += '{:>{}s}: {}\n'.format('Retain myopic databases', width, self.KeepMyopicDBs)
-        # msg += spacer
-        # msg += '{:>{}s}: {}\n'.format('Citation output status', width, self.how_to_cite)
-        # msg += '{:>{}s}: {}\n'.format('Version output status', width, self.version)
-        # msg += spacer
-        # msg += '{:>{}s}: {}\n'.format('Solver LP write status', width, self.generateSolverLP)
-        # msg += spacer
-        # msg += '{:>{}s}: {}\n'.format('MGA slack value', width, self.mga)
-        # msg += '{:>{}s}: {}\n'.format('MGA # of iterations', width, self.mga_iter)
-        # msg += '{:>{}s}: {}\n'.format('MGA weighting method', width, self.mga_weight)
-        # msg += '**NOTE: If you are performing MGA runs, navigate to the DAT file and make
-        # any modifications to the MGA sets before proceeding.'
+        if self.scenario_mode == TemoaMode.MGA:
+            msg += spacer
+            msg += '{:>{}s}: {}\n'.format(
+                'MGA Cost Epsilon', width, self.mga_inputs.get('cost_epsilon')
+            )
+            msg += '{:>{}s}: {}\n'.format(
+                'MGA Iteration Limit', width, self.mga_inputs.get('iteration_limit')
+            )
+            msg += '{:>{}s}: {}\n'.format(
+                'MGA Time Limit (hrs)', width, self.mga_inputs.get('time_limit_hrs')
+            )
+            msg += '{:>{}s}: {}\n'.format('MGA Axis:', width, self.mga_inputs.get('axis'))
+            msg += '{:>{}s}: {}\n'.format('MGA Weighting', width, self.mga_inputs.get('weighting'))
+
+        if self.scenario_mode == TemoaMode.METHOD_OF_MORRIS:
+            msg += spacer
+            msg += '{:>{}s}: {}\n'.format(
+                'Morris Perturbation', width, self.morris_inputs.get('perturbation')
+            )
+            msg += '{:>{}s}: {}\n'.format(
+                'Morris Param Levels', width, self.morris_inputs.get('levels')
+            )
+            msg += '{:>{}s}: {}\n'.format(
+                'Morris Trajectories', width, self.morris_inputs.get('trajectories')
+            )
+            msg += '{:>{}s}: {}\n'.format(
+                'Morris Random Seed', width, self.morris_inputs.get('seed', 'Auto')
+            )
+            msg += '{:>{}s}: {}\n'.format(
+                'Morris CPU Cores Requested', width, self.morris_inputs.get('cores')
+            )
+
         return msg

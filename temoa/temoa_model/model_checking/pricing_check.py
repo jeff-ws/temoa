@@ -259,7 +259,7 @@ def check_tech_uncap(M: 'TemoaModel') -> bool:
     1.  do not have fixed or invest costs
     2.  Either have no Var cost, or a Var cost in every year of their lifespan (similar to check #3 above)
     3.  Are not in the MaxCapacity/MinCapacity parameters
-    4.  future:  screen the group capacity params
+
     :param M:
     :return:
     """
@@ -316,9 +316,6 @@ def check_tech_uncap(M: 'TemoaModel') -> bool:
                 v,
                 extra_periods,
             )
-
-    # screen the basic Capacity regulating parameters
-    # TODO:  future development to refine this to look for membership in tech groups that have limits
 
     capacity_params = (M.MaxCapacity, M.MinCapacity, M.ExistingCapacity)
     bad_cap_entries = False

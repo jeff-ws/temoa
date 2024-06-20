@@ -105,7 +105,6 @@ def generate_graph(
     dg = make_nx_graph(all_edges, edge_colors, edge_weights, layers)
 
     # loop finder...
-    # TODO:  This segment of code might fit better in the network manager?
     try:
         cycles = nx.simple_cycles(G=dg)
         for cycle in cycles:
