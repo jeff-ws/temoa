@@ -151,7 +151,7 @@ with the exception of skipped tests.
 
 The full Temoa documentation can be built by following the build README file in the Documentation folder.
 
-
+<img referrerpolicy="no-referrer-when-downgrade" src="https://static.scarf.sh/a.png?x-pxid=d0c0cef3-aa11-4db1-ae9c-73bf3eb7ee80" />
 
 
 
