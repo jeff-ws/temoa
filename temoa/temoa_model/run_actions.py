@@ -277,7 +277,7 @@ def solve_instance(
                     bad_apples,
                 )
         else:
-            solver_suffixes = []
+            solver_suffixes = None
         result: SolverResults | None = None
         try:
             result = optimizer.solve(instance, suffixes=solver_suffixes)
