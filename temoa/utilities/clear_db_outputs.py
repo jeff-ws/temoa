@@ -43,10 +43,7 @@ basic_output_tables = [
     'OutputObjective',
     'OutputRetiredCapacity',
 ]
-optional_output_tables = [
-    'OutputFlowOutSummary',
-    'MyopicEfficiency'
-]
+optional_output_tables = ['OutputFlowOutSummary', 'MyopicEfficiency']
 
 if len(sys.argv) != 2:
     print('this utility file expects a CLA for the path to the database to clear')
@@ -75,4 +72,3 @@ if proceed == 'y':
         print('problem with database connection')
 else:
     print('exiting')
-

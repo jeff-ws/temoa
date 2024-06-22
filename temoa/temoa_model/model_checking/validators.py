@@ -68,16 +68,27 @@ def validate_linked_tech(M: 'TemoaModel') -> bool:
         try:
             driven_lifetime = M.LifetimeProcess[r, t_driven, v]
         except KeyError:
-            logger.error('Linked Tech Error:  Driven tech %s does not have a vintage entry %d to match driver %s', t_driven, v, t_driver)
+            logger.error(
+                'Linked Tech Error:  Driven tech %s does not have a vintage entry %d to match driver %s',
+                t_driven,
+                v,
+                t_driver,
+            )
             print('Problem with Linked Tech validation:  See log file')
             return False
         if driven_lifetime != driver_lifetime:
-            logger.error('Linked Tech Error:  Driven tech %s has lifetime %d in vintage %d while driver tech %s has lifetime %d', t_driven, driven_lifetime, v, t_driver, driver_lifetime)
+            logger.error(
+                'Linked Tech Error:  Driven tech %s has lifetime %d in vintage %d while driver tech %s has lifetime %d',
+                t_driven,
+                driven_lifetime,
+                v,
+                t_driver,
+                driver_lifetime,
+            )
             print('Problem with Linked Tech validation:  See log file')
             return False
 
     return True
-
 
 
 def region_check(M: 'TemoaModel', region) -> bool:

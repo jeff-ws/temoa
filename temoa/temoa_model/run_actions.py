@@ -347,7 +347,9 @@ def handle_results(instance: TemoaModel, results, config: TemoaConfig):
         table_writer.write_results(M=instance)
 
     if not config.silent:
-        SE.write('\r[%8.2f] Results processed.                                    \n' % (time() - hack))
+        SE.write(
+            '\r[%8.2f] Results processed.                                    \n' % (time() - hack)
+        )
         SE.flush()
 
     if config.save_excel:
