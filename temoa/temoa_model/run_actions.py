@@ -277,10 +277,15 @@ def solve_instance(
                     bad_apples,
                 )
         else:
-            solver_suffixes = None
+            solver_suffixes = []
         result: SolverResults | None = None
         try:
-            result = optimizer.solve(instance, suffixes=solver_suffixes)
+            # currently, the highs solver call will puke if the suffixes are passed, so we need to
+            # differentiate...
+            if solver_name == 'appsi_highs':
+                result = optimizer.solve(instance)
+            else:
+                result = optimizer.solve(instance, suffixes=solver_suffixes)
         except RuntimeError as error:
             logger.error('Solver failed to solve and returned an error: %s', error)
             logger.error(
@@ -342,7 +347,7 @@ def handle_results(instance: TemoaModel, results, config: TemoaConfig):
         table_writer.write_results(M=instance)
 
     if not config.silent:
-        SE.write('\r[%8.2f] Results processed.\n' % (time() - hack))
+        SE.write('\r[%8.2f] Results processed.                                    \n' % (time() - hack))
         SE.flush()
 
     if config.save_excel:
