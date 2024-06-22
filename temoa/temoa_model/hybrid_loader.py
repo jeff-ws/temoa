@@ -2,7 +2,7 @@
 A module to build/load a Data Portal for myopic run using both SQL to pull data
 and python to filter results
 """
-
+import sys
 import time
 from collections import defaultdict
 from logging import getLogger
@@ -254,7 +254,7 @@ class HybridLoader:
             values: Sequence[tuple],
             validation: ViableSet | None = None,
             val_loc: tuple = (0,),
-        ):
+        ) -> Sequence[tuple]:
             """
             Helper to alleviate some typing!
             Expects that the values passed in are an iterable of tuples, like a standard
@@ -264,11 +264,11 @@ class HybridLoader:
             get deterministic results)
             :param validation: the set to validate the keys/set value against
             :param val_loc: tuple of the positions of r, t, v in the key for validation
-            :return: None
+            :return: a sequence of the values loaded
             """
             if len(values) == 0:
                 logger.info('table, but no (usable) values for param or set: %s', c.name)
-                return
+                return []
             if not isinstance(values[0], tuple):
                 raise ValueError('values must be an iterable of tuples')
 
@@ -294,6 +294,7 @@ class HybridLoader:
                         data[c.name] = screened
                 case Param():
                     data[c.name] = {t[:-1]: t[-1] for t in screened}
+            return screened
 
         def load_indexed_set(indexed_set: Set, index_value, element, element_validator):
             """
@@ -1008,7 +1009,15 @@ class HybridLoader:
             raw = cur.execute(
                 'SELECT primary_region, primary_tech, emis_comm, driven_tech FROM main.LinkedTech'
             ).fetchall()
-            load_element(M.LinkedTechs, raw, self.viable_rtt, (0, 1, 3))
+            # we need to check that all linked techs were viable/loaded... if not ODD behavior
+            # could occur if the linkage is NOT established and the techs operate independently!
+            loaded = load_element(M.LinkedTechs, raw, self.viable_rtt, (0, 1, 3))
+            if len(loaded) < len(raw):
+                missing = set(raw) - set(loaded)
+                for item in missing:
+                    logger.error('Linked Tech item %s is not valid.  Check data', item)
+                    print('problem loading linked tech.  See log file')
+                    sys.exit(-1)
 
         # RampUp
         if self.table_exists('RampUp'):

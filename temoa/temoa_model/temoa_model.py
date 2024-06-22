@@ -433,7 +433,6 @@ class TemoaModel(AbstractModel):
         M.MaxNewCapacityShareConstraint_rptg = Set(within=M.GroupShareIndices)
         M.MaxNewCapacityShare = Param(M.GroupShareIndices)
         M.LinkedTechs = Param(M.RegionalIndices, M.tech_all, M.commodity_emissions, within=Any)
-        M.validate_LinkedTech_lifetimes = BuildCheck(rule=validate_linked_tech)
 
         # Define parameters associated with electric sector operation
         M.RampUp = Param(M.regions, M.tech_ramping)
@@ -795,6 +794,9 @@ class TemoaModel(AbstractModel):
         M.LinkedEmissionsTechConstraint_rpsdtve = Set(
             dimen=7, initialize=LinkedTechConstraintIndices
         )
+        # the validation requires that the set above be built first:
+        M.validate_LinkedTech_lifetimes = BuildCheck(rule=validate_linked_tech)
+
         M.LinkedEmissionsTechConstraint = Constraint(
             M.LinkedEmissionsTechConstraint_rpsdtve, rule=LinkedEmissionsTech_Constraint
         )
