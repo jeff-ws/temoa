@@ -2233,14 +2233,20 @@ understanding of what a constraint does requires only the last line of code:
 "Supply must meet demand."
 
 
-File Structure
+Project Structure
 --------------
 
-The Temoa model code is split into 7 main files:
+The Temoa model code is split into several packages:
+
+1. ``temoa_model`` contains the mathematical model and supporting code to perform basic runs
 
  * ``temoa_model.py`` - contains the overall model definition, defining the
    various sets, parameters, variables, and equations of the Temoa model.
-   Peruse this file for a high-level overview of the model.
+   Peruse this file for a high-level overview of the model.  It references rule
+   implementations in the ``temoa_rules.py`` file for implementations.  Of note,
+   the ``TemoaModel`` class needs to remain serializable by Python's ``pickle``
+   module, so there are no functions/lambdas within the class.  This is enforced by
+   one of the project tests.
 
  * ``temoa_rules.py`` - mainly contains the rule implementations.  That is, this
    file implements the objective function, internal parameters, and constraint
@@ -2251,24 +2257,42 @@ The Temoa model code is split into 7 main files:
    including sparse matrix indexing and checks on parameter and constraint 
    specifications.
 
- * ``temoa_run.py`` - contains the code required to 
-   execute the model when called with :code:'python' rather than :code:'pyomo solve'.  
+ * ``temoa_sequencer.py`` - contains the code required to run the execution sequence
+   during the model run.  This module may pass control to other extensions as reqd.
 
- * ``temoa_stochastic.py`` - contains the PySP required alterations to the
+ * ``run_actions.py`` - contains actions needed to build/solve the model in the course
+   of a run
+
+ * ``hybrid_loader.py`` - contains the interface to load model data from a sqlite
+   database and, when requested, interface with the source-tracing code to QA data.
+
+
+ * ``table_writer.py`` -  formats the results returned by the model; includes
+   outputting results to the shell, storing them in a database, and if requested,
+   calling 'DB_to_Excel.py' to create the Excel file outputs.
+
+2. ``data_processing`` - contains modules to process output results
+
+3. ``extensions`` - contains sub packages to execute alternative solve modes
+
+ * ``myopic`` - contains a separate sequencer and support files to run the model
+   in myopic mode, which is configurable via the config file.
+
+ * ``stochastic`` - contains the PySP required alterations to the
    deterministic model for use in a stochastic model.  Specifically, Temoa
    only needs one additional constraint class in order to partition the
    calculation of the objective function per period.
 
- * ``temoa_mga.py`` - contains the functions used to execute the modeling-to-
-   generate altenatives (MGA) algorithm. Use of MGA is specified through the config 
-   file.
+ * ``modeling_to_generate_alternatives`` - contains modules to execute an "MGA"
+   series of runs on the model via multiprocessing.  MGA is configured via the
+   config file and the additional files in this package.
 
- * ``pformat_results.py`` -  formats the results returned by the model; includes 
-   outputting results to the shell, storing them in a database, and if requested, 
-   calling 'DB_to_Excel.py' to create the Excel file outputs. 
+ * ``method_of_morris`` - contains modules to execute basic sensitivity analysis
+   using method of morris techniques and is described more fully in the ``readme``
+   in that package.
 
-If you are working with a Temoa Git repository, these files are in the
-``temoa_model/`` subdirectory.
+If you are working with a Temoa Git repository, these packages/files are in the
+``temoa/`` subdirectory.
 
 
 The Bleeding Edge
@@ -2450,7 +2474,8 @@ with variable font-sizes, this technological limit no longer exists.  While
 modern wide-screen displays can comfortably show side-by-side difference files with
 100 characters per side, and 100 characters better accommodates some long equations. A
 long line in this sense is one that is not as transparent as to its intent as it
-could be.  Ruff will enforce 100 character line length.
+could be.  **Ruff will enforce 100 character line length**, in accordance with the settings
+in the ``pyproject.toml`` file
 
 Slightly adapted from `PEP 8`_\ :
 

@@ -18,9 +18,12 @@ currently does NOT set these parameters.  It only sets the current values, which
 used for MIP models in Gurobi.  I produced a working version of this with a few lines
 of code in Pyomo, but it is not maintainable right now, and it doesn't have necessary error
 handling for cases where the model is not solved and the basis is unavailable, etc.
-- Using the warm start and a Simplex only solve in Gurobi did not speed things up.  On the 
-contrary, it seems to be much slower that the better performing Barrier solve.  Several
-warm-start solves (seen in Gurobi logs) were running 4+ hours and seemed to be making little
+- Using the warm start and a Simplex only solve in Gurobi did not speed things up appreciably.
+Performance observed was near that of the performing Barrier solve with some relaxed options.
+This could use some additional focused research if/when the pyomo interface supports LP warm start.
+Solve times vary widely and a larger sample is needed.  Additionally, some ill-conditioning in the
+model likely is causing slow performance and if that is fixed, this may be a fruitful future endeavor. 
+Several warm-start solves (seen in Gurobi logs) were running 4+ hours and seemed to be making little
 progress on the model.  This is likely due to degeneracy in the model, which slows the 
 simplex approach down on this model.
 
