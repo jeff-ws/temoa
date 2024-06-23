@@ -77,6 +77,7 @@ save_lp_file = false
 # if the run is not executed in that mode.
 # ---------------------------------------------------
 [MGA]
+# see notes on these in the extensions/modeling_to_generate_alternatives folder readme.txt
 cost_epsilon = 0.03    # propotional relaxation on optimal cost (ex: 0.05 = bound at 105% of original optimal cost)
 iteration_limit = 55   # max iterations to perform
 time_limit_hrs = 1     # max time
