@@ -48,6 +48,7 @@ from temoa.extensions.modeling_to_generate_alternatives.mga_constants import Mga
 from temoa.extensions.modeling_to_generate_alternatives.vector_manager import VectorManager
 from temoa.extensions.modeling_to_generate_alternatives.worker import Worker
 from temoa.temoa_model.hybrid_loader import HybridLoader
+from temoa.temoa_model.model_checking.pricing_check import price_checker
 from temoa.temoa_model.run_actions import build_instance
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -158,6 +159,10 @@ class MgaSequencer:
         instance: TemoaModel = build_instance(
             loaded_portal=data_portal, model_name=self.config.scenario, silent=self.config.silent
         )
+        if self.config.price_check:
+            good_prices = price_checker(instance)
+            if not good_prices and not self.config.silent:
+                print('Warning:  Cost anomalies discovered.  Check log file for details.')
         # tag the instance by name, so we can sort out the multiple results...
         instance.name = '-'.join((self.config.scenario, '0'))
 

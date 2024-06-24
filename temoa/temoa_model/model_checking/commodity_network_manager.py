@@ -57,7 +57,16 @@ class CommodityNetworkManager:
         self.other_orphans: dict[tuple[str, str], set[Tech]] = defaultdict(set)
 
     def _analyze_region(self, region: str, data: NetworkModelData):
-        """recursively whittle away at the region, within the window until no new invalid techs appear"""
+        """
+        Iteratively whittle away at the region, within the window until no new invalid techs appear
+
+        Note:  this is done in a "while" loop because actions taken in one particular period *might*
+        have repercussions in another period.  For instance, if a tech is deemed an "orphan" in
+        period 5 and needs to be removed, but it was alive in periods 1-4, those periods now need to
+        be re-analyzed post-removal.  In practice, this seems to work very quickly with few iterations, but some
+        datasets with complex lifetime relationships between dependent techs and few alternative
+        vintages or such may take a few iterations to clean.
+        """
         done = False
         iter_count = 0
 
@@ -102,7 +111,7 @@ class CommodityNetworkManager:
 
             done = not demand_orphans_this_pass and not other_orphans_this_pass
             logger.debug(
-                'Finished %s pass(es) on region %s during removal of orphan techs',
+                'Finished %d pass(es) on region %s during removal of orphan techs',
                 iter_count,
                 region,
             )
@@ -114,19 +123,22 @@ class CommodityNetworkManager:
             for orphan in sorted(other_orphans_this_pass):
                 logger.warning('Removed %s as other orphan', orphan)
 
-    def analyze_network(self):
+    def analyze_network(self) -> bool:
         """
         Analyze all regions in the model, excluding exchanges
-        :return:
+        :return: True if all regions come back "clean" (no orphans), False otherwise
         """
         # NOTE:  by excluding '-' regions, we are deciding NOT to screen any regional exchange techs,
         #        which would be a whole different level of difficulty to do.
+
         self.filtered_data = self.orig_data.clone()
         self.regions = {r for (r, p) in self.orig_data.available_techs if '-' not in r}
         for region in self.regions:
             logger.info('starting network analysis for region %s', region)
             self._analyze_region(region, data=self.filtered_data)
         self.analyzed = True
+        orphans_found = any(self.demand_orphans.values()) or any(self.other_orphans.values())
+        return not orphans_found
 
     def build_filters(self) -> dict[str, ViableSet]:
         """populate the filters from the data, after network analysis"""

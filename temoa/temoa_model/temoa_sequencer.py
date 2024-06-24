@@ -177,6 +177,9 @@ class TemoaSequencer:
 
             case TemoaMode.CHECK:
                 con = sqlite3.connect(self.config.input_database)
+                if self.config.source_trace is False:
+                    logger.info('Source trace automatic for CHECK')
+                    self.config.source_trace = True
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(
@@ -188,7 +191,9 @@ class TemoaSequencer:
                 # disregard what the config says about price_check and source_trace and just do it...
                 if self.config.price_check is False:
                     logger.info('Price check of model is automatic with CHECK')
-                price_checker(instance)
+                good_prices = price_checker(instance)
+                if not good_prices and not self.config.silent:
+                    print('\nWarning:  Cost anomalies discovered.  Check log file for details.')
                 con.close()
 
             case TemoaMode.PERFECT_FORESIGHT:
@@ -202,7 +207,9 @@ class TemoaSequencer:
                     lp_path=self.config.output_path,
                 )
                 if self.config.price_check:
-                    price_checker(instance)
+                    good_prices = price_checker(instance)
+                    if not good_prices and not self.config.silent:
+                        print('\nWarning:  Cost anomalies discovered.  Check log file for details.')
                 self.pf_solved_instance, self.pf_results = solve_instance(
                     instance, self.config.solver_name, silent=self.config.silent
                 )
