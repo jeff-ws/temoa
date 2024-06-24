@@ -77,6 +77,11 @@ class MorrisSequencer:
         if config.save_excel:
             logger.info('Saving excel is disabled during Morris runs.')
             config.save_excel = False
+        if config.price_check:
+            logger.warning(
+                'Price check is disabled during Morris runs.  If you wish to check costs, run "CHECK" on model before MM'
+            )
+            config.price_check = False
         self.config = config
 
         # read in the options

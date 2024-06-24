@@ -188,7 +188,9 @@ class TemoaSequencer:
                 # disregard what the config says about price_check and source_trace and just do it...
                 if self.config.price_check is False:
                     logger.info('Price check of model is automatic with CHECK')
-                price_checker(instance)
+                good_prices = price_checker(instance)
+                if not good_prices and not self.config.silent:
+                    print('\nWarning:  Cost anomalies discovered.  Check log file for details.')
                 con.close()
 
             case TemoaMode.PERFECT_FORESIGHT:
@@ -202,7 +204,9 @@ class TemoaSequencer:
                     lp_path=self.config.output_path,
                 )
                 if self.config.price_check:
-                    price_checker(instance)
+                    good_prices = price_checker(instance)
+                    if not good_prices and not self.config.silent:
+                        print('\nWarning:  Cost anomalies discovered.  Check log file for details.')
                 self.pf_solved_instance, self.pf_results = solve_instance(
                     instance, self.config.solver_name, silent=self.config.silent
                 )

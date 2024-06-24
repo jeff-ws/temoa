@@ -240,7 +240,9 @@ class MyopicSequencer:
             if not self.config.silent:
                 self.progress_mapper.report(idx, 'check')
             if self.config.price_check:
-                price_checker(instance)
+                good_prices = price_checker(instance)
+                if not good_prices and not self.config.silent:
+                    print('\nWarning:  Cost anomalies discovered.  Check log file for details.')
 
             # 8.  Run the model and assess solve status
             if not self.config.silent:
