@@ -9,6 +9,7 @@
 
 # Scenario Name (Mandatory)
 # This scenario name is used to label results within the output .sqlite file
+# (cannot contain "-" dash)
 scenario = "zulu"
 
 # Scenaio Mode (Mandatory)
@@ -23,13 +24,15 @@ input_database = "data_files/example_dbs/utopia.sqlite"
 # Output file (Mandatory)
 # The output file must be an existing .sqlite file
 # For Pefrect Foresight, the user may target the same input file or a separate /
-# copied sqlite file in a different location.  Myopic requires that input_database = output_database
+# copied sqlite file in a different location.  Myopic, MGA require that input_database = output_database
 output_database = "data_files/example_dbs/utopia.sqlite"
 
 # ------------------------------------
 #        DATA / MODEL CHECKS
 #  To check data / cost integrity
 # ------------------------------------
+
+# See the documentation section on Data Quality for notes on the features below
 
 # Check the pricing structure for common errors, which are reported in the log file
 # Strongly recommended
