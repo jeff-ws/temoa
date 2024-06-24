@@ -806,7 +806,6 @@ class TableWriter:
         ]
         # let's be kind and sort by something reasonable (r, v, t, p)
         rows.sort(key=lambda r: (r[1], r[4], r[3], r[2]))
-        # TODO:  maybe extract this to a pure writing function...we shall see
         cur = self.con.cursor()
         qry = 'INSERT INTO OutputCost VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         cur.executemany(qry, rows)

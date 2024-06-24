@@ -47,7 +47,7 @@ from pyomo.environ import (
 )
 from pyomo.opt import SolverResults
 
-# from temoa.data_processing.DB_to_Excel import make_excel
+from temoa.data_processing.DB_to_Excel import make_excel
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
@@ -211,7 +211,6 @@ def solve_instance(
     :param instance: the instance to solve
     :return: loaded instance
     """
-    # TODO:  Type the solver in signature
 
     # QA the solver name and get a handle on solver
     if not solver_name:
@@ -257,10 +256,11 @@ def solve_instance(
             optimizer.options['barrier convergetol'] = 1.0e-5
             optimizer.options['feasopt tolerance'] = 1.0e-6
 
-        elif solver_name == 'appsi_highs':
+        elif solver_name == 'gurobi':
             pass
 
-        # TODO: still need to add gurobi parameters?  (and move them all to .toml...?)
+        elif solver_name == 'appsi_highs':
+            pass
 
         # dev note:  The handling of suffixes is pretty weak.  As of today 4/4/2024, highspy crashes if
         #            the keyword suffixes is passed in (regardless if there are any requested).  CBC only
@@ -278,11 +278,14 @@ def solve_instance(
                 )
         else:
             solver_suffixes = []
+        result: SolverResults | None = None
         try:
-            if solver_name == 'appsi_highs' and not solver_suffixes:
-                result: SolverResults = optimizer.solve(instance)
-            else:  # we can try it...
-                result: SolverResults = optimizer.solve(instance, suffixes=solver_suffixes)
+            # currently, the highs solver call will puke if the suffixes are passed, so we need to
+            # differentiate...
+            if solver_name == 'appsi_highs':
+                result = optimizer.solve(instance)
+            else:
+                result = optimizer.solve(instance, suffixes=solver_suffixes)
         except RuntimeError as error:
             logger.error('Solver failed to solve and returned an error: %s', error)
             logger.error(
@@ -344,16 +347,17 @@ def handle_results(instance: TemoaModel, results, config: TemoaConfig):
         table_writer.write_results(M=instance)
 
     if not config.silent:
-        SE.write('\r[%8.2f] Results processed.\n' % (time() - hack))
+        SE.write(
+            '\r[%8.2f] Results processed.                                    \n' % (time() - hack)
+        )
         SE.flush()
 
-    # TODO:  Temporarily disabled while we sort out the import problem with pyam module
-    # if config.save_excel:
-    #     temp_scenario = set()
-    #     temp_scenario.add(config.scenario)
-    #     # make_excel function imported near the top
-    #     excel_filename = config.output_path / config.scenario
-    #     make_excel(str(config.output_database), excel_filename, temp_scenario)
+    if config.save_excel:
+        temp_scenario = set()
+        temp_scenario.add(config.scenario)
+        # make_excel function imported near the top
+        excel_filename = config.output_path / config.scenario
+        make_excel(str(config.output_database), excel_filename, temp_scenario)
 
     # if config.stream_output:
     #     print(output_stream.getvalue())

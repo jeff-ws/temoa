@@ -61,6 +61,7 @@ class DefaultItem:
 
 
 # just a convenience to have something other than a None item for placeholder
+# for use in categories listings for categories that are empty in the model
 default_cat = DefaultItem('DEFAULT')
 
 

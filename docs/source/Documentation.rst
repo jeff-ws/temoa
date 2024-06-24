@@ -1425,8 +1425,13 @@ StorageInit
 
 The :code:`StorageInit` parameter determines the initial charge level associated
 with each storage technology. The value should be expressed as a fraction between
-0 and 1. Note that this is an optional parameter and should only be used if the
+0 and 1.
+
+Note 1:  that this is an optional parameter and should only be used if the
 user wishes to set the initial charge rather than allowing the model to optimize it.
+
+Note 2:  This initialization is currently *not supported*.  Values in the StorageInit
+table will be ignored and a log warning will be generated.
 
 
 TechInputSplit

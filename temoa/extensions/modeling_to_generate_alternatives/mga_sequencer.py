@@ -56,8 +56,8 @@ from temoa.temoa_model.temoa_rules import TotalCost_rule
 
 logger = getLogger(__name__)
 
-path_to_options_file = Path(
-    PROJECT_ROOT, 'temoa/extensions/modeling_to_generate_alternatives/solver_options.toml'
+solver_options_path = Path(
+    PROJECT_ROOT, 'temoa/extensions/modeling_to_generate_alternatives/MGA_solver_options.toml'
 )
 
 
@@ -86,7 +86,7 @@ class MgaSequencer:
 
         # read in the options
         try:
-            with open(path_to_options_file, 'rb') as f:
+            with open(solver_options_path, 'rb') as f:
                 all_options = tomllib.load(f)
             s_options = all_options.get(self.config.solver_name, {})
             logger.info('Using solver options: %s', s_options)

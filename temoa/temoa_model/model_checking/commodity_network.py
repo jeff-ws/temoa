@@ -98,13 +98,6 @@ class CommodityNetwork:
         # make synthetic connection between linked techs
         self.prescreen_linked_tech()
 
-        # TODO:  perhaps sockets later to account for inter-regional links, for now,
-        #  we will just look at internal connex
-        # # set of exchange techs FROM this region that supply commodity through link
-        # # {tech: set(output commodities)}
-        # self.output_sockets: dict[str, set[str]] = dict()
-        # self.input_sockets: ...
-
     def remove_tech_by_name(self, tech_name: str) -> None:
         """
         Remove a tech by name from the network
