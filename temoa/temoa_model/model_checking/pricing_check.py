@@ -263,7 +263,7 @@ def price_checker(M: 'TemoaModel') -> bool:
             )
             warnings = True
     # continue by checking the uncap techs...
-    warnings |= check_tech_uncap(M)
+    warnings &= check_tech_uncap(M)
 
     logger.info('Finished Price Checking Build Action')
     return not warnings

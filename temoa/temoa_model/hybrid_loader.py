@@ -118,7 +118,9 @@ class HybridLoader:
                 p for p in periods if myopic_index.base_year <= p <= myopic_index.last_demand_year
             }
         self.manager = CommodityNetworkManager(periods=periods, network_data=network_data)
-        self.manager.analyze_network()
+        all_regions_clean = self.manager.analyze_network()
+        if not all_regions_clean and not self.config.silent:
+            print('\nWarning:  Orphaned processes detected.  See log file for details.')
         self.manager.analyze_graphs(self.config)
 
     def _build_efficiency_dataset(

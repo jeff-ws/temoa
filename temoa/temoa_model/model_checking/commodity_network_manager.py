@@ -123,19 +123,22 @@ class CommodityNetworkManager:
             for orphan in sorted(other_orphans_this_pass):
                 logger.warning('Removed %s as other orphan', orphan)
 
-    def analyze_network(self):
+    def analyze_network(self) -> bool:
         """
         Analyze all regions in the model, excluding exchanges
-        :return:
+        :return: True if all regions come back "clean" (no orphans), False otherwise
         """
         # NOTE:  by excluding '-' regions, we are deciding NOT to screen any regional exchange techs,
         #        which would be a whole different level of difficulty to do.
+
         self.filtered_data = self.orig_data.clone()
         self.regions = {r for (r, p) in self.orig_data.available_techs if '-' not in r}
         for region in self.regions:
             logger.info('starting network analysis for region %s', region)
             self._analyze_region(region, data=self.filtered_data)
         self.analyzed = True
+        orphans_found = any(self.demand_orphans.values()) or any(self.other_orphans.values())
+        return not orphans_found
 
     def build_filters(self) -> dict[str, ViableSet]:
         """populate the filters from the data, after network analysis"""

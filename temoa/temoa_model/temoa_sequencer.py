@@ -177,6 +177,9 @@ class TemoaSequencer:
 
             case TemoaMode.CHECK:
                 con = sqlite3.connect(self.config.input_database)
+                if self.config.source_trace is False:
+                    logger.info('Source trace automatic for CHECK')
+                    self.config.source_trace = True
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
                 instance = build_instance(
