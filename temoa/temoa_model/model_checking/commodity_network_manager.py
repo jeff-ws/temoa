@@ -57,7 +57,16 @@ class CommodityNetworkManager:
         self.other_orphans: dict[tuple[str, str], set[Tech]] = defaultdict(set)
 
     def _analyze_region(self, region: str, data: NetworkModelData):
-        """recursively whittle away at the region, within the window until no new invalid techs appear"""
+        """
+        Iteratively whittle away at the region, within the window until no new invalid techs appear
+
+        Note:  this is done in a "while" loop because actions taken in one particular period *might*
+        have repercussions in another period.  For instance, if a tech is deemed an "orphan" in
+        period 5 and needs to be removed, but it was alive in periods 1-4, those periods now need to
+        be re-analyzed post-removal.  In practice, this seems to work very quickly with few iterations, but some
+        datasets with complex lifetime relationships between dependent techs and few alternative
+        vintages or such may take a few iterations to clean.
+        """
         done = False
         iter_count = 0
 
@@ -102,7 +111,7 @@ class CommodityNetworkManager:
 
             done = not demand_orphans_this_pass and not other_orphans_this_pass
             logger.debug(
-                'Finished %s pass(es) on region %s during removal of orphan techs',
+                'Finished %d pass(es) on region %s during removal of orphan techs',
                 iter_count,
                 region,
             )

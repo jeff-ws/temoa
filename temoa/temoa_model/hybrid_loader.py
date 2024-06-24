@@ -1009,15 +1009,25 @@ class HybridLoader:
             raw = cur.execute(
                 'SELECT primary_region, primary_tech, emis_comm, driven_tech FROM main.LinkedTech'
             ).fetchall()
-            # we need to check that all linked techs were viable/loaded... if not ODD behavior
-            # could occur if the linkage is NOT established and the techs operate independently!
             loaded = load_element(M.LinkedTechs, raw, self.viable_rtt, (0, 1, 3))
+            # The below is a second check (belt and suspenders) and shouldn't really be needed, but it is
+            # preserved for now.
+            # we are checking that for each of the rejected LinkedTechs that each of the individual
+            # techs are also to be rejected (not members of valid_tech) ... if not ODD behavior
+            # could occur if the linkage is NOT established and the techs operate independently!
             if len(loaded) < len(raw):
                 missing = set(raw) - set(loaded)
+                valid_techs = self.viable_techs.members
                 for item in missing:
-                    logger.error('Linked Tech item %s is not valid.  Check data', item)
-                    print('problem loading linked tech.  See log file')
-                    sys.exit(-1)
+                    t1 = item[1]
+                    t2 = item[3]
+                    if t1 in valid_techs or t2 in valid_techs:
+                        # this is a PROBLEM.  The commodity network should have removed both the
+                        # driver and driven techs from the valid tech set, and they should not be in
+                        # the valid tech set lest they be allowed in the model independently.
+                        logger.error('Linked Tech item %s is not valid.  Check data', item)
+                        print('problem loading linked tech.  See log file')
+                        sys.exit(-1)
 
         # RampUp
         if self.table_exists('RampUp'):
