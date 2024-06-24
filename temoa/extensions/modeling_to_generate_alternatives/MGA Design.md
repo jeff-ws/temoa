@@ -50,14 +50,20 @@ An `Input Vector` would be the sum of the dot product of variables and coefficie
 - The logic that determines new `axis vectors` for exploration
 - To be implemented by the `Vector Manager`
 - Options:
-  - Hull Expansion:  Use the `hull norm` vectors as path for exploration
+  - Hull Expansion:  Use the `hull norm` vectors as path for exploration.  The Hull Expansion approach looks to
+  produce normal vectors to the known hull boundaries for exploration.  Initially, to construct the first instance
+  of the hull, the manager will produce +/- direction unit vectors for each of the categories to identify some extreme
+  points to start with.  For instance, if there are 3 categories of tech annotated {solar, wind, electric} the initial
+  batch of vectors would be max/min for each of those categories independently, with the others zeroed.  Then a hull is
+  built and normal vectors are employed going forward.
   - Random (?)?:  Random unit vectors in either the `Axis Vector` dimension or `Model Vector` dimension
 
 ## Implementation:
 - User should specify an `Axis` in the config.  This will enable the selection of a `Vector Manager`
-- User should specify a `Pointing Scheme` in the config that is appropriate for the `Axis` chosen.
+- User should specify a `Weighting Scheme` in the config that is appropriate for the `Axis` chosen.
 This setup is only sparsely built now, but allows a framework for follow-on development
-- User should verify the solver config data in the `solver_options.toml` file
+- User should verify the solver config data in the `solver_options.toml` file in the MGA pkg folder in the `extensions`
+package.
 - User should ensure that the `Axis` is supported in the appropriate data table.  
   - For example, if using the default, we should mark/check categories in `Technology`.  
   - Techs that have no category will be processed but not be part of the `Objective` function. 

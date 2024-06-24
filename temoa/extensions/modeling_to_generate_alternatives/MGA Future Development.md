@@ -16,7 +16,9 @@ designed to use those methods and should not need modification.
 - `Weighting`:  An implement to be used by the `Vector Manager` to help develop weights for objective
 vectors to follow an exploration plan.  It is up to the designer to choose what is eligible.  Design
 choices should be reflected in the `manager_factory.py` module which is responsible for taking the 
-configuration inputs and providing the sequencer the correct manager-weighting combo.
+configuration inputs and providing the sequencer the correct manager-weighting combo.  It would also
+be possible to just make a simple all-in-one manager and pass a `None` or such in the construction
+process.
 
 Additional named constants can be added to the `mga_constants.py` enumerations in order to support
 decisions in the `Manager Factory`.
