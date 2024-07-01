@@ -39,6 +39,7 @@ import pyomo.opt
 from temoa.extensions.method_of_morris.morris_sequencer import MorrisSequencer
 from temoa.extensions.modeling_to_generate_alternatives.mga_sequencer import MgaSequencer
 from temoa.extensions.myopic.myopic_sequencer import MyopicSequencer
+from temoa.extensions.single_vector_mga.sv_mga_sequencer import SvMgaSequencer
 from temoa.temoa_model.hybrid_loader import HybridLoader
 from temoa.temoa_model.model_checking.pricing_check import price_checker
 from temoa.temoa_model.run_actions import (
@@ -210,8 +211,18 @@ class TemoaSequencer:
                     good_prices = price_checker(instance)
                     if not good_prices and not self.config.silent:
                         print('\nWarning:  Cost anomalies discovered.  Check log file for details.')
+                suffixes = (
+                    [
+                        'dual',
+                    ]
+                    if self.config.save_duals
+                    else None
+                )
                 self.pf_solved_instance, self.pf_results = solve_instance(
-                    instance, self.config.solver_name, silent=self.config.silent
+                    instance,
+                    self.config.solver_name,
+                    silent=self.config.silent,
+                    solver_suffixes=suffixes,
                 )
                 good_solve, msg = check_solve_status(self.pf_results)
                 if not good_solve:
@@ -234,6 +245,10 @@ class TemoaSequencer:
             case TemoaMode.MGA:
                 mga_sequencer = MgaSequencer(config=self.config)
                 mga_sequencer.start()
+
+            case TemoaMode.SVMGA:
+                sv_mga_sequencer = SvMgaSequencer(config=self.config)
+                sv_mga_sequencer.start()
 
             case TemoaMode.METHOD_OF_MORRIS:
                 mm_sequencer = MorrisSequencer(config=self.config)
