@@ -1705,34 +1705,14 @@ def ReserveMargin_Constraint(M: 'TemoaModel', r, p, s, d):
     .. math::
         :label: reserve_margin
 
-           \sum_{t \in T^{res} \setminus T^{e}} {
-           CC_{t,r} \cdot
-           \textbf{CAPAVL}_{p,t} \cdot
-           SEG_{s^*,d^*} \cdot C2A_{r,t} } +
-           \sum_{t \in T^{res} \cap T^{e}} {
-           CC_{t,r_i-r} \cdot
-           \textbf{CAPAVL}_{p,t} \cdot
-           SEG_{s^*,d^*} \cdot C2A_{r_i-r,t} }\\ -
-           \sum_{t \in T^{res} \cap T^{e}} {
-           CC_{t,r-r_i} \cdot
-           \textbf{CAPAVL}_{p,t} \cdot
-           SEG_{s^*,d^*} \cdot C2A_{r_i-r,t} }
-           \geq
-           \begin{multline}\left [ {
-           \sum_{ t \in T^{res} \setminus T^{e},V,I,O }
-               \textbf{FO}_{r, p, s, d, i, t, v, o} } \\ {+
-           \sum_{ t \in T^{res} \cap T^{e},V,I,O }
-               \textbf{FO}_{r_i-r, p, s, d, i, t, v, o}  -
-            \sum_{ t \in T^{res} \cap T^{e},V,I,O }
-                \textbf{FI}_{r-r_i, p, s, d, i, t, v, o} -
-            \sum_{ t \in T^{res} \cap T^{s},V,I,O }
-                \textbf{FI}_{r, p, s, d, i, t, v, o}
-            } \right ] \end{multline}
-               \cdot (1 + PRM_r)
-           \\
-           \forall \{r, p, s, d\} \in \Theta_{\text{ReserveMargin}}
-           \text{and} \forall r_i \in R
-
+            &\sum_{t \in T^{res} \setminus T^{e}} {CC_{t,r} \cdot \textbf{CAPAVL}_{p,t} \cdot SEG_{s^*,d^*} \cdot C2A_{r,t} }\\
+            &+ \sum_{t \in T^{res} \cap T^{e}} {CC_{t,r_i-r} \cdot \textbf{CAPAVL}_{p,t} \cdot SEG_{s^*,d^*} \cdot C2A_{r_i-r,t} }\\
+            &- \sum_{t \in T^{res} \cap T^{e}} {CC_{t,r-r_i} \cdot \textbf{CAPAVL}_{p,t} \cdot SEG_{s^*,d^*} \cdot C2A_{r_i-r,t} }\\
+            &\geq \left [ \sum_{ t \in T^{res} \setminus T^{e},V,I,O } \textbf{FO}_{r, p, s, d, i, t, v, o}\right.\\
+            &+ \sum_{ t \in T^{res} \cap T^{e},V,I,O } \textbf{FO}_{r_i-r, p, s, d, i, t, v, o}\\
+            &- \sum_{ t \in T^{res} \cap T^{e},V,I,O } \textbf{FI}_{r-r_i, p, s, d, i, t, v, o}\\
+            &- \left.\sum_{ t \in T^{res} \cap T^{s},V,I,O } \textbf{FI}_{r, p, s, d, i, t, v, o}  \right]  \cdot (1 + PRM_r)\\
+            &\qquad \qquad \forall \{r, p, s, d\} \in \Theta_{\text{ReserveMargin}} \text{and} \forall r_i \in R
     """
     if (not M.tech_reserve) or (
         (r, p) not in M.processReservePeriods.keys()

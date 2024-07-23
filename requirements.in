@@ -1,5 +1,5 @@
 # Requirements for core model functionality
-# python used = 3.11
+# python used = 3.12
 
 # to use pip to install (in a venv, if desired):
 # $: pip install -r requirements.txt
@@ -8,7 +8,7 @@ pyomo
 ipython
 matplotlib
 pandas
-numpy < 2.0
+numpy < 2.0  # currently, pyomo 6.7.3 is not yet updated to allow numpy 2.0.
 joblib
 salib
 pydoe

@@ -120,8 +120,12 @@ written in `Python <http://www.python.org/>`_. Consequently, Temoa will run on
 Linux, Mac, Windows, or any operating system that Pyomo supports. There are
 several open source software elements required to run Temoa. The easiest way to
 install these elements is to create a conda environment in which to run the
-model. Creating a customized environment ensures that the latest version of
-Temoa is compatible with the required software elements. To begin, you need to
+model. Creating a customized environment (or virtual environment) ensures that the latest version of
+Temoa is compatible with the required software elements.  Currently, users have a choice
+between using Pythons :code:`pip` installation tool to set up a virtual environment or use
+:code:`anaconda` as described below:
+
+**Anaconda**:  To begin, you need to
 have conda installed either via `miniconda
 <https://docs.conda.io/en/latest/miniconda.html>`_ or
 `anaconda <https://www.anaconda.com/distribution/>`_.
@@ -142,21 +146,31 @@ Then activate the environment as follows:
   $ conda activate temoa-py3
 
 For additional guidance, `This YouTube tutorial <https://youtu.be/XYoxUGuZG2A>`
-walks through the creation of the Temoa environment. More information on virtual
-environments can be found 
+walks through the creation of the Temoa environment.  It is slightly dated with the
+release of Version 3 of Temoa, but is still informative on how to set up.
+More information on virtual environments can be found
 `here <https://uoa-eresearch.github.io/eresearch-cookbook/recipe/2014/11/20/conda/>`_.
 This new conda environment contains several elements, including Python 3, a
-compatible version of Pyomo, matplotlib, numpy, scipy, and two free solvers
-(`GLPK <https://www.gnu.org/software/glpk/>`_ and `CBC
-<https://github.com/coin-or/Cbc>`_). Windows users: the CBC solver is not
-available for Windows through conda. Thus, in order to install the environment
-properly, the last line of the :code:`environment.yml` file specifying :code:`coincbc`
-should be deleted. A few notes for on the choice of solvers. Different solvers
+compatible version of Pyomo, matplotlib, numpy, scipy.
+
+**Pip**:  For those who prefer to use Python's :code:`pip` installation tool, instructions
+are included in the top level README.md file
+
+Solvers
+-------
+
+A few notes for on the choice of solvers. Different solvers
 have widely varying solution times. If you plan to run Temoa with large datasets
 and/or conduct uncertainty analysis, you may want to consider installing
 commercial linear solvers such as `CPLEX
 <https://www.ibm.com/analytics/cplex-optimizer>`_ or `Gurobi
 <https://www.gurobi.com/>`_. Both offer free academic licenses.
+
+For smaller models, Temoa has been tested with both the `CBC <https://github.com/coin-or/Cbc>`_
+solver and the more recently released `HiGHS <https://pypi.org/project/highspy/>`_ solver.
+Each of the respective websites contains installation instructions for the individual
+solvers.  For those wishing to run the internal tests on Temoa, the :code:`CBC` solver
+is required.
 
 There are three ways to run the model, each of which is detailed below. Note that
 the example commands utilize 'temoa_utopia', a commonly used test case for ESOMs.
@@ -169,7 +183,7 @@ for Temoa. There are a couple of options for obtaining and running Temoa from
 GitHub. If you want to simply run the model, you can download Temoa from GitHub
 as a zip file. Navigate to our `Github repo <https://github.com/TemoaProject/temoa>`__,
 and click the green ‘clone or download’ button near the top-right corner. Select
-‘Download ZIP,’ and you can download the entire Temoa :code:`energysystem` (our main branch)
+‘Download ZIP,’ and you can download the entire Temoa :code:`main` (our main branch)
 to your local machine. The second option creates a local copy of the model source
 code in our GitHub repository. This is a two step process: first install git and
 then ‘clone’ the repository. Under Linux, git can be installed through the default
@@ -197,81 +211,70 @@ conditions inevitably arise. Please use the `Temoa forum
 Running Temoa
 -------------
 Temoa should always be run from the top-level from the top-level
-:code:`temoa` directory. The most basic way to run Temoa is with an input data
-(DAT) file:
+:code:`temoa` directory.
 
-.. parsed-literal::
-  $ python temoa_model/ /path/to/dat/file
-
-This option will simply run the model and output the results to the shell. To
-make sure the model is functioning correctly, try running with the ‘Utopia’
-dataset:
-
-.. parsed-literal::
-  $ python temoa_model/ data_files/utopia-15.dat
-
-To run the model with more features, use a configuration (‘config’) file. An
-example config file called :code:`config_sample`` resides within the :code:`temoa_model``
-folder. Running the model with a config file allows the user to (1) use a sqlite
+To run the model, a configuration (‘config’) file is needed. An
+example config file called :code:`config_sample.toml` resides within the
+:code:`data_files/my_configs` folder. Running the model with a config file allows
+the user to (1) use a sqlite
 database for storing input and output data, (2) create a formatted Excel output
 file, (2) specify the solver to use, (3) return the log file produced during
 model execution, (4) return the lp file utilized by the solver, and (5) to
-execute modeling-to-generate alternatives (MGA).
+execute several of the modeling extensions.
 
 .. parsed-literal::
-  $ python temoa_model/ --config=temoa_model/config_sample
+  $ python temoa_model/ --config=data_files/my_configs/config_sample.toml
 
 **For general help, use --help:**
 
 .. parsed-literal::
-  $ **python  temoa_model/  --help**
-  usage: temoa_model [-h] [--path_to_logs PATH_TO_LOGS] [--config CONFIG]
-                     [--solver {bilevel_blp_global,bilevel_blp_local,bilevel_ld,cplex,mpec_minlp,mpec_nlp,openopt,ps} ]
-                     [dot_dat [dot_dat ...]]
-  
-  positional arguments:
-    dot_dat               AMPL-format data file(s) with which to create a model
-                          instance. e.g. "data.dat"
-  
-  optional arguments:
-    -h, --help            show this help message and exit
-    --path_to_logs PATH_TO_LOGS
-                          Path to where debug logs will be generated by default.
-                          See folder debug_logs in data_files.
-    --config CONFIG       Path to file containing configuration information.
-    --solver {bilevel_blp_global,bilevel_blp_local,bilevel_ld,cplex,mpec_minlp,mpec_nlp,openopt,ps}
-                          Which backend solver to use. See 'pyomo --help-
-                          solvers' for a list of solvers with which Pyomo can
-                          interface. The list shown here is what Pyomo can
-                          currently find on this system. [Default: cplex]
+  $ **python main.py --help**
+    usage: main.py [-h] [--config CONFIG_FILE] [-b] [-s] [-d] [-o OUTPUT_PATH] [--how_to_cite] [-v]
 
-To supplement this documentation, we have also created a
-`YouTube video tutorial <https://youtu.be/WtzCrroAXnQ>` that explains
-how to run Temoa from the command line. There is also an option to run 
-`Temoa on the cloud <https://model.temoacloud.com>`, which
-is explained in `this video tutorial <https://youtu.be/fxYO_kIs364>`. 
+    options:
+      -h, --help            show this help message and exit
+      --config CONFIG_FILE  Path to file containing configuration information.
+      -b, --build_only      Build and return an unsolved TemoaModel instance.
+      -s, --silent          Silent run. No prompts.
+      -d, --debug           Set logging level to DEBUG to see debugging output in log file.
+      -o OUTPUT_PATH, --output_path OUTPUT_PATH
+                            Set the path for log and program outputs to an existing directory. Default is time-stamped folder in output_files.
+      --how_to_cite         Show citation information for publishing purposes.
+      -v, --version         Show current Temoa version
+
+..
+    dated references, preserved as comment here:
+
+    To supplement this documentation, we have also created a
+    `YouTube video tutorial <https://youtu.be/WtzCrroAXnQ>` that explains
+    how to run Temoa from the command line. There is also an option to run
+    `Temoa on the cloud <https://model.temoacloud.com>`, which
+    is explained in `this video tutorial <https://youtu.be/fxYO_kIs364>`.
 
 ====================================
 Database Construction
 ====================================
 
-Input datasets in Temoa can be constructed either as text files or relational 
-databases. Input text files are referred to as 'DAT' files and follow a specific 
-format. Take a look at the example DAT files in the :code:`temoa/data_files` 
+Input datasets in Temoa can be constructed either as text files or relational
+databases. Input text files are referred to as 'DAT' files and follow a specific
+format. Take a look at the example DAT files in the :code:`temoa/data_files`
 directory.
 
-While DAT files work fine for small datasets, relational databases are preferred 
-for larger datasets. To first order, you can think of a database as a collection 
-of tables, where a 'primary key' within each table defines a unique entry (i.e., 
-row) within the table. In addition, a 'foreign key' defines a table element drawn 
-from another table. Foreign keys enforce the defined relationships between 
+While DAT files work fine for small datasets, relational databases are preferred
+for larger datasets. To first order, you can think of a database as a collection
+of tables, where a 'primary key' within each table defines a unique entry (i.e.,
+row) within the table. In addition, a 'foreign key' defines a table element drawn
+from another table. Foreign keys enforce the defined relationships between
 different sets and parameters.
 
-Temoa uses `sqlite`_, a widely used, self-contained database 
-system. Building a database first requires constructing a sql file, which is 
-simply a text file that defines the structure of different database tables and 
-includes the input data. The snippet below is from the technology table used to 
+Temoa uses `sqlite`_, a widely used, self-contained database
+system. Building a database first requires constructing a sql file, which is
+simply a text file that defines the structure of different database tables and
+includes the input data. The snippet below is from the technology table used to
 define the 'temoa_utopia' dataset:
+
+**NOTE**:  *As of Version 3, the below table format is dated, but still shows the general structure of
+the SQL files used to create the database.*
 
 .. parsed-literal::
   CREATE TABLE technologies (
@@ -286,22 +289,22 @@ define the 'temoa_utopia' dataset:
   INSERT INTO "technologies" VALUES('IMPGSL1','r','supply',' imported gasoline','petroleum');
   INSERT INTO "technologies" VALUES('IMPHCO1','r','supply',' imported coal','coal');
 
-The first line creates the table. **Lines 2-6** define the columns within this table. 
+The first line creates the table. **Lines 2-6** define the columns within this table.
 Note that the the technology ('tech') name defines the primary key. Therefore, the
-same technology name cannot be entered twice; each technology name must be unique. 
-**Lines 7-8** define foreign keys within the table. For example, each technology 
-should be specified with a label (e.g., 'r' for 'resource'). Those labels must 
-come from the 'technology_labels' table. Likewise, the sector name must be defined 
-in the 'sector_labels' table. This enforcement of names across tables using 
-foreign keys helps immediately catch typos. (As you can imagine, typos happen in 
-plain text files and Excel when defining thousands of rows of data.) Another big 
-advantage of using databases is that the model run outputs are stored in 
-separate database output tables. The outputs by model run are indexed by a scenario name, 
-which makes it possible to perform thousands of runs, programatically store all 
-the results, and execute arbitrary queries that instantaneously return the requested 
+same technology name cannot be entered twice; each technology name must be unique.
+**Lines 7-8** define foreign keys within the table. For example, each technology
+should be specified with a label (e.g., 'r' for 'resource'). Those labels must
+come from the 'technology_labels' table. Likewise, the sector name must be defined
+in the 'sector_labels' table. This enforcement of names across tables using
+foreign keys helps immediately catch typos. (As you can imagine, typos happen in
+plain text files and Excel when defining thousands of rows of data.) Another big
+advantage of using databases is that the model run outputs are stored in
+separate database output tables. The outputs by model run are indexed by a scenario name,
+which makes it possible to perform thousands of runs, programatically store all
+the results, and execute arbitrary queries that instantaneously return the requested
 data.
 
-Because some database table elements serve as foreign keys in other tables, we 
+Because some database table elements serve as foreign keys in other tables, we
 recommend that you populate input tables in the following order:
 
 **Group 1: labels used for internal database processing**
@@ -349,10 +352,12 @@ recommend that you populate input tables in the following order:
   * TechOutputSplit
   * TechInputSplit
 
-For help getting started, take a look at how :code:`data_files/temoa_utopia.sql` is 
-constructed. Use :code:`data_files/temoa_schema.sql` (a database file with the requisite 
-structure but no data added) to begin building your own database file. We recommend 
-leaving the database structure intact, and simply adding data to the schema file.
+For help getting started, take a look at how :code:`data_files/temoa_utopia.sql` is
+constructed. Use :code:`data_files/temoa_schema.sql` (a database file with the requisite
+structure but no data added) to begin building your own database file. We recommend
+leaving the database structure intact, and simply adding data to the schema file, or
+constructing an empty database from the schema file and then using a database editor
+to import data.
 Once the sql file is complete, you can convert it into a binary sqlite file by 
 installing sqlite3 and executing the following command:
 
