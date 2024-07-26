@@ -2355,7 +2355,7 @@ def MaxNewCapacityGroup_Constraint(M: 'TemoaModel', r, p, g):
     max_new_cap = value(M.MaxNewCapacityGroup[r, p, g])
     agg_new_cap = sum(
         M.V_NewCapacity[r, t, p]
-        for t in M.tech_group_members
+        for t in M.tech_group_members[g]
         if (r, p, t) in M.V_CapacityAvailableByPeriodAndTech
     )
     expr = max_new_cap >= agg_new_cap
