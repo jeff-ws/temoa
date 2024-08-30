@@ -8,7 +8,7 @@ pyomo
 ipython
 matplotlib
 pandas
-numpy < 2.0  # currently, pyomo 6.7.3 is not yet updated to allow numpy 2.0.
+numpy
 joblib
 salib
 pydoe
