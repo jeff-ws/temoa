@@ -178,3 +178,15 @@ likely needed to avoid error on Windows machines:
     `with open(filepath, 'w', encoding='utf-8') as file_handle:`
 
 
+## Hot Fix for Graphviz
+
+Users wishing to utilize the `graphviz` package to visualize results as described in the `README.md` file
+in the `data_processing` package/folder may need to re-install `graphviz` using another delivery means
+other than `pip`.  The current `requirements.txt` will attempt to install `graphviz`, but according to
+their project page, this needs to be done with another configuration manager like `apt` or `homebrew`.
+
+Mac users wishing to use `graphviz` should re-install using `homebrew` with the command:
+
+`brew install graphviz`
+
+(Any Windows users who have tips/info on this are asked to submit a PR to this file to update this section.)
