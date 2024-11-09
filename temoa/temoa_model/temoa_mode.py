@@ -41,3 +41,4 @@ class TemoaMode(Enum):
     BUILD_ONLY = 5  # Just build the model, no solve
     CHECK = 6  # build and run price check, source trace it
     SVMGA = 7  # single-vector MGA
+    MONTE_CARLO = 8  # MC optimization

@@ -40,6 +40,7 @@ from temoa.temoa_model.model_checking.validators import (
     region_group_check,
     validate_Efficiency,
     check_flex_curtail,
+    no_slash,
 )
 from temoa.temoa_model.temoa_initialize import *
 from temoa.temoa_model.temoa_initialize import get_loan_life
@@ -130,8 +131,8 @@ class TemoaModel(AbstractModel):
         M.validate_time = BuildAction(rule=validate_time)
 
         # Define the model time slices
-        M.time_season = Set(ordered=True)
-        M.time_of_day = Set(ordered=True)
+        M.time_season = Set(ordered=True, validate=no_slash)
+        M.time_of_day = Set(ordered=True, validate=no_slash)
 
         # Define regions
         M.regions = Set(validate=region_check)
@@ -143,7 +144,7 @@ class TemoaModel(AbstractModel):
         # Define technology-related sets
         M.tech_resource = Set()
         M.tech_production = Set()
-        M.tech_all = Set(initialize=M.tech_resource | M.tech_production)
+        M.tech_all = Set(initialize=M.tech_resource | M.tech_production, validate=no_slash)
         M.tech_baseload = Set(within=M.tech_all)
         M.tech_annual = Set(within=M.tech_all)
         # annual storage not supported in Storage constraint or TableWriter, so exclude from domain
@@ -181,7 +182,9 @@ class TemoaModel(AbstractModel):
         M.commodity_physical = Set()
         M.commodity_source = Set(within=M.commodity_physical)
         M.commodity_carrier = Set(initialize=M.commodity_physical | M.commodity_demand)
-        M.commodity_all = Set(initialize=M.commodity_carrier | M.commodity_emissions)
+        M.commodity_all = Set(
+            initialize=M.commodity_carrier | M.commodity_emissions, validate=no_slash
+        )
 
         # Define sets for MGA weighting
         M.tech_mga = Set(within=M.tech_all)
