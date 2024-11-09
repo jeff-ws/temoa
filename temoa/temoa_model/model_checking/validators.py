@@ -91,7 +91,7 @@ def validate_linked_tech(M: 'TemoaModel') -> bool:
     return True
 
 
-def no_slash(M: 'TemoaModel', element) -> bool:
+def no_slash_or_pipe(M: 'TemoaModel', element) -> bool:
     """
     No slash character in element
     :param M:
@@ -100,9 +100,9 @@ def no_slash(M: 'TemoaModel', element) -> bool:
     """
     if isinstance(element, int | float):
         return True
-    good = '/' not in str(element)
+    good = '/' not in str(element) and '|' not in str(element)
     if not good:
-        logger.error('no "slash" character is allowed in: %s', str(element))
+        logger.error('no slash "/" or pipe "|" character is allowed in: %s', str(element))
         return False
     return True
 

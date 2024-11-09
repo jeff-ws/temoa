@@ -34,7 +34,7 @@ from temoa.temoa_model.model_checking.validators import (
     linked_region_check,
     region_check,
     region_group_check,
-    no_slash,
+    no_slash_or_pipe,
 )
 
 
@@ -100,6 +100,7 @@ def test_region_group_check():
 params = [
     ('dogfood', True),
     ('cat/dog', False),
+    ('cat|dog', False),
     ('123/45', False),
     (678, True),
 ]
@@ -107,4 +108,4 @@ params = [
 
 @pytest.mark.parametrize('value, expected', params)
 def test_no_slash(value, expected):
-    assert no_slash(M=None, element=value) == expected
+    assert no_slash_or_pipe(M=None, element=value) == expected
