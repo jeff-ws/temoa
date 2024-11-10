@@ -30,7 +30,7 @@ A sequencer for Monte Carlo Runs
 import sqlite3
 from datetime import datetime
 
-from temoa.extensions.monte_carlo.mc_run import MCRun
+from temoa.extensions.monte_carlo.mc_run import MCRunFactory
 from temoa.temoa_model.hybrid_loader import HybridLoader
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -70,7 +70,7 @@ class MCSequencer:
         with sqlite3.connect(self.config.input_database) as con:
             hybrid_loader = HybridLoader(db_connection=con, config=self.config)
         data_store = hybrid_loader.create_data_dict(myopic_index=None)
-        mc_run = MCRun(config=self.config, data_store=data_store)
+        mc_run = MCRunFactory(config=self.config, data_store=data_store)
 
         # 2. Screen the input file
         mc_run.prescreen_input_file()
@@ -78,7 +78,7 @@ class MCSequencer:
         # 3. check runs
         run_gen = mc_run.run_generator()
         for run in run_gen:
-            print(run)
+            pass
 
         # data_portal: DataPortal = hybrid_loader.load_data_portal(myopic_index=None)
         # instance: TemoaModel = build_instance(

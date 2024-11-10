@@ -36,10 +36,16 @@ from temoa.temoa_model.temoa_config import TemoaConfig
 
 logger = getLogger(__name__)
 
+RowData = namedtuple('RowData', ['run', 'param_name', 'indices', 'adjustment', 'value', 'notes'])
+"""cleaned and converted tuple from data in a row of the csv file"""
+ChangeRecord = namedtuple('ChangeRecord', ['param_name', 'index', 'old_value', 'new_value'])
+"""a record of a data element change, for an element acted on by a Tweak"""
+
 
 class Tweak:
     """
-    objects of this class represent individual tweaks to single data elements for a Monte Carlo run
+    objects of this class represent individual tweaks to single (or wildcard)
+    data elements for a Monte Carlo run
     """
 
     def __init__(self, param_name: str, indices: tuple, adjustment: str, value: float):
@@ -56,10 +62,7 @@ class Tweak:
         self.value = value
 
     def __repr__(self):
-        return f'param: {self.param_name}, indices: {self.indices}, adjustment: {self.adjustment}, value: {self.value}'
-
-
-RowData = namedtuple('RowData', ['run', 'param_name', 'indices', 'adjustment', 'value', 'notes'])
+        return f'<param: {self.param_name}, indices: {self.indices}, adjustment: {self.adjustment}, value: {self.value}>'
 
 
 class TweakFactory:
@@ -79,7 +82,8 @@ class TweakFactory:
 
     def make_tweaks(self, row_number: int, row: str) -> tuple[int, list[Tweak]]:
         """
-        make a tuple of tweaks from the row input
+        make a tuple of tweaks from the row input.  Rows with multiple identifiers (separated by /)
+        will produce 1 tweak per identifier per group
         :param row: run, param, index, adjustment, value
         :return: tuple of Tweaks generated from the row
         """
@@ -119,6 +123,12 @@ class TweakFactory:
         return rd.run, res
 
     def row_parser(self, row_number: int, row: str) -> RowData:
+        """
+        Parse an individual row of the input .csv file
+        :param row_number: the row number from the reader (used to ID errors)
+        :param row: the raw row in string format
+        :return: a RowData tuple element
+        """
         tokens = row.strip().split(',')
         tokens = [t.strip() for t in tokens]
         # check length
@@ -156,6 +166,15 @@ class TweakFactory:
 
 class MCRun:
     """
+    The data (and more?) to support a model build + run
+    """
+
+    def __init__(self, data_store: dict):
+        self.data_store = data_store
+
+
+class MCRunFactory:
+    """
     objects of this class represent individual run settings for Monte Carlo.
 
     They will hold the "data tweaks" gathered from input file for application to the base data
@@ -181,18 +200,16 @@ class MCRun:
             for idx, row in enumerate(f.readlines(), start=2):
                 rd = self.tweak_factory.row_parser(idx, row)
                 # check that run indexing is monotonically increasing
-                if idx==2:
+                if idx == 2:
                     current_run = rd.run
                 elif current_run > rd.run:
                     raise ValueError(f'Run sequence violation at row {idx}')
                 elif current_run < rd.run:
                     current_run = rd.run
-        logger.info(
-            f'Pre-screen of data file: {self.settings_file} successful.'
-        )
+        logger.info(f'Pre-screen of data file: {self.settings_file} successful.')
         return True
 
-    def _read_next_row(self) -> Generator[tuple[int, str]]:
+    def _next_row_generator(self) -> Generator[tuple[int, str]]:
         """
         A generator to read lines from thr run settings file
         :return:
@@ -205,12 +222,12 @@ class MCRun:
                 yield idx, line
                 idx += 1
 
-    def run_generator(self)-> tuple[int, list[Tweak]]:
+    def tweak_set_generator(self) -> tuple[int, list[Tweak]]:
         """
         generator for lists of tweaks per run
         :return:
         """
-        rows = self._read_next_row()
+        rows = self._next_row_generator()
         empty = False
         run_tweaks = []
         row_number, next_row = next(rows)
@@ -218,18 +235,99 @@ class MCRun:
         current_run = run_number
         while not empty:
             while run_number == current_run and not empty:
-                run_tweaks.append(tweaks)
+                run_tweaks.extend(tweaks)
                 try:
                     row_number, next_row = next(rows)
-                    run_number, tweaks = self.tweak_factory.make_tweaks(row_number=row_number, row=next_row)
+                    run_number, tweaks = self.tweak_factory.make_tweaks(
+                        row_number=row_number, row=next_row
+                    )
                 except StopIteration:
                     empty = True
             yield current_run, run_tweaks
             # prep the next
-            run_tweaks = [tweaks,]
+            run_tweaks = []
             current_run = run_number
 
+    @staticmethod
+    def element_locator(data_store: dict, param: str, target_index: tuple) -> list[tuple]:
+        """
+        find the associated indices that match the index, which may
+        contain wildcards
+        :param data_store: the data dictionary to search
+        :param target_index: the search criteria
+        :return: list of matching indices
+        """
+        # locate non-wildcards
+        non_wildcard_locs = []
+        for idx, item in enumerate(target_index):
+            if item != '*':
+                non_wildcard_locs.append(idx)
+        # grab all the indices for the given parameter
+        param_data = data_store.get(param)
+        if not param_data:
+            return []
+        # check for correct index length (would be odd, but...)
+        first_index = tuple(param_data.keys())[0]
+        if len(target_index) != len(first_index):
+            raise ValueError(
+                f'length of search index {target_index} for parameter {param} does not match data ex: {first_index}'
+            )
+        raw_indices = param_data.keys()
+        matches = [
+            k
+            for k in raw_indices
+            if all((k[idx] == target_index[idx] for idx in non_wildcard_locs))
+        ]
+        return matches
 
+    @staticmethod
+    def _adjust_value(old_value: float, adjust_type: str, factor: float) -> float:
+        match adjust_type:
+            case 'r':  # relative (ratio) based change
+                res = old_value * (1 + factor)
+            case 's':  # pure substitution
+                res = factor
+            case 'a':  # absolute change
+                res = old_value + factor
+            case _:
+                raise ValueError(f'unsupported adjustment type {adjust_type}')
+        return res
 
+    def run_generator(self) -> MCRun:
+        """
+        make a new MC Run, log problems with tweaks and write successful
+        tweaks to the DB Output
+        :return:
+        """
+        ts_gen = self.tweak_set_generator()
+        for run, tweaks in ts_gen:
+            logger.debug(f'making run %d from %d tweaks: %s', run, len(tweaks), tweaks)
 
+            data_store = self.data_store.copy()  # fresh copy to manipulate
+            for tweak in tweaks:
+                failed_tweaks = []
+                good_tweaks: dict[Tweak, list[ChangeRecord]] = defaultdict(list)
+                # locate the element
+                matching_indices = self.element_locator(data_store, tweak.param_name, tweak.indices)
+                if not matching_indices:  # catalog as failure
+                    failed_tweaks.append(tweak)
+                else:
+                    for index in matching_indices:
+                        old_value = data_store.get(tweak.param_name)[index]
+                        new_value = self._adjust_value(old_value, tweak.adjustment, tweak.value)
+                        data_store[tweak.param_name][index] = new_value
+                        good_tweaks[tweak].append(
+                            ChangeRecord(tweak.param_name, index, old_value, new_value)
+                        )
 
+                # do the logging
+                for tweak in good_tweaks:
+                    logger.debug('successful tweak: %s', tweak)
+                    for adjustment in good_tweaks[tweak]:
+                        logger.debug('  made adjustment: %s', adjustment)
+
+                for tweak in failed_tweaks:
+                    logger.warning('failed tweak: %s', tweak)
+
+                mc_run = MCRun(data_store)
+                yield mc_run
