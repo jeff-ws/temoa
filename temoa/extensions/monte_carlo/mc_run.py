@@ -26,9 +26,12 @@ Created on:  11/9/24
 
 """
 from collections import namedtuple, defaultdict
+from collections.abc import Generator
 from itertools import product
 from logging import getLogger
+from pathlib import Path
 
+from definitions import PROJECT_ROOT
 from temoa.temoa_model.temoa_config import TemoaConfig
 
 logger = getLogger(__name__)
@@ -52,8 +55,11 @@ class Tweak:
         self.adjustment = adjustment
         self.value = value
 
+    def __repr__(self):
+        return f'param: {self.param_name}, indices: {self.indices}, adjustment: {self.adjustment}, value: {self.value}'
 
-RowData = namedtuple('RowData', ['run', 'param_name', 'indices', 'adjustment', 'value'])
+
+RowData = namedtuple('RowData', ['run', 'param_name', 'indices', 'adjustment', 'value', 'notes'])
 
 
 class TweakFactory:
@@ -71,13 +77,13 @@ class TweakFactory:
         self.val_data = data_store
         tweak_dict: dict[int, list[Tweak]] = defaultdict(list)
 
-    def make_tweaks(self, idx: int, row: str) -> tuple[int, list[Tweak]]:
+    def make_tweaks(self, row_number: int, row: str) -> tuple[int, list[Tweak]]:
         """
         make a tuple of tweaks from the row input
         :param row: run, param, index, adjustment, value
         :return: tuple of Tweaks generated from the row
         """
-        rd = self._row_parser(idx, row)
+        rd = self.row_parser(row_number=row_number, row=row)
         # pry the index
         p_index = rd.indices.replace('(', '').replace(')', '')  # remove any optional parens
         tokens = p_index.split('|')
@@ -109,35 +115,41 @@ class TweakFactory:
             Tweak(param_name=rd.param_name, indices=index, adjustment=rd.adjustment, value=rd.value)
             for index in all_inedexes
         ]
+        logger.debug('Made %d Tweaks for data labeled with run: %d', len(res), rd.run)
         return rd.run, res
 
-    def _row_parser(self, idx: int, row: str) -> RowData:
+    def row_parser(self, row_number: int, row: str) -> RowData:
         tokens = row.strip().split(',')
         tokens = [t.strip() for t in tokens]
+        # check length
+        if len(tokens) != 6:
+            raise ValueError(
+                f'Incorrect number of tokens for row {row_number}.  Did you omit notes / trailing comma for no notes or have a comma in your note?'
+            )
         # convert the run number
         try:
             tokens[0] = int(tokens[0])
         except ValueError:
-            raise ValueError('run number at index {idx} must be an integer')
+            raise ValueError('run number at row {idx} must be an integer')
         # convert the value
         try:
-            tokens[-1] = float(tokens[-1])
+            tokens[-2] = float(tokens[-2])
         except ValueError:
-            raise ValueError('value at index {idx} must be numeric')
+            raise ValueError('value at row {idx} must be numeric')
         rd = RowData(*tokens)
 
         # make other checks...
         if not rd.param_name in self.val_data:
             # the param name should be a key value in the data dictionary
             raise ValueError(
-                f'param_name at index: {idx} is either invalid or not represented in the input dataset'
+                f'param_name at index: {row_number} is either invalid or not represented in the input dataset'
             )
         if not rd.adjustment in {'r', 'a', 's'}:
-            raise ValueError(f'adjustment at index {idx} must be either r/a/s')
+            raise ValueError(f'adjustment at index {row_number} must be either r/a/s')
         # check for no "empty" indices in the index
         if '||' in rd.indices:
             raise ValueError(
-                f'indices at index {idx} cannot contain empty marker: ||.  Did you mean to put in wildcard "*"?'
+                f'indices at index {row_number} cannot contain empty marker: ||.  Did you mean to put in wildcard "*"?'
             )
         return rd
 
@@ -149,8 +161,75 @@ class MCRun:
     They will hold the "data tweaks" gathered from input file for application to the base data
     """
 
-    def __init__(self, config: TemoaConfig):
+    def __init__(self, config: TemoaConfig, data_store: dict):
         self.config = config
+        self.data_store = data_store
+        self.tweak_factory = TweakFactory(data_store)
+        self.settings_file = PROJECT_ROOT / Path(self.config.monte_carlo_inputs['run_settings'])
 
     def prescreen_input_file(self):
-        pass
+        """
+        read the input csv file and screen common errors
+        :return: True if file passes, false otherwise with log entries
+        """
+        with open(self.settings_file, 'r') as f:
+            header = f.readline().strip()
+            assert (
+                header == 'run,param,index,mod,value,notes'
+            ), 'header should be: run,param,index,mod,value,notes'
+            current_run = -1
+            for idx, row in enumerate(f.readlines(), start=2):
+                rd = self.tweak_factory.row_parser(idx, row)
+                # check that run indexing is monotonically increasing
+                if idx==2:
+                    current_run = rd.run
+                elif current_run > rd.run:
+                    raise ValueError(f'Run sequence violation at row {idx}')
+                elif current_run < rd.run:
+                    current_run = rd.run
+        logger.info(
+            f'Pre-screen of data file: {self.settings_file} successful.'
+        )
+        return True
+
+    def _read_next_row(self) -> Generator[tuple[int, str]]:
+        """
+        A generator to read lines from thr run settings file
+        :return:
+        """
+        with open(self.settings_file, 'r') as f:
+            # burn header
+            f.readline()
+            idx = 2
+            for line in f:
+                yield idx, line
+                idx += 1
+
+    def run_generator(self)-> tuple[int, list[Tweak]]:
+        """
+        generator for lists of tweaks per run
+        :return:
+        """
+        rows = self._read_next_row()
+        empty = False
+        run_tweaks = []
+        row_number, next_row = next(rows)
+        run_number, tweaks = self.tweak_factory.make_tweaks(row_number=row_number, row=next_row)
+        current_run = run_number
+        while not empty:
+            while run_number == current_run and not empty:
+                run_tweaks.append(tweaks)
+                try:
+                    row_number, next_row = next(rows)
+                    run_number, tweaks = self.tweak_factory.make_tweaks(row_number=row_number, row=next_row)
+                except StopIteration:
+                    empty = True
+            yield current_run, run_tweaks
+            # prep the next
+            run_tweaks = [tweaks,]
+            current_run = run_number
+
+
+
+
+

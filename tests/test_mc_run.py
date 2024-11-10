@@ -39,34 +39,35 @@ def tweak_factory():
 
 
 good_params = [
-    ('1,dog,1|2,a,1.0', RowData(1, 'dog', '1|2', 'a', 1.0), 1),
+    ('1,dog,1|2,a,1.0,some good notes', RowData(1, 'dog', '1|2', 'a', 1.0, 'some good notes'), 1),
     (
-        '1  , dog,  1|2  , a , 1.0',
-        RowData(1, 'dog', '1|2', 'a', 1.0),
+        '1  , dog,  1|2  , a , 1.0,',
+        RowData(1, 'dog', '1|2', 'a', 1.0, ''),
         1,
     ),  # we should be able to strip lead/trail spaces
-    ('22,cat,c|d/e/f|9/10,r,2', RowData(22, 'cat', 'c|d/e/f|9/10', 'r', 2.0), 6),
+    ('22,cat,c|d/e/f|9/10,r,2,', RowData(22, 'cat', 'c|d/e/f|9/10', 'r', 2.0, ''), 6),
 ]
 fail_examples = [
-    ('z,dog,1|2,a,1.0'),  # has 'z' for run, non integer
-    ('1,dog,1||2,a,1.0'),  # has empty index location
-    ('2,dog,5|6,x,2.0'),  # has 'x' not in r/s/a
-    ('3,pig,4|5|7,r,2.0'),  # no pig in data source
+    ('z,dog,1|2,a,1.0,'),  # has 'z' for run, non integer
+    ('1,dog,1||2,a,1.0,'),  # has empty index location
+    ('2,dog,5|6,x,2.0,'),  # has 'x' not in r/s/a
+    ('3,pig,4|5|7,r,2.0,'),  # no pig in data source
 ]
+ids = ['non-int run label', 'empty index', 'non r/s/a', 'no-match param']
 
 
-@pytest.mark.parametrize('row, expected,_', good_params)
+@pytest.mark.parametrize('row, expected,_', good_params, ids=range(len(good_params)))
 def test__row_parser(row, expected, _, tweak_factory):
-    assert tweak_factory._row_parser(0, row=row) == expected
+    assert tweak_factory.row_parser(0, row=row) == expected
 
 
-@pytest.mark.parametrize('row', fail_examples)
+@pytest.mark.parametrize('row', fail_examples, ids=ids)
 def test__row_parser_fail(row, tweak_factory):
     with pytest.raises(ValueError):
-        tweak_factory._row_parser(0, row=row)
+        tweak_factory.row_parser(0, row=row)
 
 
-@pytest.mark.parametrize('row, _, num_tweaks', good_params)
+@pytest.mark.parametrize('row, _, num_tweaks', good_params, ids=range(len(good_params)))
 def test_make_tweaks(row, _, num_tweaks, tweak_factory):
     _, tweaks = tweak_factory.make_tweaks(0, row=row)
     assert len(tweaks) == num_tweaks
