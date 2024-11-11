@@ -18,13 +18,13 @@ scenario = "sierra"
 scenario_mode = "mga"
 
 # Input database (Mandatory)
-input_database = "data_files/utopia.sqlite"
+input_database = "data_files/example_dbs/utopia.sqlite"
 
 # Output file (Mandatory)
 # The output file must be an existing .sqlite file
 # For Pefrect Foresight, the user may target the same input file or a separate /
 # copied sqlite file in a different location.  Myopic requires that input_database = output_database
-output_database = "data_files/utopia.sqlite"
+output_database = "data_files/example_dbs/utopia.sqlite"
 
 # ------------------------------------
 #        DATA / MODEL CHECKS
@@ -79,7 +79,7 @@ save_lp_file = false
 [MGA]
 # see notes on these in the extensions/modeling_to_generate_alternatives folder readme.txt
 cost_epsilon = 0.03    # propotional relaxation on optimal cost (ex: 0.05 = bound at 105% of original optimal cost)
-iteration_limit = 55   # max iterations to perform
+iteration_limit = 20   # max iterations to perform
 time_limit_hrs = 1     # max time
 axis = "tech_category_activity"   # use the tech activity Manager to control exploration based on categories in Tech
 weighting = "hull_expansion"  # use a convex hull expansion algorithm to weight exploration

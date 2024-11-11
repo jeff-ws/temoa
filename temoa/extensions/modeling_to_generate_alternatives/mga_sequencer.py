@@ -210,8 +210,11 @@ class MgaSequencer:
         )
 
         # 5.  Set up the Workers
+        num_workers = self.num_workers
         work_queue = Queue(1)  # restrict the queue to hold just 1 models in it max
-        result_queue = Queue(2)
+        result_queue = Queue(
+            num_workers + 1
+        )  # must be able to hold a shutdown signal from all workers at once!
         log_queue = Queue(50)
         # make workers
         workers = []
@@ -219,7 +222,6 @@ class MgaSequencer:
             'solver_name': self.config.solver_name,
             'solver_options': self.worker_solver_options,
         }
-        num_workers = self.num_workers
         # construct path for the solver logs
         s_path = Path(get_OUTPUT_PATH(), 'solver_logs')
         if not s_path.exists():
@@ -285,6 +287,8 @@ class MgaSequencer:
         if self.verbose:
             print('shutting it down')
         for _ in workers:
+            if self.verbose:
+                print('shutdown sent')
             work_queue.put('ZEBRA')  # shutdown signal
 
         # 7b.  Keep pulling results from the queue to empty it out
