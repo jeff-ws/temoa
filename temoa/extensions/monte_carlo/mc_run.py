@@ -32,13 +32,15 @@ from logging import getLogger
 from pathlib import Path
 
 from definitions import PROJECT_ROOT
+from temoa.temoa_model.hybrid_loader import HybridLoader
 from temoa.temoa_model.temoa_config import TemoaConfig
+from temoa.temoa_model.temoa_model import TemoaModel
 
 logger = getLogger(__name__)
 
 RowData = namedtuple('RowData', ['run', 'param_name', 'indices', 'adjustment', 'value', 'notes'])
 """cleaned and converted tuple from data in a row of the csv file"""
-ChangeRecord = namedtuple('ChangeRecord', ['param_name', 'index', 'old_value', 'new_value'])
+ChangeRecord = namedtuple('ChangeRecord', ['param_name', 'param_index', 'old_value', 'new_value'])
 """a record of a data element change, for an element acted on by a Tweak"""
 
 
@@ -169,8 +171,34 @@ class MCRun:
     The data (and more?) to support a model build + run
     """
 
-    def __init__(self, data_store: dict):
+    def __init__(
+        self,
+        scenario_name: str,
+        run_index: int,
+        data_store: dict,
+        included_tweaks: dict[Tweak, list[ChangeRecord]],
+    ):
+        self.scenario_name = scenario_name
+        self.run_index = run_index
         self.data_store = data_store
+        self.included_tweaks = included_tweaks
+
+    @property
+    def change_records(self) -> list[ChangeRecord]:
+        res = []
+        for k in self.included_tweaks:
+            res.extend(self.included_tweaks[k])
+        return res
+
+    @property
+    def model(self) -> TemoaModel:
+        dp = HybridLoader.data_portal_from_data(self.data_store)
+        model = TemoaModel()
+        instance = model.create_instance(data=dp)
+        # update the name to indexed...
+        instance.name = f'{self.scenario_name}-{self.run_index}'
+        logger.info('Created model instance for run %d', self.run_index)
+        return instance
 
 
 class MCRunFactory:
@@ -209,7 +237,7 @@ class MCRunFactory:
         logger.info(f'Pre-screen of data file: {self.settings_file} successful.')
         return True
 
-    def _next_row_generator(self) -> Generator[tuple[int, str]]:
+    def _next_row_generator(self) -> Generator[tuple[int, str], None, None]:
         """
         A generator to read lines from thr run settings file
         :return:
@@ -290,10 +318,10 @@ class MCRunFactory:
             case 'a':  # absolute change
                 res = old_value + factor
             case _:
-                raise ValueError(f'unsupported adjustment type {adjust_type}')
+                raise ValueError(f'Unsupported adjustment type {adjust_type}')
         return res
 
-    def run_generator(self) -> MCRun:
+    def run_generator(self) -> Generator[MCRun, None, None]:
         """
         make a new MC Run, log problems with tweaks and write successful
         tweaks to the DB Output
@@ -301,12 +329,12 @@ class MCRunFactory:
         """
         ts_gen = self.tweak_set_generator()
         for run, tweaks in ts_gen:
-            logger.debug(f'making run %d from %d tweaks: %s', run, len(tweaks), tweaks)
+            logger.info(f'Making run %d from %d tweaks: %s', run, len(tweaks), tweaks)
 
             data_store = self.data_store.copy()  # fresh copy to manipulate
+            failed_tweaks = []
+            good_tweaks: dict[Tweak, list[ChangeRecord]] = defaultdict(list)
             for tweak in tweaks:
-                failed_tweaks = []
-                good_tweaks: dict[Tweak, list[ChangeRecord]] = defaultdict(list)
                 # locate the element
                 matching_indices = self.element_locator(data_store, tweak.param_name, tweak.indices)
                 if not matching_indices:  # catalog as failure
@@ -320,14 +348,22 @@ class MCRunFactory:
                             ChangeRecord(tweak.param_name, index, old_value, new_value)
                         )
 
-                # do the logging
-                for tweak in good_tweaks:
-                    logger.debug('successful tweak: %s', tweak)
-                    for adjustment in good_tweaks[tweak]:
-                        logger.debug('  made adjustment: %s', adjustment)
+            # do the logging
+            for tweak in good_tweaks:
+                logger.debug('Successful tweak: %s', tweak)
+                for adjustment in good_tweaks[tweak]:
+                    logger.debug('  made adjustment: %s', adjustment)
 
-                for tweak in failed_tweaks:
-                    logger.warning('failed tweak: %s', tweak)
-
-                mc_run = MCRun(data_store)
-                yield mc_run
+            for tweak in failed_tweaks:
+                logger.warning('Failed tweak: %s', tweak)
+            # skip the creation of the run if no tweaks were successful (it would just be the baseline run...)
+            if not good_tweaks:
+                logger.warning(f'Aborting run: {run}.  No good tweaks found')
+                continue
+            mc_run = MCRun(
+                scenario_name=self.config.scenario,
+                run_index=run,
+                data_store=data_store,
+                included_tweaks=good_tweaks,
+            )
+            yield mc_run

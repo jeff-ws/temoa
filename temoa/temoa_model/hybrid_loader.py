@@ -226,13 +226,14 @@ class HybridLoader:
         logger.debug('Data Portal Load time: %0.5f seconds', (toc - tic))
         return dp
 
-    def data_portal_from_data(self, data: dict) -> DataPortal:
+    @staticmethod
+    def data_portal_from_data(data_source: dict) -> DataPortal:
         """
         Create a DataPortal object from a data dictionary.  Useful when the data has been modified
-        :param data: the dataset to use
+        :param data_source: the dataset to use
         :return: a new DataPortal object
         """
-        namespace = {None: data}
+        namespace = {None: data_source}
         dp = DataPortal(data_dict=namespace)
         return dp
 
