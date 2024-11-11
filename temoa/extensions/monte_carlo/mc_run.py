@@ -151,12 +151,12 @@ class TweakFactory:
         rd = RowData(*tokens)
 
         # make other checks...
-        if not rd.param_name in self.val_data:
+        if rd.param_name not in self.val_data:
             # the param name should be a key value in the data dictionary
             raise ValueError(
                 f'param_name at index: {row_number} is either invalid or not represented in the input dataset'
             )
-        if not rd.adjustment in {'r', 'a', 's'}:
+        if rd.adjustment not in {'r', 'a', 's'}:
             raise ValueError(f'adjustment at index {row_number} must be either r/a/s')
         # check for no "empty" indices in the index
         if '||' in rd.indices:
@@ -329,7 +329,7 @@ class MCRunFactory:
         """
         ts_gen = self.tweak_set_generator()
         for run, tweaks in ts_gen:
-            logger.info(f'Making run %d from %d tweaks: %s', run, len(tweaks), tweaks)
+            logger.info('Making run %d from %d tweaks: %s', run, len(tweaks), tweaks)
 
             data_store = self.data_store.copy()  # fresh copy to manipulate
             failed_tweaks = []

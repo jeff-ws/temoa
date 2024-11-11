@@ -230,7 +230,7 @@ class TableWriter:
         for table in optional_output_tables:
             try:
                 cur.execute(f'DELETE FROM {table} WHERE scenario like ?', (target,))
-            except sqlite3.OperationalError as e:
+            except sqlite3.OperationalError:
                 pass
         self.con.commit()
 
