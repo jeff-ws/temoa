@@ -269,6 +269,7 @@ class TemoaSequencer:
                     self.config.plot_commodity_network = False
                     logger.warning('Plot commodity network disabled for MONTE_CARLO')
                 if self.config.price_check:
+                    self.config.price_check = False
                     logger.warning('Price check disabled for MONTE_CARLO')
                 if self.config.save_excel:
                     self.config.save_excel = False
@@ -277,6 +278,7 @@ class TemoaSequencer:
                     self.config.save_lp_file = False
                     logger.warning('Save lp file disabled for MONTE_CARLO')
                 if self.config.save_duals:
+                    self.config.save_duals = False
                     logger.warning('Save duals disabled for MONTE_CARLO')
                 mc_sequencer = MCSequencer(config=self.config)
                 mc_sequencer.start()
