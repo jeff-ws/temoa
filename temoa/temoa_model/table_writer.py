@@ -871,7 +871,6 @@ class TableWriter:
                 change_record.new_value,
             )
             records.append(element)
-        print(records)
         qry = 'INSERT INTO OutputMCTweaks VALUES (?, ?, ?, ?, ?, ?)'
         self.con.executemany(qry, records)
         self.con.commit()
