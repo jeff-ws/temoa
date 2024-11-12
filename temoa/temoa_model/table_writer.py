@@ -191,7 +191,6 @@ class TableWriter:
         """
         if not self.tech_sectors:
             self._set_tech_sectors()
-        self.write_objective(M, iteration=iteration)
         # analyze the emissions to get the costs and flows
         e_costs, e_flows = self._gather_emission_costs_and_flows(M)
         self.emission_register = e_flows
@@ -225,6 +224,7 @@ class TableWriter:
         cur = self.con.cursor()
         for table in basic_output_tables:
             cur.execute(f'DELETE FROM {table} WHERE scenario like ?', (target,))
+        self.con.commit()
         for table in optional_output_tables:
             try:
                 cur.execute(f'DELETE FROM {table} WHERE scenario like ?', (target,))
