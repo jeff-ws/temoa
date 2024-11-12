@@ -142,7 +142,7 @@ class TweakFactory:
         try:
             tokens[0] = int(tokens[0])
         except ValueError:
-            raise ValueError('run number at row {idx} must be an integer')
+            raise ValueError(f'run number at row {row_number} must be an integer')
         # convert the value
         try:
             tokens[-2] = float(tokens[-2])
@@ -331,7 +331,8 @@ class MCRunFactory:
         for run, tweaks in ts_gen:
             logger.info('Making run %d from %d tweaks: %s', run, len(tweaks), tweaks)
 
-            data_store = self.data_store.copy()  # fresh copy to manipulate
+            # need to make a DEEP copy of the orig, which holds other dictionaries...
+            data_store = {k: v.copy() for k, v in self.data_store.items()}
             failed_tweaks = []
             good_tweaks: dict[Tweak, list[ChangeRecord]] = defaultdict(list)
             for tweak in tweaks:
