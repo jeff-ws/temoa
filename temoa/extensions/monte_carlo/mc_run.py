@@ -353,7 +353,7 @@ class MCRunFactory:
             for tweak in good_tweaks:
                 logger.debug('Successful tweak: %s', tweak)
                 for adjustment in good_tweaks[tweak]:
-                    logger.debug('  made adjustment: %s', adjustment)
+                    logger.debug('  made delta: %s', adjustment)
 
             for tweak in failed_tweaks:
                 logger.warning('Failed tweak: %s', tweak)

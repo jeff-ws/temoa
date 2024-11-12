@@ -1,6 +1,6 @@
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS OutputMCTweaks
+CREATE TABLE IF NOT EXISTS OutputMCDelta
 (
     scenario    TEXT NOT NULL,
     run         INT NOT NULL,

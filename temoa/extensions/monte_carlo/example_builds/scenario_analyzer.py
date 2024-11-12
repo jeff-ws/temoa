@@ -35,7 +35,7 @@ from matplotlib import pyplot as plt
 
 from definitions import PROJECT_ROOT
 
-scenario_name = 'Orange Squirrel'  # must match config file
+scenario_name = 'Purple Onion'  # must match config file
 db_path = Path(PROJECT_ROOT, 'data_files/example_dbs/utopia.sqlite')
 with Connection(db_path) as conn:
     cur = conn.cursor()

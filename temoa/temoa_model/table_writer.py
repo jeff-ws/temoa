@@ -69,12 +69,12 @@ basic_output_tables = [
     'OutputObjective',
     'OutputRetiredCapacity',
 ]
-optional_output_tables = ['OutputFlowOutSummary', 'OutputMCTweaks']
+optional_output_tables = ['OutputFlowOutSummary', 'OutputMCDelta']
 
 flow_summary_file_loc = Path(
     PROJECT_ROOT, 'temoa/extensions/modeling_to_generate_alternatives/make_flow_summary_table.sql'
 )
-mc_tweaks_file_loc = Path(PROJECT_ROOT, 'temoa/extensions/monte_carlo/make_tweaks_table.sql')
+mc_tweaks_file_loc = Path(PROJECT_ROOT, 'temoa/extensions/monte_carlo/make_deltas_table.sql')
 
 
 def _marks(num: int) -> str:
@@ -212,8 +212,6 @@ class TableWriter:
         cur = self.con.cursor()
         for table in basic_output_tables:
             cur.execute(f'DELETE FROM {table} WHERE scenario = ?', (self.config.scenario,))
-        for table in optional_output_tables:
-            cur.execute(f'DROP TABLE IF EXISTS {table}')
         self.con.commit()
         self.clear_iterative_runs()
 
@@ -871,7 +869,7 @@ class TableWriter:
                 change_record.new_value,
             )
             records.append(element)
-        qry = 'INSERT INTO OutputMCTweaks VALUES (?, ?, ?, ?, ?, ?)'
+        qry = 'INSERT INTO OutputMCDelta VALUES (?, ?, ?, ?, ?, ?)'
         self.con.executemany(qry, records)
         self.con.commit()
 

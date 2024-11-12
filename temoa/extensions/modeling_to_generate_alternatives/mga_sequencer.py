@@ -75,13 +75,13 @@ class MgaSequencer:
                 'Recommend selecting source trace in config file.'
             )
         if config.save_lp_file:
-            logger.info('Saving LP file is disabled during MGA runs.')
+            logger.warning('Saving LP file is disabled during MGA runs.')
             config.save_lp_file = False
         if config.save_duals:
-            logger.info('Saving duals is disabled during MGA runs.')
+            logger.warning('Saving duals is disabled during MGA runs.')
             config.save_duals = False
         if config.save_excel:
-            logger.info('Saving excel is disabled during MGA runs.')
+            logger.warning('Saving excel is disabled during MGA runs.')
             config.save_excel = False
         self.config = config
 
