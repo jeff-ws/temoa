@@ -50,6 +50,7 @@ class TemoaConfig:
         SVMGA: dict | None = None,
         myopic: dict | None = None,
         morris: dict | None = None,
+        monte_carlo: dict | None = None,
         config_file: Path | None = None,
         silent: bool = False,
         stream_output: bool = False,
@@ -122,6 +123,7 @@ class TemoaConfig:
         self.svmga_inputs = SVMGA
         self.myopic_inputs = myopic
         self.morris_inputs = morris
+        self.monte_carlo_inputs = monte_carlo
         self.silent = silent
         self.stream_output = stream_output
         self.price_check = price_check

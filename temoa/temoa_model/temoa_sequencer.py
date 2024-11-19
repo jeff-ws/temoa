@@ -38,6 +38,7 @@ import pyomo.opt
 
 from temoa.extensions.method_of_morris.morris_sequencer import MorrisSequencer
 from temoa.extensions.modeling_to_generate_alternatives.mga_sequencer import MgaSequencer
+from temoa.extensions.monte_carlo.mc_sequencer import MCSequencer
 from temoa.extensions.myopic.myopic_sequencer import MyopicSequencer
 from temoa.extensions.single_vector_mga.sv_mga_sequencer import SvMgaSequencer
 from temoa.temoa_model.hybrid_loader import HybridLoader
@@ -163,12 +164,12 @@ class TemoaSequencer:
                 # override the "extras"
                 if self.config.source_trace:
                     self.config.source_trace = False
-                    logger.info('Source trace disabled for BUILD_ONLY')
+                    logger.warning('Source trace disabled for BUILD_ONLY')
                 if self.config.plot_commodity_network:
                     self.config.plot_commodity_network = False
-                    logger.info('Plot commodity network disabled for BUILD_ONLY')
+                    logger.warning('Plot commodity network disabled for BUILD_ONLY')
                 if self.config.price_check:
-                    logger.info('Price check disabled for BUILD_ONLY')
+                    logger.warning('Price check disabled for BUILD_ONLY')
                 con = sqlite3.connect(self.config.input_database)
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
@@ -179,7 +180,7 @@ class TemoaSequencer:
             case TemoaMode.CHECK:
                 con = sqlite3.connect(self.config.input_database)
                 if self.config.source_trace is False:
-                    logger.info('Source trace automatic for CHECK')
+                    logger.warning('Source trace automatic for CHECK')
                     self.config.source_trace = True
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
@@ -191,7 +192,7 @@ class TemoaSequencer:
                 )
                 # disregard what the config says about price_check and source_trace and just do it...
                 if self.config.price_check is False:
-                    logger.info('Price check of model is automatic with CHECK')
+                    logger.warning('Price check of model is automatic with CHECK')
                 good_prices = price_checker(instance)
                 if not good_prices and not self.config.silent:
                     print('\nWarning:  Cost anomalies discovered.  Check log file for details.')
@@ -234,7 +235,6 @@ class TemoaSequencer:
                     )
                     sys.exit(-1)
                 handle_results(self.pf_solved_instance, self.pf_results, self.config)
-
                 con.close()
 
             case TemoaMode.MYOPIC:
@@ -243,6 +243,11 @@ class TemoaSequencer:
                 myopic_sequencer.start()
 
             case TemoaMode.MGA:
+                if self.config.solver_name == 'appsi_highs':
+                    raise ValueError(
+                        'Multiprocessing currently not working with HiGHS solver.  '
+                        'Unknown fix...appears to be pyomo issue.  Gurobi, CBC, Ipopt all work.'
+                    )
                 mga_sequencer = MgaSequencer(config=self.config)
                 mga_sequencer.start()
 
@@ -253,6 +258,30 @@ class TemoaSequencer:
             case TemoaMode.METHOD_OF_MORRIS:
                 mm_sequencer = MorrisSequencer(config=self.config)
                 mm_sequencer.start()
+
+            case TemoaMode.MONTE_CARLO:
+                if self.config.solver_name == 'appsi_highs':
+                    raise ValueError(
+                        'Multiprocessing currently not working with HiGHS solver.  '
+                        'Unknown fix...appears to be pyomo issue.  Gurobi, CBC, Ipopt all work.'
+                    )
+                if self.config.plot_commodity_network:
+                    self.config.plot_commodity_network = False
+                    logger.warning('Plot commodity network disabled for MONTE_CARLO')
+                if self.config.price_check:
+                    self.config.price_check = False
+                    logger.warning('Price check disabled for MONTE_CARLO')
+                if self.config.save_excel:
+                    self.config.save_excel = False
+                    logger.warning('Save excel disabled for MONTE_CARLO')
+                if self.config.save_lp_file:
+                    self.config.save_lp_file = False
+                    logger.warning('Save lp file disabled for MONTE_CARLO')
+                if self.config.save_duals:
+                    self.config.save_duals = False
+                    logger.warning('Save duals disabled for MONTE_CARLO')
+                mc_sequencer = MCSequencer(config=self.config)
+                mc_sequencer.start()
 
             case _:
                 raise NotImplementedError('not yet built')

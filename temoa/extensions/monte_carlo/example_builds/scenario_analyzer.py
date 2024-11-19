@@ -18,27 +18,31 @@ A complete copy of the GNU General Public License v2 (GPLv2) is available
 in LICENSE.txt.  Users uncompressing this from an archive may not have
 received this license file.  If not, see <http://www.gnu.org/licenses/>.
 
+
 Written by:  J. F. Hyink
 jeff@westernspark.us
 https://westernspark.us
-Created on:  11/28/23
+Created on:  11/11/24
 
-The possible operating modes for a scenario
+Simple analyzer--example only
 
 """
+from math import sqrt
+from pathlib import Path
+from sqlite3 import Connection
 
-from enum import Enum, unique
+from matplotlib import pyplot as plt
 
+from definitions import PROJECT_ROOT
 
-@unique
-class TemoaMode(Enum):
-    """The processing mode for the scenario"""
+scenario_name = 'Purple Onion'  # must match config file
+db_path = Path(PROJECT_ROOT, 'data_files/example_dbs/utopia.sqlite')
+with Connection(db_path) as conn:
+    cur = conn.cursor()
+    obj_values = cur.execute(
+        f"SELECT total_system_cost FROM OutputObjective WHERE scenario LIKE '{scenario_name}-%'"
+    ).fetchall()
+    obj_values = tuple(t[0] for t in obj_values)
 
-    PERFECT_FORESIGHT = 1  # Normal run, single execution for full time horizon
-    MGA = 2  # Modeling for Generation of Alternatives, multiple runs w/ changing constrained obj
-    MYOPIC = 3  # Step-wise execution through the future
-    METHOD_OF_MORRIS = 4  # Method-of-Morris run
-    BUILD_ONLY = 5  # Just build the model, no solve
-    CHECK = 6  # build and run price check, source trace it
-    SVMGA = 7  # single-vector MGA
-    MONTE_CARLO = 8  # MC optimization
+plt.hist(obj_values, bins=int(sqrt(len(obj_values))))
+plt.show()

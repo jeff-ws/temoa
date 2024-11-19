@@ -4,6 +4,7 @@ tool for writing outputs to database tables
 import sqlite3
 import sys
 from collections import defaultdict, namedtuple
+from collections.abc import Iterable
 from enum import Enum, unique
 from logging import getLogger
 from pathlib import Path
@@ -13,6 +14,7 @@ from pyomo.core import value, Objective
 from pyomo.opt import SolverResults
 
 from definitions import PROJECT_ROOT
+from temoa.extensions.monte_carlo.mc_run import ChangeRecord
 from temoa.temoa_model import temoa_rules
 from temoa.temoa_model.exchange_tech_cost_ledger import CostType, ExchangeTechCostLedger
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -67,13 +69,12 @@ basic_output_tables = [
     'OutputObjective',
     'OutputRetiredCapacity',
 ]
-optional_output_tables = [
-    'OutputFlowOutSummary',
-]
+optional_output_tables = ['OutputFlowOutSummary', 'OutputMCDelta']
 
 flow_summary_file_loc = Path(
     PROJECT_ROOT, 'temoa/extensions/modeling_to_generate_alternatives/make_flow_summary_table.sql'
 )
+mc_tweaks_file_loc = Path(PROJECT_ROOT, 'temoa/extensions/monte_carlo/make_deltas_table.sql')
 
 
 def _marks(num: int) -> str:
@@ -144,7 +145,7 @@ class TableWriter:
         if not append:
             self.clear_scenario()
         if not self.tech_sectors:
-            self._get_tech_sectors()
+            self._set_tech_sectors()
         self.write_objective(M, iteration=iteration)
         self.write_capacity_tables(M, iteration=iteration)
         # analyze the emissions to get the costs and flows
@@ -172,7 +173,7 @@ class TableWriter:
         :return:
         """
         if not self.tech_sectors:
-            self._get_tech_sectors()
+            self._set_tech_sectors()
         self.write_objective(M, iteration=iteration)
         # analyze the emissions to get the costs and flows
         e_costs, e_flows = self._gather_emission_costs_and_flows(M)
@@ -181,7 +182,26 @@ class TableWriter:
         self.con.commit()
         self.con.execute('VACUUM')
 
-    def _get_tech_sectors(self):
+    def write_mc_results(self, M: TemoaModel, iteration: int):
+        """
+        tailored write function to capture appropriate monte carlo results
+        :param M: solve model
+        :param iteration: iteration number
+        :return:
+        """
+        if not self.tech_sectors:
+            self._set_tech_sectors()
+        # analyze the emissions to get the costs and flows
+        e_costs, e_flows = self._gather_emission_costs_and_flows(M)
+        self.emission_register = e_flows
+        self.write_emissions(iteration=iteration)
+        self.write_capacity_tables(M, iteration=iteration)
+        self.write_summary_flow(M, iteration=iteration)
+        self.write_objective(M, iteration=iteration)
+        self.con.commit()
+        self.con.execute('VACUUM')
+
+    def _set_tech_sectors(self):
         """pull the sector info and fill the mapping"""
         qry = 'SELECT tech, sector FROM Technology'
         data = self.con.execute(qry).fetchall()
@@ -191,8 +211,6 @@ class TableWriter:
         cur = self.con.cursor()
         for table in basic_output_tables:
             cur.execute(f'DELETE FROM {table} WHERE scenario = ?', (self.config.scenario,))
-        for table in optional_output_tables:
-            cur.execute(f'DROP TABLE IF EXISTS {table}')
         self.con.commit()
         self.clear_iterative_runs()
 
@@ -206,6 +224,12 @@ class TableWriter:
         cur = self.con.cursor()
         for table in basic_output_tables:
             cur.execute(f'DELETE FROM {table} WHERE scenario like ?', (target,))
+        self.con.commit()
+        for table in optional_output_tables:
+            try:
+                cur.execute(f'DELETE FROM {table} WHERE scenario like ?', (target,))
+            except sqlite3.OperationalError:
+                pass
         self.con.commit()
 
     def write_objective(self, M: TemoaModel, iteration=None) -> None:
@@ -830,6 +854,25 @@ class TableWriter:
         self.con.executemany(qry, dual_data)
         self.con.commit()
 
+    # MONTE CARLO stuff
+
+    def write_tweaks(self, iteration: int, change_records: Iterable[ChangeRecord]):
+        scenario = f'{self.config.scenario}-{iteration}'
+        records = []
+        for change_record in change_records:
+            element = (
+                scenario,
+                iteration,
+                change_record.param_name,
+                str(change_record.param_index).replace("'", ''),
+                change_record.old_value,
+                change_record.new_value,
+            )
+            records.append(element)
+        qry = 'INSERT INTO OutputMCDelta VALUES (?, ?, ?, ?, ?, ?)'
+        self.con.executemany(qry, records)
+        self.con.commit()
+
     def __del__(self):
         if self.con:
             self.con.close()
@@ -837,6 +880,10 @@ class TableWriter:
     def make_summary_flow_table(self):
         # make the additional output table, if needed...
         self.execute_script(flow_summary_file_loc)
+
+    def make_mc_tweaks_table(self):
+        # make the table for monte carlo tweaks, if needed...
+        self.execute_script(mc_tweaks_file_loc)
 
     def execute_script(self, script_file: str | Path):
         """

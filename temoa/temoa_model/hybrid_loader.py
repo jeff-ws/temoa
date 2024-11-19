@@ -208,7 +208,36 @@ class HybridLoader:
         logger.info('Did not find existing table for (optional) table:  %s', table_name)
         return False
 
+        pass
+
     def load_data_portal(self, myopic_index: MyopicIndex | None = None) -> DataPortal:
+        # time the creation of the data portal
+        tic = time.time()
+        data_dict = self.create_data_dict(myopic_index=myopic_index)
+
+        # pyomo namespace format has data[namespace][idx]=value
+        # the default namespace is None, thus...
+        namespace = {None: data_dict}
+        if self.debugging:
+            for item in namespace[None].items():
+                print(item[0], item[1])
+        dp = DataPortal(data_dict=namespace)
+        toc = time.time()
+        logger.debug('Data Portal Load time: %0.5f seconds', (toc - tic))
+        return dp
+
+    @staticmethod
+    def data_portal_from_data(data_source: dict) -> DataPortal:
+        """
+        Create a DataPortal object from a data dictionary.  Useful when the data has been modified
+        :param data_source: the dataset to use
+        :return: a new DataPortal object
+        """
+        namespace = {None: data_source}
+        dp = DataPortal(data_dict=namespace)
+        return dp
+
+    def create_data_dict(self, myopic_index: MyopicIndex | None = None) -> dict:
         """
         Create and Load a Data Portal.  If source tracing is enabled in the config, the source trace will
         be executed and filtered data will be used.  Without source-trace, raw (unfiltered) data will be loaded.
@@ -222,7 +251,7 @@ class HybridLoader:
         # 3. use SQL query to get the full table
         # 4. (OPTIONALLY) filter it, as needed for myopic
         # 5. load it into the data dictionary
-        logger.info('Loading data portal')
+        logger.info('Loading data dictionary')
 
         # some logic checking...
         if myopic_index is not None:
@@ -230,7 +259,7 @@ class HybridLoader:
                 raise ValueError(f'received an illegal entry for the myopic index: {myopic_index}')
             if self.config.scenario_mode != TemoaMode.MYOPIC:
                 raise RuntimeError(
-                    'Myopic Index passed to data portal build, but mode is not Myopic.... '
+                    'Myopic Index passed to data dictionary build, but mode is not Myopic.... '
                     'Likely code error.'
                 )
         elif myopic_index is None and self.config.scenario_mode == TemoaMode.MYOPIC:
@@ -250,8 +279,6 @@ class HybridLoader:
 
         mi = myopic_index  # convenience
 
-        # time the creation of the data portal
-        tic = time.time()
         # housekeeping
         data: dict[str, list | dict] = dict()
 
@@ -1131,16 +1158,8 @@ class HybridLoader:
         set_data = self.load_param_idx_sets(data=data)
         data.update(set_data)
         self.data = data
-        # pyomo namespace format has data[namespace][idx]=value
-        # the default namespace is None, thus...
-        namespace = {None: data}
-        if self.debugging:
-            for item in namespace[None].items():
-                print(item[0], item[1])
-        dp = DataPortal(data_dict=namespace)
-        toc = time.time()
-        logger.debug('Data Portal Load time: %0.5f seconds', (toc - tic))
-        return dp
+
+        return data
 
     def load_param_idx_sets(self, data: dict) -> dict:
         """
@@ -1149,10 +1168,13 @@ class HybridLoader:
         :return: a dictionary of the set name: values
 
         The purpose of this function is to use the data we have already captured for the parameters
-        to make indexing sets in the model.  This replaces all of the "lambda" functions to reverse
-        engineer the built parameters.
+        to make indexing sets in the model.  This replaces all of the "lambda" functions  which were
+        previously used to reverse engineer the built parameters.
 
-        Having these sets allows quicker constraint builds becuase they are the basis of many constraints
+        Having these sets allows quicker constraint builds because they are the basis of many constraints
+
+        It also enables the model to be serialized by python's pickle by removing functions from the model
+        definitions
         """
 
         M: TemoaModel = TemoaModel()  # for typing

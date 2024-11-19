@@ -75,13 +75,13 @@ class MgaSequencer:
                 'Recommend selecting source trace in config file.'
             )
         if config.save_lp_file:
-            logger.info('Saving LP file is disabled during MGA runs.')
+            logger.warning('Saving LP file is disabled during MGA runs.')
             config.save_lp_file = False
         if config.save_duals:
-            logger.info('Saving duals is disabled during MGA runs.')
+            logger.warning('Saving duals is disabled during MGA runs.')
             config.save_duals = False
         if config.save_excel:
-            logger.info('Saving excel is disabled during MGA runs.')
+            logger.warning('Saving excel is disabled during MGA runs.')
             config.save_excel = False
         self.config = config
 
@@ -210,8 +210,11 @@ class MgaSequencer:
         )
 
         # 5.  Set up the Workers
+        num_workers = self.num_workers
         work_queue = Queue(1)  # restrict the queue to hold just 1 models in it max
-        result_queue = Queue(2)
+        result_queue = Queue(
+            num_workers + 1
+        )  # must be able to hold a shutdown signal from all workers at once!
         log_queue = Queue(50)
         # make workers
         workers = []
@@ -219,7 +222,6 @@ class MgaSequencer:
             'solver_name': self.config.solver_name,
             'solver_options': self.worker_solver_options,
         }
-        num_workers = self.num_workers
         # construct path for the solver logs
         s_path = Path(get_OUTPUT_PATH(), 'solver_logs')
         if not s_path.exists():
@@ -285,6 +287,8 @@ class MgaSequencer:
         if self.verbose:
             print('shutting it down')
         for _ in workers:
+            if self.verbose:
+                print('shutdown sent')
             work_queue.put('ZEBRA')  # shutdown signal
 
         # 7b.  Keep pulling results from the queue to empty it out

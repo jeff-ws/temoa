@@ -91,6 +91,22 @@ def validate_linked_tech(M: 'TemoaModel') -> bool:
     return True
 
 
+def no_slash_or_pipe(M: 'TemoaModel', element) -> bool:
+    """
+    No slash character in element
+    :param M:
+    :param element:
+    :return:
+    """
+    if isinstance(element, int | float):
+        return True
+    good = '/' not in str(element) and '|' not in str(element)
+    if not good:
+        logger.error('no slash "/" or pipe "|" character is allowed in: %s', str(element))
+        return False
+    return True
+
+
 def region_check(M: 'TemoaModel', region) -> bool:
     """
     Validate the region name (letters + numbers only + underscore)

@@ -10,13 +10,13 @@
 # Scenario Name (Mandatory)
 # This scenario name is used to label results within the output .sqlite file
 # (cannot contain "-" dash)
-scenario = "zulu"
+scenario = "Orange Squirrel"
 
 # Scenaio Mode (Mandatory)
 # See documentation for explanations.  A standard single run is "perfect_foresight"
 # mode must be one of (case-insensitive):
 #     [perfect_foresight, MGA, myopic, method_of_morris, build_only, check, monte_carlo]
-scenario_mode = "perfect_foresight"
+scenario_mode = "monte_carlo"
 
 # Input database (Mandatory)
 input_database = "data_files/example_dbs/utopia.sqlite"
