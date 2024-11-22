@@ -329,7 +329,8 @@ class MCRunFactory:
         """
         ts_gen = self.tweak_set_generator()
         for run, tweaks in ts_gen:
-            logger.info('Making run %d from %d tweaks: %s', run, len(tweaks), tweaks)
+            logger.info('Making run %d from %d tweaks', run, len(tweaks))
+            logger.debug('Run %d tweaks: %s', run, tweaks)
 
             # need to make a DEEP copy of the orig, which holds other dictionaries...
             data_store = {k: v.copy() for k, v in self.data_store.items()}
