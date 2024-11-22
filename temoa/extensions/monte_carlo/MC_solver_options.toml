@@ -20,7 +20,11 @@ TimeLimit= 18000  # 5 hrs
 # 'LPWarmStart': 2,  # pass basis
 
 [cbc]
+primalT = 1e-3
+dualT = 1e-3
 # tbd
 
 [appsi_highs]
-# tbd
+threads = 2
+primal_feasibility_tolerance = 1e-3
+dual_feasibility_tolerance = 1e-3

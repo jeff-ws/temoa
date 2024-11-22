@@ -113,7 +113,7 @@ class MCSequencer:
 
         # 4. Set up the workers
         num_workers = self.num_workers
-        work_queue = Queue(1)  # restrict the queue to hold just 1 models in it max
+        work_queue = Queue(2)  # restrict the queue to hold just 1 models in it max
         result_queue = Queue(
             num_workers + 1
         )  # must be able to hold a shutdown signal from all workers at once!
@@ -149,6 +149,7 @@ class MCSequencer:
         # capture the "tweaks"
         self.writer.write_tweaks(iteration=mc_run.run_index, change_records=mc_run.change_records)
         instance = mc_run.model
+        iter_counter = 0
         while more_runs:
             try:
                 work_queue.put(instance, block=False)  # put a log on the fire, if room
@@ -187,6 +188,18 @@ class MCSequencer:
                 except queue.Empty:
                     break
             time.sleep(0.1)  # prevent hyperactivity...
+
+            # check the queues...
+            if iter_counter % 100 == 0:
+                try:
+                    logger.info('Work queue size: %d', work_queue.qsize())
+                    logger.info('Result queue size: %d', result_queue.qsize())
+                except NotImplementedError:
+                    pass
+                    # not implemented on OSX
+                finally:
+                    iter_counter = 0
+                iter_counter += 1
 
         # 7. Shut down the workers and then the logging queue
         if self.verbose:
