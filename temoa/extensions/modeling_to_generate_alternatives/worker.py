@@ -106,6 +106,7 @@ class Worker(Process):
             tic = datetime.now()
             try:
                 self.solve_count += 1
+                logger.info('Worker %d solving', self.worker_number)
                 res: SolverResults | None = self.opt.solve(model)
 
             except Exception as e:
