@@ -174,6 +174,7 @@ class MCSequencer:
                 next_result = None
                 # print('no result')
             if next_result is not None:
+                logger.info('Starting post-processing on %d', self.solve_count)
                 self.process_solve_results(next_result)
                 logger.info('Solve count: %d', self.solve_count)
                 self.solve_count += 1
