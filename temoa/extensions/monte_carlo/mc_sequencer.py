@@ -113,7 +113,7 @@ class MCSequencer:
 
         # 4. Set up the workers
         num_workers = self.num_workers
-        work_queue = Queue(2)  # restrict the queue to hold just 1 models in it max
+        work_queue = Queue(6)  # restrict the queue to hold just 1 models in it max
         result_queue = Queue(
             num_workers + 1
         )  # must be able to hold a shutdown signal from all workers at once!
@@ -165,7 +165,7 @@ class MCSequencer:
                     logger.debug('Pulled last run from run generator')
                     more_runs = False
             except queue.Full:
-                # print('work queue is full')
+                print('work queue is full')
                 pass
             # see if there is a result ready to pick up, if not, pass
             try:
@@ -188,10 +188,13 @@ class MCSequencer:
                 except queue.Empty:
                     break
             time.sleep(0.1)  # prevent hyperactivity...
+            # print(f'the run generator size: {sys.getsizeof(log_queue)}')
+            # print(f'the size of the writer is: {sys.getsizeof(self.writer)}')
 
             # check the queues...
             if iter_counter % 100 == 0:
                 try:
+
                     logger.info('Work queue size: %d', work_queue.qsize())
                     logger.info('Result queue size: %d', result_queue.qsize())
                 except NotImplementedError:
@@ -199,7 +202,7 @@ class MCSequencer:
                     # not implemented on OSX
                 finally:
                     iter_counter = 0
-                iter_counter += 1
+            iter_counter += 1
 
         # 7. Shut down the workers and then the logging queue
         if self.verbose:
