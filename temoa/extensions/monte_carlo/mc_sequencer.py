@@ -155,39 +155,48 @@ class MCSequencer:
                 work_queue.put(instance, block=False)  # put a log on the fire, if room
                 logger.info('Putting an instance in the work queue')
                 try:
+                    logger.info('1.  Pulling from gen')
                     mc_run = next(run_gen)
+                    logger.info('2.  Pulled from gen')
                     # capture the "tweaks"
+                    logger.info('3.  Putting making instance')
                     self.writer.write_tweaks(
                         iteration=mc_run.run_index, change_records=mc_run.change_records
                     )
                     instance = mc_run.model
+                    logger.info('4.  Instance made')
                 except StopIteration:
                     logger.debug('Pulled last run from run generator')
                     more_runs = False
             except queue.Full:
-                print('work queue is full')
+                # print('work queue is full')
                 pass
             # see if there is a result ready to pick up, if not, pass
             try:
+                logger.info('5.  looking for result')
                 next_result = result_queue.get_nowait()
+                logger.info('6a.  got result')
             except queue.Empty:
+                logger.info('6b.  No result')
                 next_result = None
                 # print('no result')
             if next_result is not None:
-                logger.info('Starting post-processing on %d', self.solve_count)
+                logger.info('7.  Starting post-processing on %d', self.solve_count)
                 self.process_solve_results(next_result)
-                logger.info('Solve count: %d', self.solve_count)
+                logger.info('8.  Solve count: %d', self.solve_count)
                 self.solve_count += 1
                 if self.verbose or not self.config.silent:
                     print(f'MC Solve count: {self.solve_count}')
             # pull anything from the logging queue and log it...
             while True:
+                logger.info('9.  polling log queue')
                 try:
                     record = log_queue.get_nowait()
                     process_logger = getLogger(record.name)
                     process_logger.handle(record)
                 except queue.Empty:
                     break
+            logger.info('10. Finished polling log queue')
             time.sleep(0.1)  # prevent hyperactivity...
             # print(f'the run generator size: {sys.getsizeof(log_queue)}')
             # print(f'the size of the writer is: {sys.getsizeof(self.writer)}')
