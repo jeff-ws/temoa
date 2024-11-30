@@ -175,7 +175,8 @@ class MCSequencer:
             # see if there is a result ready to pick up, if not, pass
             try:
                 logger.info('5.  looking for result')
-                next_result = result_queue.get_nowait()
+                # next_result = result_queue.get_nowait()  # taking like 16 minutes to pull
+                next_result = result_queue.get(block=True, timeout=1)  # wait for 1 second
                 logger.info('6a.  got result')
             except queue.Empty:
                 logger.info('6b.  No result')
