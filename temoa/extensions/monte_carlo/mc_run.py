@@ -194,7 +194,9 @@ class MCRun:
     def model(self) -> TemoaModel:
         dp = HybridLoader.data_portal_from_data(self.data_store)
         model = TemoaModel()
+        logger.info('3.6  Making instance in MCRun')
         instance = model.create_instance(data=dp)
+        logger.info('3.7  instance done in MCRun')
         # update the name to indexed...
         instance.name = f'{self.scenario_name}-{self.run_index}'
         logger.info('Created model instance for run %d', self.run_index)
