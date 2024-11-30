@@ -159,10 +159,11 @@ class MCSequencer:
                     mc_run = next(run_gen)
                     logger.info('2.  Pulled from gen')
                     # capture the "tweaks"
-                    logger.info('3.  Putting making instance')
+                    logger.info('3.  Writing Tweaks')
                     self.writer.write_tweaks(
                         iteration=mc_run.run_index, change_records=mc_run.change_records
                     )
+                    logger.info('3.1  Making Instance')
                     instance = mc_run.model
                     logger.info('4.  Instance made')
                 except StopIteration:
