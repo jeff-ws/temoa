@@ -30,6 +30,7 @@ A sequencer for Monte Carlo Runs
 import logging
 import queue
 import sqlite3
+import sys
 import time
 import tomllib
 from datetime import datetime
@@ -156,13 +157,17 @@ class MCSequencer:
         iter_counter = 0
         while more_runs:
             try:
+                tic = datetime.now()
                 work_queue.put((run_name, dp), block=False)  # put a log on the fire, if room
-                logger.info('Putting an instance in the work queue')
+                toc = datetime.now()
+
+                logger.info('Put a DataPortal in the work queue of size %0.2f MB in work queue in %0.2f seconds',
+                            sys.getsizeof((run_name, dp)), (toc - tic).total_seconds())
                 try:
                     tic = datetime.now()
                     mc_run = next(run_gen)
                     toc = datetime.now()
-                    logger.info('Made mc_run from generator in %0.2f', (toc - tic).total_seconds())
+                    logger.info('Made mc_run from generator in %0.2f seconds', (toc - tic).total_seconds())
                     # capture the "tweaks"
                     self.writer.write_tweaks(
                         iteration=mc_run.run_index, change_records=mc_run.change_records
@@ -181,7 +186,7 @@ class MCSequencer:
                 next_result = result_queue.get_nowait()
                 toc = datetime.now()
                 logger.info(
-                    'Pulled DataBrick from result_queue in %0.2f', (toc - tic).total_seconds()
+                    'Pulled DataBrick from result_queue in %0.2f seconds', (toc - tic).total_seconds()
                 )
             except queue.Empty:
                 next_result = None
@@ -203,7 +208,7 @@ class MCSequencer:
             time.sleep(0.1)  # prevent hyperactivity...
 
             # check the queues...
-            if iter_counter % 100 == 0:
+            if iter_counter % 6000 == 0:  # about every 10 minutes...post the queue sizes
                 try:
                     logger.info('Work queue size: %d', work_queue.qsize())
                     logger.info('Result queue size: %d', result_queue.qsize())
@@ -276,6 +281,7 @@ class MCSequencer:
         if idx in self.seen_instance_indices:
             raise ValueError(f'Instance index {idx} already seen.  Likely coding error')
         self.seen_instance_indices.add(idx)
+        logger.info('Starting processing of DataBrick of size %0.2f MB', sys.getsizeof(brick)/1e6)
         tic = datetime.now()
         self.writer.write_mc_results(brick=brick, iteration=idx)
         toc = datetime.now()

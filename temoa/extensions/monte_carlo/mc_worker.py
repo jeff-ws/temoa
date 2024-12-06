@@ -104,7 +104,10 @@ class MCWorker(Process):
             self.opt.options = self.solver_options
 
             # wait for a DataPortal object to show up, then get to work
+            tic = datetime.now()
             data = self.dp_queue.get()
+            toc = datetime.now()
+            logger.info('Worker %d pulled a DataPortal from work queue in %0.2f seconds', self.worker_number, (toc - tic).total_seconds())
             if data == 'ZEBRA':  # shutdown signal
                 if verbose:
                     print(f'worker {self.worker_number} got shutdown signal')
