@@ -31,6 +31,8 @@ from itertools import product
 from logging import getLogger
 from pathlib import Path
 
+from pyomo.dataportal import DataPortal
+
 from definitions import PROJECT_ROOT
 from temoa.temoa_model.hybrid_loader import HybridLoader
 from temoa.temoa_model.temoa_config import TemoaConfig
@@ -191,12 +193,17 @@ class MCRun:
         return res
 
     @property
-    def model(self) -> TemoaModel:
+    def model_dp(self) -> tuple[str, DataPortal]:
+        """tuple of the indexed name for the scenario, and the DP"""
+        name = f'{self.scenario_name}-{self.run_index}'
         dp = HybridLoader.data_portal_from_data(self.data_store)
+        return name, dp
+
+    @property
+    def model(self) -> TemoaModel:
+        dp = self.model_dp
         model = TemoaModel()
-        logger.info('3.6  Making instance in MCRun')
         instance = model.create_instance(data=dp)
-        logger.info('3.7  instance done in MCRun')
         # update the name to indexed...
         instance.name = f'{self.scenario_name}-{self.run_index}'
         logger.info('Created model instance for run %d', self.run_index)

@@ -37,13 +37,15 @@ from logging import getLogger
 from multiprocessing import Queue
 from pathlib import Path
 
+from pyomo.dataportal import DataPortal
+
 from definitions import PROJECT_ROOT, get_OUTPUT_PATH
-from temoa.extensions.modeling_to_generate_alternatives.worker import Worker
 from temoa.extensions.monte_carlo.mc_run import MCRunFactory
+from temoa.extensions.monte_carlo.mc_worker import MCWorker
+from temoa.temoa_model.data_brick import DataBrick
 from temoa.temoa_model.hybrid_loader import HybridLoader
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
-from temoa.temoa_model.temoa_model import TemoaModel
 
 logger = getLogger(__name__)
 
@@ -113,8 +115,10 @@ class MCSequencer:
 
         # 4. Set up the workers
         num_workers = self.num_workers
-        work_queue = Queue(6)  # restrict the queue to hold just 1 models in it max
-        result_queue = Queue(
+        work_queue: Queue[tuple[str, DataPortal] | str] = Queue(
+            6
+        )  # restrict the queue to hold just 1 models in it max
+        result_queue: Queue[DataBrick | str] = Queue(
             num_workers + 1
         )  # must be able to hold a shutdown signal from all workers at once!
         log_queue = Queue(50)
@@ -129,8 +133,8 @@ class MCSequencer:
         if not s_path.exists():
             s_path.mkdir()
         for i in range(num_workers):
-            w = Worker(
-                model_queue=work_queue,
+            w = MCWorker(
+                dp_queue=work_queue,
                 results_queue=result_queue,
                 log_root_name=__name__,
                 log_queue=log_queue,
@@ -148,42 +152,41 @@ class MCSequencer:
         mc_run = next(run_gen)
         # capture the "tweaks"
         self.writer.write_tweaks(iteration=mc_run.run_index, change_records=mc_run.change_records)
-        instance = mc_run.model
+        run_name, dp = mc_run.model_dp
         iter_counter = 0
         while more_runs:
             try:
-                work_queue.put(instance, block=False)  # put a log on the fire, if room
+                work_queue.put((run_name, dp), block=False)  # put a log on the fire, if room
                 logger.info('Putting an instance in the work queue')
                 try:
-                    logger.info('1.  Pulling from gen')
+                    tic = datetime.now()
                     mc_run = next(run_gen)
-                    logger.info('2.  Pulled from gen')
+                    toc = datetime.now()
+                    logger.info('Made mc_run from generator in %0.2f', (toc - tic).total_seconds())
                     # capture the "tweaks"
-                    logger.info('3.  Writing Tweaks')
                     self.writer.write_tweaks(
                         iteration=mc_run.run_index, change_records=mc_run.change_records
                     )
-                    logger.info('3.1  Making Instance')
-                    instance = mc_run.model
-                    logger.info('4.  Instance made')
+                    # ready the next one
+                    run_name, dp = mc_run.model_dp
                 except StopIteration:
-                    logger.debug('Pulled last run from run generator')
+                    logger.debug('Pulled last DP from run generator')
                     more_runs = False
             except queue.Full:
                 # print('work queue is full')
                 pass
             # see if there is a result ready to pick up, if not, pass
             try:
-                logger.info('5.  looking for result')
-                # next_result = result_queue.get_nowait()  # taking like 16 minutes to pull
-                next_result = result_queue.get(block=True, timeout=1)  # wait for 1 second
-                logger.info('6a.  got result')
+                tic = datetime.now()
+                next_result = result_queue.get_nowait()
+                toc = datetime.now()
+                logger.info(
+                    'Pulled DataBrick from result_queue in %0.2f', (toc - tic).total_seconds()
+                )
             except queue.Empty:
-                logger.info('6b.  No result')
                 next_result = None
                 # print('no result')
             if next_result is not None:
-                logger.info('7.  Starting post-processing on %d', self.solve_count)
                 self.process_solve_results(next_result)
                 logger.info('8.  Solve count: %d', self.solve_count)
                 self.solve_count += 1
@@ -191,22 +194,17 @@ class MCSequencer:
                     print(f'MC Solve count: {self.solve_count}')
             # pull anything from the logging queue and log it...
             while True:
-                logger.info('9.  polling log queue')
                 try:
                     record = log_queue.get_nowait()
                     process_logger = getLogger(record.name)
                     process_logger.handle(record)
                 except queue.Empty:
                     break
-            logger.info('10. Finished polling log queue')
             time.sleep(0.1)  # prevent hyperactivity...
-            # print(f'the run generator size: {sys.getsizeof(log_queue)}')
-            # print(f'the size of the writer is: {sys.getsizeof(self.writer)}')
 
             # check the queues...
             if iter_counter % 100 == 0:
                 try:
-
                     logger.info('Work queue size: %d', work_queue.qsize())
                     logger.info('Result queue size: %d', result_queue.qsize())
                 except NotImplementedError:
@@ -267,15 +265,16 @@ class MCSequencer:
         if self.verbose:
             print('result queue joined')
 
-    def process_solve_results(self, instance: TemoaModel):
+    def process_solve_results(self, brick: DataBrick):
         """write the results as required"""
         # get the instance number from the model name, if provided
-        if '-' not in instance.name:
+        if '-' not in brick.name:
             raise ValueError(
                 'Instance name does not appear to contain a -idx value.  The manager should be tagging/updating this'
             )
-        idx = int(instance.name.split('-')[-1])
+        idx = int(brick.name.split('-')[-1])
         if idx in self.seen_instance_indices:
             raise ValueError(f'Instance index {idx} already seen.  Likely coding error')
         self.seen_instance_indices.add(idx)
-        self.writer.write_mc_results(M=instance, iteration=idx)
+        logger.info('Processing results for %s', brick.name)
+        self.writer.write_mc_results(brick=brick, iteration=idx)

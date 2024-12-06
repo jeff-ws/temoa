@@ -26,6 +26,11 @@ Created on:  5/5/24
 
 Class to contain Workers that execute solves in separate processes
 
+dev note:
+This class is derived from the original Worker class in MGA extension, but is just different enough
+that it is a separate class.  In future, it may make sense to re-combine these.  RN, this worker will
+ingest DataPortal objects to make new models.  The MGA will (in future) likely just take in new obj functions
+
 """
 import logging.handlers
 from datetime import datetime
@@ -33,19 +38,21 @@ from logging import getLogger
 from multiprocessing import Process, Queue
 from pathlib import Path
 
+from pyomo.dataportal import DataPortal
 from pyomo.opt import SolverFactory, SolverResults, check_optimal_termination
 
+from temoa.temoa_model.data_brick import DataBrick, data_brick_factory
 from temoa.temoa_model.temoa_model import TemoaModel
 
 verbose = False  # for T/S or monitoring...
 
 
-class Worker(Process):
+class MCWorker(Process):
     worker_idx = 1
 
     def __init__(
         self,
-        model_queue: Queue,
+        dp_queue: Queue,
         results_queue: Queue,
         log_root_name,
         log_queue,
@@ -53,11 +60,11 @@ class Worker(Process):
         solver_log_path: Path | None = None,
         **kwargs,
     ):
-        super(Worker, self).__init__(daemon=True)
-        self.worker_number = Worker.worker_idx
-        Worker.worker_idx += 1
-        self.model_queue: Queue = model_queue
-        self.results_queue: Queue = results_queue
+        super(MCWorker, self).__init__(daemon=True)
+        self.worker_number = MCWorker.worker_idx
+        MCWorker.worker_idx += 1
+        self.dp_queue: Queue[DataPortal | str] = dp_queue
+        self.results_queue: Queue[DataBrick | str] = results_queue
         self.solver_name = kwargs['solver_name']
         self.solver_options = kwargs['solver_options']
         self.opt = SolverFactory(self.solver_name, options=self.solver_options)
@@ -96,13 +103,18 @@ class Worker(Process):
 
             self.opt.options = self.solver_options
 
-            model: TemoaModel = self.model_queue.get()
-            if model == 'ZEBRA':  # shutdown signal
+            # wait for a DataPortal object to show up, then get to work
+            data = self.dp_queue.get()
+            if data == 'ZEBRA':  # shutdown signal
                 if verbose:
                     print(f'worker {self.worker_number} got shutdown signal')
                 logger.info('Worker %d received shutdown signal', self.worker_number)
                 self.results_queue.put('COYOTE')
                 break
+            name, dp = data
+            abstract_model = TemoaModel()
+            model: TemoaModel = abstract_model.create_instance(data=dp)
+            model.name = name  # set the name from the input
             tic = datetime.now()
             try:
                 self.solve_count += 1
@@ -124,7 +136,8 @@ class Worker(Process):
             try:
                 good_solve = check_optimal_termination(res)
                 if good_solve:
-                    self.results_queue.put(model)
+                    data_brick = data_brick_factory(model)
+                    self.results_queue.put(data_brick)
                     logger.info(
                         'Worker %d solved a model in %0.2f minutes',
                         self.worker_number,
