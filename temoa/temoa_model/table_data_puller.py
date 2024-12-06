@@ -30,6 +30,7 @@ these functions can be called on a model instance without any DB interactions.  
 by Workers who shouldn't interact with DB).  Dev Note:  In future, if transition away from sqlite, this
 could all be refactored to perform tasks within workers, but concurrent access to sqlite is a no-go
 """
+import functools
 import logging
 from collections import namedtuple, defaultdict
 from enum import unique, Enum
@@ -117,7 +118,8 @@ def poll_capacity_results(M: TemoaModel, epsilon=1e-5) -> CapData:
 
 def poll_flow_results(M: TemoaModel, epsilon=1e-5) -> dict[FI, dict[FlowType, float]]:
     """A static version that can be called directly by a solver worker without making a class instance"""
-    res: dict[FI, dict[FlowType, float]] = defaultdict(lambda: defaultdict(float))
+    dd = functools.partial(defaultdict, float)
+    res: dict[FI, dict[FlowType, float]] = defaultdict(dd)
 
     # ---- NON-annual ----
 

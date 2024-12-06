@@ -106,18 +106,30 @@ class DataBrick:
 
 
 def data_brick_factory(model: TemoaModel) -> DataBrick:
-    _name = model.name
+    name = model.name
     # process costs
-    _regular_costs, _exchange_costs = poll_cost_results(model, p_0=None)
+    regular_costs, exchange_costs = poll_cost_results(model, p_0=None)
 
     # process flows
-    _flow_data = poll_flow_results(model)
+    flow_data = poll_flow_results(model)
 
     # process emissions
-    _emission_costs, _emission_flows = poll_emissions(model)
+    emission_costs, emission_flows = poll_emissions(model)
 
     # poll capacity
-    _capacity_data = poll_capacity_results(model)
+    capacity_data = poll_capacity_results(model)
 
     # process objectives
-    _obj_data = poll_objective(model)
+    obj_data = poll_objective(model)
+
+    db = DataBrick(
+        name=name,
+        emission_costs=emission_costs,
+        emission_flows=emission_flows,
+        capacity_data=capacity_data,
+        flow_data=flow_data,
+        obj_data=obj_data,
+        regular_costs=regular_costs,
+        exchange_costs=exchange_costs,
+    )
+    return db

@@ -188,7 +188,7 @@ class MCSequencer:
                 # print('no result')
             if next_result is not None:
                 self.process_solve_results(next_result)
-                logger.info('8.  Solve count: %d', self.solve_count)
+                logger.info('Solve count: %d', self.solve_count)
                 self.solve_count += 1
                 if self.verbose or not self.config.silent:
                     print(f'MC Solve count: {self.solve_count}')
@@ -276,5 +276,7 @@ class MCSequencer:
         if idx in self.seen_instance_indices:
             raise ValueError(f'Instance index {idx} already seen.  Likely coding error')
         self.seen_instance_indices.add(idx)
-        logger.info('Processing results for %s', brick.name)
+        tic = datetime.now()
         self.writer.write_mc_results(brick=brick, iteration=idx)
+        toc = datetime.now()
+        logger.info('Processed results for %s in %0.2f seconds', brick.name, (toc - tic).total_seconds())
