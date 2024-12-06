@@ -161,8 +161,8 @@ class MCSequencer:
                 work_queue.put((run_name, dp), block=False)  # put a log on the fire, if room
                 toc = datetime.now()
 
-                logger.info('Put a DataPortal in the work queue of size %0.2f MB in work queue in %0.2f seconds',
-                            sys.getsizeof((run_name, dp)), (toc - tic).total_seconds())
+                logger.info('Put a DataPortal in the work queue of size %0.2f KB in work queue in %0.2f seconds',
+                            sys.getsizeof((run_name, dp))/1e3, (toc - tic).total_seconds())
                 try:
                     tic = datetime.now()
                     mc_run = next(run_gen)
@@ -281,7 +281,7 @@ class MCSequencer:
         if idx in self.seen_instance_indices:
             raise ValueError(f'Instance index {idx} already seen.  Likely coding error')
         self.seen_instance_indices.add(idx)
-        logger.info('Starting processing of DataBrick of size %0.2f MB', sys.getsizeof(brick)/1e6)
+        logger.info('Starting processing of DataBrick of size %0.2f KB', sys.getsizeof(brick)/1e3)
         tic = datetime.now()
         self.writer.write_mc_results(brick=brick, iteration=idx)
         toc = datetime.now()
