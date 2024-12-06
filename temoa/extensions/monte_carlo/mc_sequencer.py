@@ -162,7 +162,7 @@ class MCSequencer:
                 toc = datetime.now()
 
                 logger.info('Put a DataPortal in the work queue of size %0.2f KB in work queue in %0.2f seconds',
-                            sys.getsizeof((run_name, dp))/1e3, (toc - tic).total_seconds())
+                            sys.getsizeof(dp)/1e3, (toc - tic).total_seconds())
                 try:
                     tic = datetime.now()
                     mc_run = next(run_gen)
