@@ -85,6 +85,12 @@ def rpetv(fi: FI, e: str) -> tuple:
 
 
 def poll_capacity_results(M: TemoaModel, epsilon=1e-5) -> CapData:
+    """
+    Poll a solved model for capacity results.
+    :param M: Solved Model
+    :param epsilon: epsilon (default 1e-5)
+    :return: a CapData object
+    """
     # Built Capacity
     built = []
     for r, t, v in M.V_NewCapacity:
@@ -117,7 +123,12 @@ def poll_capacity_results(M: TemoaModel, epsilon=1e-5) -> CapData:
 
 
 def poll_flow_results(M: TemoaModel, epsilon=1e-5) -> dict[FI, dict[FlowType, float]]:
-    """A static version that can be called directly by a solver worker without making a class instance"""
+    f"""
+    Poll a solved model for flow results.
+    :param M: A solved Model
+    :param epsilon: epsilon (default 1e-5)
+    :return: nested dictionary of FlowIndex, FlowType : value
+    """
     dd = functools.partial(defaultdict, float)
     res: dict[FI, dict[FlowType, float]] = defaultdict(dd)
 
@@ -192,7 +203,6 @@ def poll_flow_results(M: TemoaModel, epsilon=1e-5) -> dict[FI, dict[FlowType, fl
 
 def poll_objective(M: TemoaModel) -> list[tuple[str, float]]:
     """gather objective name, value tuples for all active objectives"""
-
     objs: list[Objective] = list(M.component_data_objects(Objective))
     active_objs = [obj for obj in objs if obj.active]
     if len(active_objs) > 1:
@@ -207,7 +217,13 @@ def poll_objective(M: TemoaModel) -> list[tuple[str, float]]:
 def poll_cost_results(
     M: TemoaModel, p_0: int | None, epsilon=1e-5
 ) -> tuple[dict[tuple, dict], ...]:
-    """gather all cost data from solved model"""
+    """
+    Poll a solved model for all cost results
+    :param M: Solved Model
+    :param p_0: a base year for discounting of loans, typically only used in MYOPIC.  If none, first optimization year used
+    :param epsilon: epsilon (default 1e-5)
+    :return: tuple of cost_dict, exchange_cost_dict (for exchange techs)
+    """
     if not p_0:
         p_0 = min(M.time_optimize)
 
@@ -397,7 +413,7 @@ def poll_emissions(
     :param M: the model
     :param p_0: the first period, if other than min(time_optimize), as in MYOPIC
     :param epsilon: a minimal epsilon for ignored values
-    :return:
+    :return: cost_dict, flow_dict
     """
 
     # UPDATE:  older versions brought forward had some accounting errors here for flex/curtailed emissions

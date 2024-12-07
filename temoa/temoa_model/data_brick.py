@@ -45,7 +45,7 @@ from temoa.temoa_model.temoa_model import TemoaModel
 
 class DataBrick:
     """
-    A utility container for bundling assorted data structures for runs done by Worker objects.
+    A utility container for bundling assorted data structures for solved models done by Worker objects.
     """
 
     def __init__(
@@ -59,10 +59,6 @@ class DataBrick:
         regular_costs,
         exchange_costs,
     ):
-        """
-        Build a data brick storage object from a model instance
-        :param model:
-        """
         self._name = name
         self._emission_costs = emission_costs
         self._emission_flows = emission_flows
@@ -106,6 +102,10 @@ class DataBrick:
 
 
 def data_brick_factory(model: TemoaModel) -> DataBrick:
+    """
+    Build a data brick storage object from a model instance
+    :param model: A solved model to pull data from.
+    """
     name = model.name
     # process costs
     regular_costs, exchange_costs = poll_cost_results(model, p_0=None)
@@ -114,7 +114,7 @@ def data_brick_factory(model: TemoaModel) -> DataBrick:
     flow_data = poll_flow_results(model)
 
     # process emissions
-    emission_costs, emission_flows = poll_emissions(model)
+    emission_costs, emission_flows = poll_emissions(model, p_0=None)
 
     # poll capacity
     capacity_data = poll_capacity_results(model)

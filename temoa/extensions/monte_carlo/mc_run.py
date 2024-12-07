@@ -170,7 +170,7 @@ class TweakFactory:
 
 class MCRun:
     """
-    The data (and more?) to support a model build + run
+    A Container class to hold the data (and more?) to support a model build + run
     """
 
     def __init__(

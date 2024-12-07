@@ -30,7 +30,6 @@ A sequencer for Monte Carlo Runs
 import logging
 import queue
 import sqlite3
-import sys
 import time
 import tomllib
 from datetime import datetime
@@ -161,13 +160,17 @@ class MCSequencer:
                 work_queue.put((run_name, dp), block=False)  # put a log on the fire, if room
                 toc = datetime.now()
 
-                logger.info('Put a DataPortal in the work queue of size %0.2f KB in work queue in %0.2f seconds',
-                            sys.getsizeof(dp)/1e3, (toc - tic).total_seconds())
+                logger.info(
+                    'Put a DataPortal in the work queue in work queue in %0.2f seconds',
+                    (toc - tic).total_seconds(),
+                )
                 try:
                     tic = datetime.now()
                     mc_run = next(run_gen)
                     toc = datetime.now()
-                    logger.info('Made mc_run from generator in %0.2f seconds', (toc - tic).total_seconds())
+                    logger.info(
+                        'Made mc_run from generator in %0.2f seconds', (toc - tic).total_seconds()
+                    )
                     # capture the "tweaks"
                     self.writer.write_tweaks(
                         iteration=mc_run.run_index, change_records=mc_run.change_records
@@ -186,15 +189,16 @@ class MCSequencer:
                 next_result = result_queue.get_nowait()
                 toc = datetime.now()
                 logger.info(
-                    'Pulled DataBrick from result_queue in %0.2f seconds', (toc - tic).total_seconds()
+                    'Pulled DataBrick from result_queue in %0.2f seconds',
+                    (toc - tic).total_seconds(),
                 )
             except queue.Empty:
                 next_result = None
                 # print('no result')
             if next_result is not None:
                 self.process_solve_results(next_result)
-                logger.info('Solve count: %d', self.solve_count)
                 self.solve_count += 1
+                logger.info('Solve count: %d', self.solve_count)
                 if self.verbose or not self.config.silent:
                     print(f'MC Solve count: {self.solve_count}')
             # pull anything from the logging queue and log it...
@@ -239,8 +243,8 @@ class MCSequencer:
             if next_result is not None and next_result != 'COYOTE':
                 logger.debug('bagged a result post-shutdown')
                 self.process_solve_results(next_result)
-                logger.info('Solve count: %d', self.solve_count)
                 self.solve_count += 1
+                logger.info('Solve count: %d', self.solve_count)
                 if self.verbose or not self.config.silent:
                     print(f'MC Solve count: {self.solve_count}')
             while True:
@@ -281,8 +285,9 @@ class MCSequencer:
         if idx in self.seen_instance_indices:
             raise ValueError(f'Instance index {idx} already seen.  Likely coding error')
         self.seen_instance_indices.add(idx)
-        logger.info('Starting processing of DataBrick of size %0.2f KB', sys.getsizeof(brick)/1e3)
         tic = datetime.now()
         self.writer.write_mc_results(brick=brick, iteration=idx)
         toc = datetime.now()
-        logger.info('Processed results for %s in %0.2f seconds', brick.name, (toc - tic).total_seconds())
+        logger.info(
+            'Processed results for %s in %0.2f seconds', brick.name, (toc - tic).total_seconds()
+        )
