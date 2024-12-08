@@ -48,6 +48,7 @@ from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 
 logger = getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 solver_options_path = Path(PROJECT_ROOT, 'temoa/extensions/monte_carlo/MC_solver_options.toml')
 
@@ -82,7 +83,7 @@ class MCSequencer:
         self.orig_label = self.config.scenario
 
         self.writer = TableWriter(self.config)
-        self.verbose = False  # for troubleshooting
+        self.verbose = True  # for troubleshooting
 
     def start(self):
         """Run the sequencer"""
@@ -138,7 +139,7 @@ class MCSequencer:
                 results_queue=result_queue,
                 log_root_name=__name__,
                 log_queue=log_queue,
-                log_level=logging.INFO,
+                log_level=logging.DEBUG,
                 solver_log_path=s_path,
                 **kwargs,
             )
@@ -230,13 +231,18 @@ class MCSequencer:
             if self.verbose:
                 print('shutdown sent')
             work_queue.put('ZEBRA')  # shutdown signal
+            logger.debug('Put "ZEBRA" on work queue (shutdown signal)')
 
         # 7b.  Keep pulling results from the queue to empty it out
         empty = 0
+        logger.debug('*** Starting the waiting process to wrap up... ***')
         while True:
+            # print(f'{empty}-', end='')
+            # logger.debug('Polling result queue...')
             try:
                 next_result = result_queue.get_nowait()
                 if next_result == 'COYOTE':  # shutdown signal
+                    logger.debug('Got COYOTE (shutdown received)')
                     empty += 1
             except queue.Empty:
                 next_result = None
@@ -263,6 +269,7 @@ class MCSequencer:
 
         log_queue.close()
         log_queue.join_thread()
+        logger.debug('All queues closed')
         if self.verbose:
             print('log queue closed')
         work_queue.close()
