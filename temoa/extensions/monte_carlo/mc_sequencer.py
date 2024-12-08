@@ -117,8 +117,8 @@ class MCSequencer:
         # 4. Set up the workers
         num_workers = self.num_workers
         work_queue: Queue[tuple[str, DataPortal] | str] = Queue(
-            6
-        )  # restrict the queue to hold just 1 models in it max
+            num_workers + 1
+        )  # must be able to hold all shutdowns at once (could be changed later to not lock on insertion...)
         result_queue: Queue[DataBrick | str] = Queue(
             num_workers + 1
         )  # must be able to hold a shutdown signal from all workers at once!
