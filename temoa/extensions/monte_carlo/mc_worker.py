@@ -112,12 +112,10 @@ class MCWorker(Process):
                 self.worker_number,
                 (toc - tic).total_seconds(),
             )
-            if isinstance(data, str):
-                logger.info('Worker %d received string: %s', self.worker_number, data)
             if data == 'ZEBRA':  # shutdown signal
                 if verbose:
                     print(f'worker {self.worker_number} got shutdown signal')
-                logger.info('Worker %d received shutdown signal', self.worker_number)
+                logger.debug('Worker %d received shutdown signal', self.worker_number)
                 self.results_queue.put('COYOTE')
                 break
             name, dp = data

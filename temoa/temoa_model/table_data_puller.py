@@ -123,7 +123,7 @@ def poll_capacity_results(M: TemoaModel, epsilon=1e-5) -> CapData:
 
 
 def poll_flow_results(M: TemoaModel, epsilon=1e-5) -> dict[FI, dict[FlowType, float]]:
-    f"""
+    """
     Poll a solved model for flow results.
     :param M: A solved Model
     :param epsilon: epsilon (default 1e-5)
