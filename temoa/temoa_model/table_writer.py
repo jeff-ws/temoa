@@ -507,7 +507,7 @@ class TableWriter:
         self.con.commit()
 
     def write_dual_variables(self, results: SolverResults, iteration=None):
-        """Write the dual variables to the OutputCost table"""
+        """Write the dual variables to the OutputDualVariable table"""
         scenario_name = (
             self.config.scenario + f'-{iteration}'
             if iteration is not None
