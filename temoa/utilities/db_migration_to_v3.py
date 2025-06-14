@@ -154,6 +154,7 @@ for name_pair in direct_transfer_tables:
         data = con_old.execute(f'SELECT * FROM {old_name}').fetchall()
     except sqlite3.OperationalError:
         print('TABLE NOT FOUND: ' + old_name)
+        data = []
         continue
 
     if not data:
@@ -177,11 +178,18 @@ for name_pair in units_added_tables:
         data = con_old.execute(f'SELECT * FROM {old_name}').fetchall()
     except sqlite3.OperationalError:
         print('table not found: ' + old_name)
+        data = []
         continue
     if not data:
         print('no data for: ' + old_name)
         continue
-
+    # quick check for expected number of fields...
+    if len(data[0]) != 5:
+        print(f'\nWARNING:  unexpected number of fields in table: {old_name}.  Was expecting 5:  region, period, group, value, notes')
+        print('\nIt is possible that the older table you have was not indexed by REGION, which might be common'
+              'for old datasets.  If so, that cannot be moved automatically.  You will need to do it manually.')
+        print(f'\n  *** IGNORING TABLE:  {old_name} in transfer!! ***\n')
+        continue
     query = f'INSERT OR REPLACE INTO {new_name} VALUES (?, ?, ?, ?, "", ?)'
     con_new.executemany(query, data)
     print(f'inserted {len(data)} rows into {new_name}')
@@ -289,7 +297,11 @@ try:
         )
         cur.execute('INSERT OR REPLACE INTO TechGroupMember VALUES (?, ?)', (new_name, tech))
 except sqlite3.OperationalError:
-    print('souce does not appear to employ tech_groups...skipping.')
+    print('source does not appear to employ tech_groups...skipping.')
+    skip_tech_groups = True
+except ValueError as e:
+    print('\nWARNING:  unusual schema variation discovered in tech_groups.  Error:  ' + str(e))
+    print('\n *** SKIPPING TRANSITION OF tech_groups and associated weightings, etc. ***\n')
     skip_tech_groups = True
 if not skip_tech_groups:
     # ------- FIX TABLES THAT USED TO USE tech_groups -----------
@@ -315,6 +327,7 @@ if not skip_tech_groups:
             pairs = cur.execute(f'SELECT DISTINCT region, group_name FROM {table}').fetchall()
         except sqlite3.OperationalError:
             print(f'table not found: {table}')
+            pairs = []
             continue
         if len(pairs) == 0:
             print(f'No groups found for: {table}')
@@ -435,11 +448,11 @@ try:
     data = con_new.execute('PRAGMA FOREIGN_KEY_CHECK;').fetchall()
     print('FK check fails (MUST BE FIXED):')
     if not data:
-        print('No Foreign Key Failures.  (Good news!)')
+        print('\tNo Foreign Key Failures.  (Good news!)')
     else:
-        print('(Table, Row ID, Reference Table, (fkid) )')
+        print('\t(Table, Row ID, Reference Table, (fkid) )')
         for row in data:
-            print(row)
+            print(f'\t{row}')
 except sqlite3.OperationalError as e:
     print('Foreign Key Check FAILED on new DB.  Something may be wrong with schema.')
     print(e)
