@@ -185,9 +185,13 @@ for name_pair in units_added_tables:
         continue
     # quick check for expected number of fields...
     if len(data[0]) != 5:
-        print(f'\nWARNING:  unexpected number of fields in table: {old_name}.  Was expecting 5:  region, period, group, value, notes')
-        print('\nIt is possible that the older table you have was not indexed by REGION, which might be common'
-              'for old datasets.  If so, that cannot be moved automatically.  You will need to do it manually.')
+        print(
+            f'\nWARNING:  unexpected number of fields in table: {old_name}.  Was expecting 5:  region, period, group, value, notes'
+        )
+        print(
+            '\nIt is possible that the older table you have was not indexed by REGION, which might be common'
+            'for old datasets.  If so, that cannot be moved automatically.  You will need to do it manually.'
+        )
         print(f'\n  *** IGNORING TABLE:  {old_name} in transfer!! ***\n')
         continue
     query = f'INSERT OR REPLACE INTO {new_name} VALUES (?, ?, ?, ?, "", ?)'
