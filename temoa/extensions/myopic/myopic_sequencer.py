@@ -271,6 +271,9 @@ class MyopicSequencer:
                 self.progress_mapper.report(idx, 'report')
             # write results by appending.  We have already cleared necessary items
             self.table_writer.write_results(M=model, append=True)
+            # handle side-case for writing duals
+            if self.config.save_duals:
+                self.table_writer.write_dual_variables(results=results, iteration=idx.base_year)
 
             # prep next loop
             last_base_year = idx.base_year  # update
@@ -501,7 +504,10 @@ class MyopicSequencer:
         logger.debug('Deleting old results for scenario name %s', scenario_name)
         for table in self.tables_with_scenario_reference:
             try:
-                self.cursor.execute(f'DELETE FROM {table} WHERE scenario = ?', (scenario_name,))
+                self.cursor.execute(
+                    f'DELETE FROM {table} WHERE scenario = ? OR scenario like ?',
+                    (scenario_name, f'{scenario_name}-%'),
+                )
             except sqlite3.OperationalError:
                 SE.write(f'no scenario ref in table {table}\n')
                 raise sqlite3.OperationalError
