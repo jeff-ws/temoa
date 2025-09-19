@@ -42,3 +42,6 @@ gravis
 highspy
 scipy
 gurobipy
+
+# for database v3.1
+pint
