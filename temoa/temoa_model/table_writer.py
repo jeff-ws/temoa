@@ -62,6 +62,8 @@ Created on:  2/9/24
 
 Note:  This file borrows heavily from the legacy pformat_results.py, and is somewhat of a restructure of that code
        to accommodate the run modes more cleanly
+       
+update 9/19/2025:  Modifications to allow functionality with V3.0 or V3.1 database schema
 
 """
 
@@ -230,7 +232,7 @@ class TableWriter:
             else self.config.scenario
         )
         for obj_name, obj_value in obj_vals:
-            qry = 'INSERT INTO OutputObjective VALUES (?, ?, ?)'
+            qry = 'INSERT INTO OutputObjective (scenario, objective_name, total_system_cost) VALUES (?, ?, ?)'
             data = (scenario_name, obj_name, obj_value)
             self.con.execute(qry, data)
             self.con.commit()
@@ -253,7 +255,7 @@ class TableWriter:
                 continue
             entry = (scenario, ei.r, sector, ei.p, ei.e, ei.t, ei.v, val)
             data.append(entry)
-        qry = f'INSERT INTO OutputEmission VALUES {_marks(8)}'
+        qry = f'INSERT INTO OutputEmission (scenario, region, sector, period, emis_comm, tech, vintage, emission) VALUES {_marks(8)}'
         self.con.executemany(qry, data)
         self.con.commit()
 
@@ -269,7 +271,7 @@ class TableWriter:
             s = self.tech_sectors.get(t)
             new_cap = (scenario, r, s, t, v, val)
             data.append(new_cap)
-        qry = 'INSERT INTO OutputBuiltCapacity VALUES (?, ?, ?, ?, ?, ?)'
+        qry = 'INSERT INTO OutputBuiltCapacity (scenario, region, sector, tech, vintage, capacity) VALUES (?, ?, ?, ?, ?, ?)'
         self.con.executemany(qry, data)
 
         # NetCapacity
@@ -278,7 +280,7 @@ class TableWriter:
             s = self.tech_sectors.get(t)
             new_net_cap = (scenario, r, s, p, t, v, val)
             data.append(new_net_cap)
-        qry = 'INSERT INTO OutputNetCapacity VALUES (?, ?, ?, ?, ?, ?, ?)'
+        qry = 'INSERT INTO OutputNetCapacity (scenario, region, sector, period, tech, vintage, capacity) VALUES (?, ?, ?, ?, ?, ?, ?)'
         self.con.executemany(qry, data)
 
         # Retired Capacity
@@ -287,7 +289,7 @@ class TableWriter:
             s = self.tech_sectors.get(t)
             new_retired_cap = (scenario, r, s, p, t, v, val)
             data.append(new_retired_cap)
-        qry = 'INSERT INTO OutputRetiredCapacity VALUES (?, ?, ?, ?, ?, ?, ?)'
+        qry = 'INSERT INTO OutputRetiredCapacity (scenario, region, sector, period, tech, vintage, capacity) VALUES (?, ?, ?, ?, ?, ?, ?)'
         self.con.executemany(qry, data)
         self.con.commit()
 
@@ -319,14 +321,28 @@ class TableWriter:
                 flows_by_type[flow_type].append(entry)
 
         table_associations = {
-            FlowType.OUT: 'OutputFlowOut',
-            FlowType.IN: 'OutputFlowIn',
-            FlowType.CURTAIL: 'OutputCurtailment',
-            FlowType.FLEX: 'OutputCurtailment',
+            FlowType.OUT: ('OutputFlowOut', 'flow'),
+            FlowType.IN: ('OutputFlowIn', 'flow'),
+            FlowType.CURTAIL: ('OutputCurtailment', 'curtailment'),
+            FlowType.FLEX: ('OutputCurtailment', 'curtailment'),
         }
-
-        for flow_type, table_name in table_associations.items():
-            qry = f'INSERT INTO {table_name} VALUES {_marks(11)}'
+        for flow_type, (table_name, value_field_name) in table_associations.items():
+            fields = ', '.join(
+                (
+                    'scenario',
+                    'region',
+                    'sector',
+                    'period',
+                    'season',
+                    'tod',
+                    'input_comm',
+                    'tech',
+                    'vintage',
+                    'output_comm',
+                    value_field_name,
+                )
+            )
+            qry = f'INSERT INTO {table_name} ({fields}) VALUES {_marks(11)}'
             self.con.executemany(qry, flows_by_type[flow_type])
 
         self.con.commit()
@@ -375,7 +391,7 @@ class TableWriter:
             entry = (*idx, flow)
             entries.append(entry)
 
-        qry = f'INSERT INTO OutputFlowOutSummary VALUES {_marks(9)}'
+        qry = f'INSERT INTO OutputFlowOutSummary (scenario, region, sector, period, input_comm, tech, vintage, output_comm, flow) VALUES {_marks(9)}'
         self.con.executemany(qry, entries)
 
         self.con.commit()
@@ -502,7 +518,7 @@ class TableWriter:
         # let's be kind and sort by something reasonable (r, v, t, p)
         rows.sort(key=lambda r: (r[1], r[4], r[3], r[2]))
         cur = self.con.cursor()
-        qry = 'INSERT INTO OutputCost VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        qry = 'INSERT INTO OutputCost (scenario, region, period, tech, vintage, d_invest, d_fixed, d_var, d_emiss, invest, fixed, var, emiss) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         cur.executemany(qry, rows)
         self.con.commit()
 
@@ -515,7 +531,7 @@ class TableWriter:
         )  # collect the values
         constraint_data = results['Solution'].Constraint.items()
         dual_data = [(scenario_name, t[0], t[1]['Dual']) for t in constraint_data]
-        qry = 'INSERT INTO OutputDualVariable VALUES (?, ?, ?)'
+        qry = 'INSERT INTO OutputDualVariable (scenario, constraint_name, dual) VALUES (?, ?, ?)'
         self.con.executemany(qry, dual_data)
         self.con.commit()
 
@@ -534,7 +550,7 @@ class TableWriter:
                 change_record.new_value,
             )
             records.append(element)
-        qry = 'INSERT INTO OutputMCDelta VALUES (?, ?, ?, ?, ?, ?)'
+        qry = 'INSERT INTO OutputMCDelta (scenario, run, param, param_index, old_val, new_val) VALUES (?, ?, ?, ?, ?, ?)'
         self.con.executemany(qry, records)
         self.con.commit()
 
