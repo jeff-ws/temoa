@@ -48,10 +48,10 @@ parser.add_argument(
 )
 parser.add_argument(
     '--schema',
-    help='Path to schema file (default=../../data_files/temoa_schema_v3.sql)',
+    help='Path to schema file (default=data_files/temoa_schema_v3.sql)',
     required=False,
     dest='schema',
-    default='../../data_files/temoa_schema_v3.sql',
+    default='data_files/temoa_schema_v3.sql',
 )
 options = parser.parse_args()
 legacy_db: Path = Path(options.source_db)
