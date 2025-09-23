@@ -936,7 +936,7 @@ class HybridLoader:
         # MinNewCapacityShare
         if self.table_exists('MinNewCapacityShare'):
             raw = cur.execute(
-                'SELECT region, period, tech, group_name, max_proportion FROM main.MinNewCapacityShare'
+                'SELECT region, period, tech, group_name, min_proportion FROM main.MinNewCapacityShare'
             ).fetchall()
             load_element(M.MinCapacityShare, raw, self.viable_rt, (0, 2))
 
