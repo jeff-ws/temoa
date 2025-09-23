@@ -160,9 +160,10 @@ con_new.executescript(sql_script)
 con_new.execute('PRAGMA foreign_keys = 0;')
 
 # belt & suspenders check that we have all tables in the schema covered
-v31_tables = {
-    t[0] for t in (con_new.execute('SELECT name FROM sqlite_master WHERE type="table"').fetchall())
-}
+
+table_query_result = con_new.execute('SELECT name FROM sqlite_master WHERE type="table"').fetchall()
+v31_tables = {t[0] for t in table_query_result}
+
 covered = set(direct_transfer_tables + add_units_tables + list(transfer_with_mod.keys()))
 deltas = v31_tables ^ covered
 if deltas:
@@ -236,9 +237,12 @@ for table_name, mod_dict in transfer_with_mod.items():
         cols_str = ', '.join(new_cols)
 
         # make exclusion statement
-        exclusions = ' AND '.join(f'{field} != {value}' for field, value in mod_dict['omits'])
-
-        data = con_old.execute(f'SELECT {cols_str} FROM {table_name} WHERE {exclusions}').fetchall()
+        where = ' AND '.join(f'{field} != ?' for field, _ in mod_dict['omits'])
+        params = tuple(v for _, v in mod_dict['omits'])
+        data = con_old.execute(
+            f'SELECT {cols_str} FROM {table_name} WHERE {where}',
+            params,
+        ).fetchall()
 
     except sqlite3.OperationalError:
         print(f'TABLE NOT FOUND: {table_name} (using default from schema)')
@@ -264,7 +268,8 @@ for table_name in add_units_tables:
         ]
 
         if set(old_cols + ['units']) != set(new_cols):
-            print(f'WARNING: Column mismatch in {table_name}')
+            print(f'WARNING: Column mismatch in {table_name}.  NO DATA TRANSFERRED FOR THIS TABLE.  '
+                  'MUST DO MANUALLY or ALIGN AND RE-RUN AGENT.')
             print(f'Old columns: {old_cols}')
             print(f'New columns: {new_cols}')
             continue

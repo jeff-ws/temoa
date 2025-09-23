@@ -104,8 +104,8 @@ def compare_db_to_schema(
 ) -> dict[str, tuple[list[str], list[str]]]:
     """
     compare the db provided to a baseline schema and return a table-based comparison
-    :param db_file:
-    :param schema_file:
+    :param db_file: the other database
+    :param schema_file: the basis of comparison
     :return: dictionary of table name : (list of fields missing in other, list of new fields in other)
     """
     td = tempfile.TemporaryDirectory()
@@ -132,7 +132,8 @@ def write_comparison_md(output_file: Path, orig_schema: Path, new_db: Path):
         f.write('|--------|-----------------|--------------|----------------|\n')
         for key in comp:
             f.write(
-                f"| {key} | {comp[key][0] if comp[key][0] else ''} | {comp[key][1] if comp[key][1] else ''} | {'yes' if units_present[key] else ''} |\n"
+                f"| {key} | {comp[key][0] if comp[key][0] else ''} | {comp[key][1] if comp[key][1] else ''} | "
+                f"{'yes' if units_present.get(key, False) else ''} |\n"
             )
 
 
