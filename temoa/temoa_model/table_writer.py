@@ -320,11 +320,21 @@ class TableWriter:
                 entry = (scenario, fi.r, sector, fi.p, fi.s, fi.d, fi.i, fi.t, fi.v, fi.o, val)
                 flows_by_type[flow_type].append(entry)
 
+        # merge FLEX into CURTAIL to avoid duplicate PK rows
+        if flows_by_type[FlowType.FLEX]:
+            from collections import defaultdict as _dd
+
+            _sum = _dd(float)
+            # walk through all entries in both collections, summing the values (last column)
+            for entry in (*flows_by_type[FlowType.CURTAIL], *flows_by_type[FlowType.FLEX]):
+                _sum[entry[:-1]] += entry[-1]
+            flows_by_type[FlowType.CURTAIL] = [(*k, v) for k, v in _sum.items()]
+            flows_by_type[FlowType.FLEX] = []
+
         table_associations = {
             FlowType.OUT: ('OutputFlowOut', 'flow'),
             FlowType.IN: ('OutputFlowIn', 'flow'),
             FlowType.CURTAIL: ('OutputCurtailment', 'curtailment'),
-            FlowType.FLEX: ('OutputCurtailment', 'curtailment'),
         }
         for flow_type, (table_name, value_field_name) in table_associations.items():
             fields = ', '.join(
