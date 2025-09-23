@@ -268,8 +268,10 @@ for table_name in add_units_tables:
         ]
 
         if set(old_cols + ['units']) != set(new_cols):
-            print(f'WARNING: Column mismatch in {table_name}.  NO DATA TRANSFERRED FOR THIS TABLE.  '
-                  'MUST DO MANUALLY or ALIGN AND RE-RUN AGENT.')
+            print(
+                f'WARNING: Column mismatch in {table_name}.  NO DATA TRANSFERRED FOR THIS TABLE.  '
+                'MUST DO MANUALLY or ALIGN AND RE-RUN AGENT.'
+            )
             print(f'Old columns: {old_cols}')
             print(f'New columns: {new_cols}')
             continue

@@ -921,30 +921,58 @@ class HybridLoader:
 
         # MinCapacityShare
         if self.table_exists('MinCapacityShare'):
-            raw = cur.execute(
-                'SELECT region, period, tech, group_name, min_proportion FROM main.MinCapacityShare'
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, min_proportion FROM main.MinCapacityShare'
+                    ' WHERE period >= ? AND period <= ?',
+                    (mi.base_year, mi.last_demand_year),
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, min_proportion FROM main.MinCapacityShare'
+                ).fetchall()
             load_element(M.MinCapacityShare, raw, self.viable_rt, (0, 2))
 
         # MaxCapacityShare
         if self.table_exists('MaxCapacityShare'):
-            raw = cur.execute(
-                'SELECT region, period, tech, group_name, max_proportion FROM main.MaxCapacityShare'
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, max_proportion FROM main.MaxCapacityShare'
+                    ' WHERE period >= ? AND period <= ?',
+                    (mi.base_year, mi.last_demand_year),
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, max_proportion FROM main.MaxCapacityShare'
+                ).fetchall()
             load_element(M.MaxCapacityShare, raw, self.viable_rt, (0, 2))
 
         # MinNewCapacityShare
         if self.table_exists('MinNewCapacityShare'):
-            raw = cur.execute(
-                'SELECT region, period, tech, group_name, min_proportion FROM main.MinNewCapacityShare'
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, min_proportion FROM main.MinNewCapacityShare'
+                    ' WHERE period >= ? AND period <= ?',
+                    (mi.base_year, mi.last_demand_year),
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, min_proportion FROM main.MinNewCapacityShare'
+                ).fetchall()
             load_element(M.MinNewCapacityShare, raw, self.viable_rt, (0, 2))
 
         # MaxNewCapacityShare
         if self.table_exists('MaxNewCapacityShare'):
-            raw = cur.execute(
-                'SELECT region, period, tech, group_name, max_proportion FROM main.MaxNewCapacityShare'
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, max_proportion FROM main.MaxNewCapacityShare'
+                    ' WHERE period >= ? AND period <= ?',
+                    (mi.base_year, mi.last_demand_year),
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, max_proportion FROM main.MaxNewCapacityShare'
+                ).fetchall()
             load_element(M.MaxNewCapacityShare, raw, self.viable_rt, (0, 2))
 
         # MinActivityGroup
@@ -977,16 +1005,30 @@ class HybridLoader:
 
         # MinActivityShare
         if self.table_exists('MinActivityShare'):
-            raw = cur.execute(
-                'SELECT region, period, tech, group_name, min_proportion FROM main.MinActivityShare'
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, min_proportion FROM main.MinActivityShare'
+                    ' WHERE period >= ? AND period <= ?',
+                    (mi.base_year, mi.last_demand_year),
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, min_proportion FROM main.MinActivityShare'
+                ).fetchall()
             load_element(M.MinActivityShare, raw, self.viable_rt, (0, 2))
 
         # MaxActivityShare
         if self.table_exists('MaxActivityShare'):
-            raw = cur.execute(
-                'SELECT region, period, tech, group_name, max_proportion FROM main.MaxActivityShare'
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, max_proportion FROM main.MaxActivityShare'
+                    ' WHERE period >= ? AND period <= ?',
+                    (mi.base_year, mi.last_demand_year),
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT region, period, tech, group_name, max_proportion FROM main.MaxActivityShare'
+                ).fetchall()
             load_element(M.MaxActivityShare, raw, self.viable_rt, (0, 2))
 
         # MaxResource
@@ -1024,16 +1066,30 @@ class HybridLoader:
 
         # MinAnnualCapacityFactor
         if self.table_exists('MinAnnualCapacityFactor'):
-            raw = cur.execute(
-                'SELECT region, period, tech, output_comm, factor FROM main.MinAnnualCapacityFactor'
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT region, period, tech, output_comm, factor FROM main.MinAnnualCapacityFactor'
+                    ' WHERE period >= ? AND period <= ?',
+                    (mi.base_year, mi.last_demand_year),
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT region, period, tech, output_comm, factor FROM main.MinAnnualCapacityFactor'
+                ).fetchall()
             load_element(M.MinAnnualCapacityFactor, raw, self.viable_rt, (0, 2))
 
         # MaxAnnualCapacityFactor
         if self.table_exists('MaxAnnualCapacityFactor'):
-            raw = cur.execute(
-                'SELECT region, period, tech, output_comm, factor FROM main.MaxAnnualCapacityFactor'
-            ).fetchall()
+            if mi:
+                raw = cur.execute(
+                    'SELECT region, period, tech, output_comm, factor FROM main.MaxAnnualCapacityFactor'
+                    ' WHERE period >= ? AND period <= ?',
+                    (mi.base_year, mi.last_demand_year),
+                ).fetchall()
+            else:
+                raw = cur.execute(
+                    'SELECT region, period, tech, output_comm, factor FROM main.MaxAnnualCapacityFactor'
+                ).fetchall()
             load_element(M.MaxAnnualCapacityFactor, raw, self.viable_rt, (0, 2))
 
         # GrowthRateMax
