@@ -1,0 +1,141 @@
+"""
+Tools for Energy Model Optimization and Analysis (Temoa):
+An open source framework for energy systems optimization modeling
+
+Copyright (C) 2015,  NC State University
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+A complete copy of the GNU General Public License v2 (GPLv2) is available
+in LICENSE.txt.  Users uncompressing this from an archive may not have
+received this license file.  If not, see <http://www.gnu.org/licenses/>.
+
+
+Written by:  J. F. Hyink
+jeff@westernspark.us
+https://westernspark.us
+Created on:  9/19/25
+
+common elements used within Unit Checking
+
+"""
+from dataclasses import dataclass
+
+tables_with_units = [
+    'CapacityToActivity',
+    'Commodity',
+    'CostEmission',
+    'CostFixed',
+    'CostInvest',
+    'CostVariable',
+    'Demand',
+    'Efficiency',
+    'EmissionActivity',
+    'EmissionLimit',
+    'ExistingCapacity',
+    'GrowthRateSeed',
+    'LifetimeProcess',
+    'LifetimeTech',
+    'LoanLifetimeTech',
+    'MaxActivity',
+    'MaxActivityGroup',
+    'MaxCapacity',
+    'MaxCapacityGroup',
+    'MaxNewCapacity',
+    'MaxNewCapacityGroup',
+    'MaxResource',
+    'MinActivity',
+    'MinActivityGroup',
+    'MinCapacity',
+    'MinCapacityGroup',
+    'MinNewCapacity',
+    'MinNewCapacityGroup',
+    'OutputBuiltCapacity',
+    'OutputCost',
+    'OutputCurtailment',
+    'OutputEmission',
+    'OutputFlowIn',
+    'OutputFlowOut',
+    'OutputNetCapacity',
+    'OutputObjective',
+    'OutputRetiredCapacity',
+    'StorageDuration',
+]
+"""Tables that have units"""
+
+ratio_units_tables = {
+    'Efficiency',
+    'EmissionActivity',
+    'CostEmission',
+    'CostFixed',
+    'CostInvest',
+    'CostVariable',
+}
+"""Tables that express a ratio of units in form "units / (other units)" """
+
+activity_based_tables = [
+    'Demand',
+    'MaxActivity',
+    'MaxActivityGroup',
+    'MaxResource',
+    'MinActivity',
+    'MinActivityGroup',
+]
+"""Tables that should have units equivalent to the commodity's native units"""
+
+capacity_based_tables = [
+    'MaxCapacity',
+    'MaxCapacityGroup',
+    'MaxNewCapacity',
+    'MaxNewCapacityGroup',
+    'MinCapacity',
+    'MinCapacityGroup',
+    'MinNewCapacity',
+    'MinNewCapacityGroup',
+]
+"""Tables that require conversion via CapacityToActivity to reach the native units"""
+
+period_based_tables = [
+    'LifetimeProcess',
+    'LifetimeTech',
+    'LoanLifetimeTech',
+]
+"""Tables that align to the time period, presumably 'years'"""
+
+cost_based_tables = [
+    'CostEmission',
+    'CostFixed',
+    'CostInvest',
+    'CostVariable',
+]
+
+
+# TODO:  Unclear tables:  MaxResource, GrowthRateSeed
+
+MIXED_UNITS = 42
+"""Marker for mixed units entries"""
+
+
+@dataclass(frozen=True)
+class UnitsFormat:
+    format: str
+    groups: int
+
+
+# any gathering of letters and allowed symbols which are "*" and "_" with end lead/trail spaces trimmed
+SINGLE_ELEMENT = UnitsFormat(format=r'^\s*([A-Za-z\*\_\s]+?)\s*$', groups=1)
+
+# any fractional expression using the same pattern above with the denominator IN PARENTHESES
+RATIO_ELEMENT = UnitsFormat(
+    format=r'^\s*([A-Za-z\*\_\s]+?)\s*\/\s*\(\s*([A-Za-z\*\_\s]+?)\s*\)\s*$', groups=2
+)
+
+ACCEPTABLE_CHARACTERS = r'^\s*([A-Za-z\*\_\s\/\(\)]+?)\s*$'
