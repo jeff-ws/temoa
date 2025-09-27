@@ -408,6 +408,74 @@ a particular region could easily be overlooked.  Price checks performed/reported
 6. **Uncapacitated Tech Costs**:  Any technology flagged as `uncapacitated` will trigger warnings here
    if it has any fixed/invest costs.
 
+Units Checking
+--------------
+An upgrade to the database schema to Version 3.1 allows fairly complete units checking throughout the model.
+Unit checking helps for consistency and accuracty in the model and also supports more complete documentation of
+inputs and outputs.  The Version 3.0 of the Temoa model will work with database versions of both 3.0 and 3.1.
+The latter addition to the schema adds `units` to 16 tables, several of which are output tables.
+
+The Python package :code:`pint` is used to perform reference checking for units.  Using Pint allows us to leverage
+Pint's built in unit registry to enable validating and equating units with varying prefixes and allows for possible
+future extensions in processing.  It is important to note that the units expressed and checked via :code:`pint` do not
+"follow the values" through the mathematics of the model.  The unit checking is merely a layer of pre-processing
+used to to support validation and documentation of units.  The units are not used in the model itself.
+
+The basis for most unit comparisons and validations in the model come from the `Commodity` table and the `Efficiency`
+table.  Commodities have native units of measure defined in their table.  As the nodes in the energy network, this
+establishes a convenient benchmark to validate nodal connections entering and leaving a commodity node.
+The units of a technology are inferred from the `Efficiency` table which expresses the process modeled
+by a ratio of units as output / input.
+
+* Expressing Units
+    Units in the Efficiency table should be expressed in the form:
+
+    .. math::
+       OutputUnits / ( InputUnits )
+
+    A Regular Expression is used to parse these units and expects the denominator to be parenthesized.  Other tables
+    should just have a plain entry such as `PJ` or `peta joules`.  Unique entries into the registry from Temoa
+    include:  `dollar` (or `USD`), `euro` (or `EUR`), `passenger`, `seat` (to support passenger miles and seat miles),
+    and `ethos` to support dimensionless starting point commondly used in Temoa as a source.
+
+* Mixed I/O
+    Technologies summarized in the `Efficiency` table must match the commodity (nodal) values they connect
+    as input/output.  While it is ok (but perhaps unusual) to have differing input units, the output units must be
+    standardized, even if the output commodities differ.  This is inferred from the many constraints on tech
+    activity which span regions and output commodities.  For example a `MaxActivityGroup` constraint across the
+    `global` region set needs to be expressed in 1 set of units.  An example might be a mixed power plant that
+    takes in barrels of oil or cubic meters of natural gas but outputs peta joules of electricity.
+
+* Testing values
+    It is possible to test the validity of units expressed separately from the model or when troubleshooting a
+    reported error.  Temoa augments the default registry slighty by adding dollars and a few other miscellaneous
+    units for completeness.  It is possible to load the registry and check values as such:
+
+    .. code-block::
+
+        >>> import pint
+        >>> ureg = pint.UnitRegistry()
+        >>> _ = ureg.load_definitions('temoa/temoa_model/unit_checking/temoa_units.txt')  # adds some additionals
+        >>> 'PJ' in ureg
+        True
+        >>> 'MJ' in ureg
+        True
+        >>> 'petajoule' in ureg
+        True
+        >>> 'peta joule' in ureg
+        False
+        >>> 'kWh' in ureg
+        True
+        >>> 'catfood' in ureg
+        False
+        >>>
+
+* Test sequencing
+    Tables with units are sequentially checked for illegal characters in the :code:`units` field, proper formatting,
+    validation of the units themselves.  Data retrieved from the `Commodity` and `Efficiency` tables is then used
+    to QA entries in other fields for consistency.  If selected in the configuration file, this process takes place
+    before the model is run and results in log entries and an optional secondary text report.
+
 Source Tracing
 --------------
 
