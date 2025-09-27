@@ -25,7 +25,11 @@ https://westernspark.us
 Created on:  9/19/25
 
 """
+from pathlib import Path
 
 from pint import UnitRegistry
 
+from definitions import PROJECT_ROOT
+
 ureg = UnitRegistry()
+ureg.load_definitions(Path(PROJECT_ROOT) / 'temoa/temoa_model/unit_checking/temoa_units.txt')

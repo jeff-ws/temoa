@@ -32,12 +32,15 @@ import re
 import sqlite3
 from pathlib import Path
 
+from pint.registry import Unit
+
 from temoa.temoa_model.unit_checking.common import (
     tables_with_units,
     ratio_units_tables,
     RATIO_ELEMENT,
     SINGLE_ELEMENT,
     ACCEPTABLE_CHARACTERS,
+    consolidate_lines,
 )
 from temoa.temoa_model.unit_checking.entry_checker import (
     validate_units_expression,
@@ -48,9 +51,10 @@ from temoa.temoa_model.unit_checking.entry_checker import (
 logger = logging.getLogger(__name__)
 
 
-def check_table(conn: sqlite3.Connection, table_name: str) -> list[str]:
+def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Unit], list[str]]:
     """Check all entries in a table for format and registry compliance"""
     errors = []
+    res = {}
     format_type = RATIO_ELEMENT if table_name in ratio_units_tables else SINGLE_ELEMENT
 
     entries = gather_from_table(conn, table_name)
@@ -58,41 +62,45 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> list[str]:
         # check characters
         valid_chars = re.search(ACCEPTABLE_CHARACTERS, expr)
         if not valid_chars:
-            listed_lines = (
-                line_nums
-                if len(line_nums) < 5
-                else f'{", ".join(str(t) for t in line_nums[:5])}", ... more"'
-            )
+            listed_lines = consolidate_lines(line_nums)
+
             errors.append(
-                f'Invalid character(s) in {listed_lines} [only letters, underscore and "*, /" operators allowed]: {expr}'
+                f'Invalid character(s) at rows {listed_lines} [only letters, underscore and "*, /" operators allowed]: {expr}'
             )
             continue
 
         # Check format
         valid, elements = validate_units_format(expr, format_type)
         if not valid:
-            listed_lines = (
-                line_nums
-                if len(line_nums) < 5
-                else f'{", ".join(str(t) for t in line_nums[:5])}", ... more"'
-            )
-            errors.append(f'Format violation at lines {listed_lines}:  {expr}')
+            listed_lines = consolidate_lines(line_nums)
+
+            errors.append(f'Format violation at rows {listed_lines}:  {expr}')
             continue
 
         # Check registry compliance
+        converted_units = []
         for element in elements:
             if element:
-                success, _ = validate_units_expression(element)
+                success, units = validate_units_expression(element)
                 if not success:
-                    listed_lines = (
-                        line_nums
-                        if len(line_nums) < 5
-                        else f'{", ".join(str(t) for t in line_nums[:5])}", ... more"'
-                    )
+                    listed_lines = consolidate_lines(line_nums)
                     errors.append(
-                        f'Registry violation (UNK units) at lines {listed_lines}:  {element}'
+                        f'Registry violation (UNK units) at rows {listed_lines}:  {element}'
                     )
-    return errors
+                else:
+                    converted_units.append(units)
+        # assemble a reference of item: units-relationship if we have a valid entry
+        if len(converted_units) == format_type.groups:  # we have the right number
+            match format_type:
+                case SINGLE_ELEMENT():
+                    ref = {expr: converted_units[0]}
+                    res.update(ref)
+                case RATIO_ELEMENT():
+                    ref = {expr: converted_units[0] / converted_units[1]}
+                    res.update(ref)
+                case _:
+                    logger.error('Unknown units format: %s', format_type)
+    return res, errors
 
 
 def check_database(db_path: Path) -> list[str]:

@@ -31,10 +31,16 @@ import logging
 import sqlite3
 from pathlib import Path
 
-from fontTools.misc.bezierTools import namedtuple
+from mypy.message_registry import NamedTuple
+from pint.registry import Unit
 
 from definitions import PROJECT_ROOT
-from temoa.temoa_model.unit_checking.common import RATIO_ELEMENT, SINGLE_ELEMENT, MIXED_UNITS
+from temoa.temoa_model.unit_checking.common import (
+    RATIO_ELEMENT,
+    SINGLE_ELEMENT,
+    MIXED_UNITS,
+    consolidate_lines,
+)
 from temoa.temoa_model.unit_checking.entry_checker import validate_units_format
 
 logger = logging.getLogger(__name__)
@@ -56,38 +62,56 @@ def commodity_units(conn: sqlite3.Connection) -> dict[str, str]:
     return res
 
 
-IOUnits = namedtuple('IOUnits', ['input_units', 'output_units'])
+class IOUnits(NamedTuple):
+    input_units: str
+    output_units: str
 
 
 def check_efficiency_table(
     conn: sqlite3.Connection, comm_units: dict[str, str]
-) -> dict[str, IOUnits]:
-    """Check the technology units for Efficiency table entries"""
-    cursor = conn.cursor()
+) -> tuple[dict[str, IOUnits], list[str]]:
+    """
+    Check the technology units for Efficiency table entries
+
+    Returns a dictionary of technology to IOUnits and a list of error messages
+
+    """
+
     query = 'SELECT tech, input_comm, output_comm, units FROM efficiency'
-    cursor.execute(query)
-    rows = cursor.fetchall()
+    rows = conn.execute(query).fetchall()
     res = {}
-    for tech, ic, oc, units in rows:
+    error_msgs = []
+    invalid_rows = []
+    for idx, (tech, ic, oc, units) in enumerate(rows, start=1):
         valid, located_units = validate_units_format(units, RATIO_ELEMENT)
         if not valid:
+            invalid_rows.append(idx)
             continue
-            # we should be 'clean' on the basic unist before getting here
-            # raise RuntimeError(f"Invalid units for efficiency table: {ic} {oc} {units}")
         output_units, input_units = located_units
         invalid_input = input_units != comm_units[ic] and input_units != MIXED_UNITS
         invalid_output = output_units != comm_units[oc]
         if invalid_input or invalid_output:
-            logger.error('Units conflict for Techology %s', tech)
+            logger.warning('Units conflict for Technology %s near row %d', tech, idx)
             msg = f"\n  Expected:  {f'{ic} [{input_units}]' :^25} ----> {tech :^20} ----> {f'{oc} [{output_units}]': ^25}"
             if invalid_input:
                 msg += f'\n    Invalid input units: {comm_units[ic]}'
             if invalid_output:
                 msg += f'\n    Invalid output units: {comm_units[oc]}'
-            logger.error(msg)
+            error_msgs.append(msg)
         else:
             res[tech] = IOUnits(input_units, output_units)
-    return res
+    if invalid_rows:
+        listed_lines = consolidate_lines(invalid_rows)
+        line_error_msg = f'Non-processed rows (see earlier tests): {listed_lines}'
+        error_msgs.append(line_error_msg)
+
+    return res, error_msgs
+
+
+def check_inter_table_relations(
+    source_relations: dict[str, Unit], table_relations: dict[str, IOUnits]
+) -> tuple[dict[str, str], list[str]]:
+    pass
 
 
 def main(db_path: Path):

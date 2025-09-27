@@ -36,7 +36,7 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
-from pint import UndefinedUnitError
+from pint import UndefinedUnitError, Unit
 
 from definitions import PROJECT_ROOT
 from temoa.temoa_model.unit_checking import ureg
@@ -44,13 +44,12 @@ from temoa.temoa_model.unit_checking.common import (
     UnitsFormat,
     RATIO_ELEMENT,
     SINGLE_ELEMENT,
-    MIXED_UNITS,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def validate_units_expression(expr: str) -> tuple[bool, ureg.Unit]:
+def validate_units_expression(expr: str) -> tuple[bool, Unit]:
     """
     validate an entry against the units registry
     :param expr: the expression to validate
@@ -60,15 +59,16 @@ def validate_units_expression(expr: str) -> tuple[bool, ureg.Unit]:
         units = ureg.parse_units(expr)
         return True, units
     except UndefinedUnitError as e:
-        if expr == 'mixed':
-            return True, MIXED_UNITS
         return False, None
 
 
 def validate_units_format(
     expr: str, unit_format: UnitsFormat
 ) -> tuple[bool, tuple[str, ...] | None]:
-    """validate against the format"""
+    """
+    validate against the format
+    return boolean for validity and tuple of elements if valid
+    """
     if not expr:
         return False, None
     elements = re.search(unit_format.format, expr)
@@ -105,6 +105,9 @@ if __name__ == '__main__':
         'killowathour',
         'KWh',
         'KWH',
+        'USD',
+        'dollar',
+        'passenger',
     ]
     for expr in exprs:
         success, converted = validate_units_expression(expr)
@@ -126,7 +129,7 @@ if __name__ == '__main__':
         conn = sqlite3.connect(
             Path(PROJECT_ROOT) / 'data_files/mike_US/US_9R_8D_v3_stability_v3_1.sqlite'
         )
-        res = gather_from_table(conn, table_name, line_nums=False)
+        res = gather_from_table(conn, table_name)
         conn.close()
         for expr in res:
             valid, elements = validate_units_format(expr, units_format)

@@ -30,7 +30,7 @@ Set of tests for related to the unit checker
 import pytest
 
 from temoa.temoa_model.unit_checking import ureg
-from temoa.temoa_model.unit_checking.common import SINGLE_ELEMENT, RATIO_ELEMENT, MIXED_UNITS
+from temoa.temoa_model.unit_checking.common import SINGLE_ELEMENT, RATIO_ELEMENT
 from temoa.temoa_model.unit_checking.entry_checker import (
     validate_units_format,
     validate_units_expression,
@@ -64,7 +64,12 @@ cases = [
     ('kg', (True, ureg.kg)),
     ('m/s', (True, ureg('m/s'))),
     ('dog_food', (False, None)),
-    ('mixed', (True, MIXED_UNITS)),
+    ('ethos', (True, ureg.ethos)),
+    ('passenger', (True, ureg.passenger)),
+    ('seat', (True, ureg.seat)),
+    ('dollar', (True, ureg.dollar)),
+    ('USD', (True, ureg.dollar)),
+    ('EUR', (True, ureg.euro)),
 ]
 
 

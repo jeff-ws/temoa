@@ -33,6 +33,7 @@ from pathlib import Path
 
 from definitions import PROJECT_ROOT
 from temoa.temoa_model.unit_checking.common import tables_with_units
+from temoa.temoa_model.unit_checking.relation_checker import check_efficiency_table, commodity_units
 from temoa.temoa_model.unit_checking.table_checker import check_table
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,8 @@ verbose = True  # for dev/test work
 def screen(dp_path: Path, report_path: Path | None = None):
     """The sequencer to run a series of checks on units in the database"""
     report_entries = []
+    table_units = {}
+    """Table name : {tech | commodity: units}"""
     with sqlite3.connect(dp_path) as conn:
         # test 1:  DB version
         data = conn.execute('SELECT element, value FROM MetaData').fetchall()
@@ -58,16 +61,23 @@ def screen(dp_path: Path, report_path: Path | None = None):
             msg = 'Units Check 1 (DB Version):  Failed.  DB must be v3.1 or greater for units checking'
             report_entries.extend((msg, '\n'))
             logger.warning(msg)
+            # we are non-viable, write the (very short) report and return
+            _write_report(report_path, report_entries)
+            if verbose:
+                print(
+                    f'Units Check 1 (DB Version):  Failed.  DB must be v3.1 or greater for units checking'
+                )
             return
-        report_entries.append('\n')
 
         # test 2:  Units in tables
+        report_entries.append('\n')
         msg = 'Units Check 2 (Units Entries in Tables):  Started'
         logger.info(msg)
         report_entries.extend((msg, '\n'))
         errors = False
         for table in tables_with_units:
-            table_errors = check_table(conn, table)
+            relations, table_errors = check_table(conn, table)
+            table_units[table] = relations
             if table_errors:
                 errors = True
                 for error in table_errors:
@@ -81,9 +91,21 @@ def screen(dp_path: Path, report_path: Path | None = None):
             report_entries.extend((msg, '\n'))
         report_entries.append('\n')
 
-    if report_path:
-        with open(report_path, 'w') as report_file:
-            report_file.writelines(report_entries)
+        # test 3:  Efficiency Table
+        msg = 'Units Check 3 (Tech I/O via Efficiency Table):  Started'
+        logger.info(msg)
+        report_entries.extend((msg, '\n'))
+        tech_io, errors = check_efficiency_table(conn, comm_units=commodity_units(conn))
+        if errors:
+            report_entries.extend((msg, '\n'))
+
+
+def _write_report(report_path: Path, report_entries: list[str]):
+    """Write the report to file"""
+    if not report_path:
+        return
+    with open(report_path, 'w') as report_file:
+        report_file.writelines(report_entries)
 
 
 if __name__ == '__main__':

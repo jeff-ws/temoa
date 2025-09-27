@@ -81,11 +81,13 @@ ratio_units_tables = {
 }
 """Tables that express a ratio of units in form "units / (other units)" """
 
-activity_based_tables = [
+commodity_based_tables = [
     'Demand',
+    'MaxResource',  # haven't we done away with this table/constraint?
+]
+activity_based_tables = [
     'MaxActivity',
     'MaxActivityGroup',
-    'MaxResource',
     'MinActivity',
     'MinActivityGroup',
 ]
@@ -120,9 +122,6 @@ cost_based_tables = [
 
 # TODO:  Unclear tables:  MaxResource, GrowthRateSeed
 
-MIXED_UNITS = 42
-"""Marker for mixed units entries"""
-
 
 @dataclass(frozen=True)
 class UnitsFormat:
@@ -137,5 +136,15 @@ SINGLE_ELEMENT = UnitsFormat(format=r'^\s*([A-Za-z\*\_\s]+?)\s*$', groups=1)
 RATIO_ELEMENT = UnitsFormat(
     format=r'^\s*([A-Za-z\*\_\s]+?)\s*\/\s*\(\s*([A-Za-z\*\_\s]+?)\s*\)\s*$', groups=2
 )
+"""Format for a units ratio.  re will return the first group as the numerator and the second as the denominator"""
 
 ACCEPTABLE_CHARACTERS = r'^\s*([A-Za-z\*\_\s\/\(\)]+?)\s*$'
+
+
+def consolidate_lines(line_nums: list[str | int]) -> list[str]:
+    listed_lines = (
+        line_nums
+        if len(line_nums) < 5
+        else f'{", ".join(str(t) for t in line_nums[:5])}", ... +{len(line_nums)-5} more"'
+    )
+    return listed_lines

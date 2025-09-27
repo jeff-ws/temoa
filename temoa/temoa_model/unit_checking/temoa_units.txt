@@ -1,0 +1,12 @@
+# a few additions needed to for completeness in Temoa model
+# the units here AUGMENT the default units in pint.  See pint's documentation for more info.
+
+passenger = [person] = passenger
+seat = [object] = seat
+
+# see pint's notes about currency and conversion before getting ideas about currency conversions.  ;)
+# it would be OK to add other currencies here in addition to USD.
+
+dollar = [currency] = USD = dollars
+euro = [currency] = EUR = euros
+ethos = [empty]
