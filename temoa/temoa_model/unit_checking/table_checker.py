@@ -65,7 +65,7 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
             listed_lines = consolidate_lines(line_nums)
 
             errors.append(
-                f'Invalid character(s) at rows {listed_lines} [only letters, underscore and "*, /" operators allowed]: {expr}'
+                f'Invalid character(s) at rows {listed_lines} [only letters, underscore and "*, /, ^" operators allowed]: {expr}'
             )
             continue
 

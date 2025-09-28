@@ -130,15 +130,16 @@ class UnitsFormat:
 
 
 # any gathering of letters and allowed symbols which are "*" and "_" with end lead/trail spaces trimmed
-SINGLE_ELEMENT = UnitsFormat(format=r'^\s*([A-Za-z\*\_\s\/\(\)]+?)\s*$', groups=1)
+SINGLE_ELEMENT = UnitsFormat(format=r'^\s*([A-Za-z0-9\*\^\_\s\/\(\)]+?)\s*$', groups=1)
 
 # any fractional expression using the same pattern above with the denominator IN PARENTHESES
 RATIO_ELEMENT = UnitsFormat(
-    format=r'^\s*([A-Za-z\*\_\s]+?)\s*\/\s*\(\s*([A-Za-z\*\_\s]+?)\s*\)\s*$', groups=2
+    format=r'^\s*([A-Za-z0-9\*\/\^\_\s]+?)\s*\/\s*\(\s*([A-Za-z0-9\*\^\/\(\)\_\s]+?)\s*\)\s*$',
+    groups=2,
 )
 """Format for a units ratio.  re will return the first group as the numerator and the second as the denominator"""
 
-ACCEPTABLE_CHARACTERS = r'^\s*([A-Za-z\*\_\s\/\(\)]+?)\s*$'
+ACCEPTABLE_CHARACTERS = r'^\s*([A-Za-z0-9\*\^\_\s\/\(\)]+?)\s*$'
 
 
 def consolidate_lines(line_nums: list[str | int]) -> list[str]:

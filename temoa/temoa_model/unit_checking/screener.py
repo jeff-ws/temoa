@@ -35,6 +35,7 @@ from definitions import PROJECT_ROOT
 from temoa.temoa_model.unit_checking.common import (
     tables_with_units,
     capacity_based_tables,
+    activity_based_tables,
 )
 from temoa.temoa_model.unit_checking.relation_checker import (
     check_efficiency_table,
@@ -120,14 +121,16 @@ def screen(dp_path: Path, report_path: Path | None = None):
         msg = 'Units Check 4 (Related Tables):  Started'
         logger.info(msg)
         report_entries.extend((msg, '\n'))
-        # for table in activity_based_tables:
-        #     errors_1 = check_inter_table_relations(conn=conn, table_name=table, tech_units=tech_io, capacity_based=False)
-        #     if errors_1:
-        #         for error in errors_1:
-        #             logger.warning('%s: %s', table, error)
-        #             report_entries.extend((f'{table}: {error}', '\n'))
-        #             if verbose:
-        #                 print(f'{table}: {error}')
+        for table in activity_based_tables:
+            errors_1 = check_inter_table_relations(
+                conn=conn, table_name=table, tech_units=tech_io, capacity_based=False
+            )
+            if errors_1:
+                for error in errors_1:
+                    logger.warning('%s: %s', table, error)
+                    report_entries.extend((f'{table}: {error}', '\n'))
+                    if verbose:
+                        print(f'{table}: {error}')
         for table in capacity_based_tables:
             errors_2 = check_inter_table_relations(
                 conn=conn, table_name=table, tech_units=tech_io, capacity_based=True
@@ -138,8 +141,8 @@ def screen(dp_path: Path, report_path: Path | None = None):
                     report_entries.extend((f'{table}: {error}', '\n'))
                     if verbose:
                         print(f'{table}: {error}')
-        # if not errors_1 and not errors_2:
-        #     report_entries.extend((f'Units Check 4: (Related Tables):  Passed', '\n'))
+        if not errors_1 and not errors_2:
+            report_entries.extend((f'Units Check 4: (Related Tables):  Passed', '\n'))
 
         # wrap it up
         _write_report(report_path, report_entries)
