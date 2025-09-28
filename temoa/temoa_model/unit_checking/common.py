@@ -87,21 +87,21 @@ commodity_based_tables = [
 ]
 activity_based_tables = [
     'MaxActivity',
-    'MaxActivityGroup',
+    # 'MaxActivityGroup',
     'MinActivity',
-    'MinActivityGroup',
+    # 'MinActivityGroup',
 ]
 """Tables that should have units equivalent to the commodity's native units"""
 
 capacity_based_tables = [
     'MaxCapacity',
-    'MaxCapacityGroup',
+    # 'MaxCapacityGroup',
     'MaxNewCapacity',
-    'MaxNewCapacityGroup',
+    # 'MaxNewCapacityGroup',
     'MinCapacity',
-    'MinCapacityGroup',
+    # 'MinCapacityGroup',
     'MinNewCapacity',
-    'MinNewCapacityGroup',
+    # 'MinNewCapacityGroup',
 ]
 """Tables that require conversion via CapacityToActivity to reach the native units"""
 
@@ -130,7 +130,7 @@ class UnitsFormat:
 
 
 # any gathering of letters and allowed symbols which are "*" and "_" with end lead/trail spaces trimmed
-SINGLE_ELEMENT = UnitsFormat(format=r'^\s*([A-Za-z\*\_\s]+?)\s*$', groups=1)
+SINGLE_ELEMENT = UnitsFormat(format=r'^\s*([A-Za-z\*\_\s\/\(\)]+?)\s*$', groups=1)
 
 # any fractional expression using the same pattern above with the denominator IN PARENTHESES
 RATIO_ELEMENT = UnitsFormat(

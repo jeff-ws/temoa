@@ -91,15 +91,14 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
                     converted_units.append(units)
         # assemble a reference of item: units-relationship if we have a valid entry
         if len(converted_units) == format_type.groups:  # we have the right number
-            match format_type:
-                case SINGLE_ELEMENT():
-                    ref = {expr: converted_units[0]}
-                    res.update(ref)
-                case RATIO_ELEMENT():
-                    ref = {expr: converted_units[0] / converted_units[1]}
-                    res.update(ref)
-                case _:
-                    logger.error('Unknown units format: %s', format_type)
+            if format_type == SINGLE_ELEMENT:
+                ref = {expr: converted_units[0]}
+                res.update(ref)
+            elif format_type == RATIO_ELEMENT:
+                ref = {expr: converted_units[0] / converted_units[1]}
+                res.update(ref)
+            else:
+                logger.error('Unknown units format: %s', format_type)
     return res, errors
 
 

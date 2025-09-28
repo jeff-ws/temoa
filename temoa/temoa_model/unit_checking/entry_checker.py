@@ -35,6 +35,7 @@ import re
 import sqlite3
 from collections import defaultdict
 from pathlib import Path
+from typing import Union
 
 from pint import UndefinedUnitError, Unit
 
@@ -49,7 +50,7 @@ from temoa.temoa_model.unit_checking.common import (
 logger = logging.getLogger(__name__)
 
 
-def validate_units_expression(expr: str) -> tuple[bool, Unit]:
+def validate_units_expression(expr: str) -> tuple[bool, Union[Unit, None]]:
     """
     validate an entry against the units registry
     :param expr: the expression to validate

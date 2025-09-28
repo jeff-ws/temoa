@@ -32,8 +32,15 @@ import sqlite3
 from pathlib import Path
 
 from definitions import PROJECT_ROOT
-from temoa.temoa_model.unit_checking.common import tables_with_units
-from temoa.temoa_model.unit_checking.relation_checker import check_efficiency_table, commodity_units
+from temoa.temoa_model.unit_checking.common import (
+    tables_with_units,
+    capacity_based_tables,
+)
+from temoa.temoa_model.unit_checking.relation_checker import (
+    check_efficiency_table,
+    commodity_units,
+    check_inter_table_relations,
+)
 from temoa.temoa_model.unit_checking.table_checker import check_table
 
 logger = logging.getLogger(__name__)
@@ -95,9 +102,47 @@ def screen(dp_path: Path, report_path: Path | None = None):
         msg = 'Units Check 3 (Tech I/O via Efficiency Table):  Started'
         logger.info(msg)
         report_entries.extend((msg, '\n'))
-        tech_io, errors = check_efficiency_table(conn, comm_units=commodity_units(conn))
+        commodity_ref = commodity_units(conn)
+        tech_io, errors = check_efficiency_table(conn, comm_units=commodity_ref)
         if errors:
-            report_entries.extend((msg, '\n'))
+            for error in errors:
+                logger.warning('%s: %s', 'Efficiency', error)
+                report_entries.extend((f'Efficiency: {error}', '\n'))
+                if verbose:
+                    print(f'Efficiency: {error}')
+        else:
+            report_entries.extend((f'Units Check 3: (Efficiency Table and Tech I/O:  Passed', '\n'))
+
+        report_entries.append('\n')
+
+        # test 4:  Relationships in other tables
+        # this utilizes tech_io gathered above
+        msg = 'Units Check 4 (Related Tables):  Started'
+        logger.info(msg)
+        report_entries.extend((msg, '\n'))
+        # for table in activity_based_tables:
+        #     errors_1 = check_inter_table_relations(conn=conn, table_name=table, tech_units=tech_io, capacity_based=False)
+        #     if errors_1:
+        #         for error in errors_1:
+        #             logger.warning('%s: %s', table, error)
+        #             report_entries.extend((f'{table}: {error}', '\n'))
+        #             if verbose:
+        #                 print(f'{table}: {error}')
+        for table in capacity_based_tables:
+            errors_2 = check_inter_table_relations(
+                conn=conn, table_name=table, tech_units=tech_io, capacity_based=True
+            )
+            if errors_2:
+                for error in errors_2:
+                    logger.warning('%s: %s', table, error)
+                    report_entries.extend((f'{table}: {error}', '\n'))
+                    if verbose:
+                        print(f'{table}: {error}')
+        # if not errors_1 and not errors_2:
+        #     report_entries.extend((f'Units Check 4: (Related Tables):  Passed', '\n'))
+
+        # wrap it up
+        _write_report(report_path, report_entries)
 
 
 def _write_report(report_path: Path, report_entries: list[str]):
