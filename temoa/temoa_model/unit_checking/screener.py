@@ -36,11 +36,14 @@ from temoa.temoa_model.unit_checking.common import (
     tables_with_units,
     capacity_based_tables,
     activity_based_tables,
+    cost_based_tables,
 )
 from temoa.temoa_model.unit_checking.relation_checker import (
     check_efficiency_table,
-    commodity_units,
+    make_commodity_lut,
     check_inter_table_relations,
+    check_cost_tables,
+    make_c2a_lut,
 )
 from temoa.temoa_model.unit_checking.table_checker import check_table
 
@@ -55,6 +58,11 @@ def screen(dp_path: Path, report_path: Path | None = None):
     """Table name : {tech | commodity: units}"""
     with sqlite3.connect(dp_path) as conn:
         # test 1:  DB version
+        msg = '========  Units Check 1 (DB Version):  Started ========'
+        report_entries.extend((msg, '\n'))
+        logger.info(msg)
+        if verbose:
+            print(msg)
         data = conn.execute('SELECT element, value FROM MetaData').fetchall()
         meta_data = dict(data)
         major = meta_data.get('DB_MAJOR', 0)
@@ -64,7 +72,7 @@ def screen(dp_path: Path, report_path: Path | None = None):
             report_entries.extend((msg, '\n'))
             logger.info(msg)
             if verbose:
-                print(f'Units Check 1 (DB Version):  Passed')
+                print(msg)
         else:
             msg = 'Units Check 1 (DB Version):  Failed.  DB must be v3.1 or greater for units checking'
             report_entries.extend((msg, '\n'))
@@ -73,13 +81,13 @@ def screen(dp_path: Path, report_path: Path | None = None):
             _write_report(report_path, report_entries)
             if verbose:
                 print(
-                    f'Units Check 1 (DB Version):  Failed.  DB must be v3.1 or greater for units checking'
+                    'Units Check 1 (DB Version):  Failed.  DB must be v3.1 or greater for units checking'
                 )
             return
 
         # test 2:  Units in tables
         report_entries.append('\n')
-        msg = 'Units Check 2 (Units Entries in Tables):  Started'
+        msg = '======== Units Check 2 (Units Entries in Tables):  Started ========'
         logger.info(msg)
         report_entries.extend((msg, '\n'))
         errors = False
@@ -90,7 +98,7 @@ def screen(dp_path: Path, report_path: Path | None = None):
                 errors = True
                 for error in table_errors:
                     logger.warning('%s: %s', table, error)
-                    report_entries.extend((f'{table}: {error}', '\n'))
+                    report_entries.extend((f'  {table}: {error}', '\n'))
                     if verbose:
                         print(f'{table}: {error}')
         if not errors:
@@ -100,11 +108,13 @@ def screen(dp_path: Path, report_path: Path | None = None):
         report_entries.append('\n')
 
         # test 3:  Efficiency Table
-        msg = 'Units Check 3 (Tech I/O via Efficiency Table):  Started'
+        msg = '======== Units Check 3 (Tech I/O via Efficiency Table):  Started ========'
         logger.info(msg)
         report_entries.extend((msg, '\n'))
-        commodity_ref = commodity_units(conn)
-        tech_io, errors = check_efficiency_table(conn, comm_units=commodity_ref)
+        # make Look Up Tables for use in follow-on checks
+        commodity_lut = make_commodity_lut(conn)
+        c2a_lut = make_c2a_lut(conn)
+        tech_io, errors = check_efficiency_table(conn, comm_units=commodity_lut)
         if errors:
             for error in errors:
                 logger.warning('%s: %s', 'Efficiency', error)
@@ -112,18 +122,18 @@ def screen(dp_path: Path, report_path: Path | None = None):
                 if verbose:
                     print(f'Efficiency: {error}')
         else:
-            report_entries.extend((f'Units Check 3: (Efficiency Table and Tech I/O:  Passed', '\n'))
+            report_entries.extend(('Units Check 3: (Efficiency Table and Tech I/O:  Passed', '\n'))
 
         report_entries.append('\n')
 
         # test 4:  Relationships in other tables
         # this utilizes tech_io gathered above
-        msg = 'Units Check 4 (Related Tables):  Started'
+        msg = '======== Units Check 4 (Related Tables):  Started ========'
         logger.info(msg)
         report_entries.extend((msg, '\n'))
         for table in activity_based_tables:
             errors_1 = check_inter_table_relations(
-                conn=conn, table_name=table, tech_units=tech_io, capacity_based=False
+                conn=conn, table_name=table, tech_lut=tech_io, c2a_lut=c2a_lut, capacity_based=False
             )
             if errors_1:
                 for error in errors_1:
@@ -133,7 +143,7 @@ def screen(dp_path: Path, report_path: Path | None = None):
                         print(f'{table}: {error}')
         for table in capacity_based_tables:
             errors_2 = check_inter_table_relations(
-                conn=conn, table_name=table, tech_units=tech_io, capacity_based=True
+                conn=conn, table_name=table, tech_lut=tech_io, c2a_lut=c2a_lut, capacity_based=True
             )
             if errors_2:
                 for error in errors_2:
@@ -142,7 +152,31 @@ def screen(dp_path: Path, report_path: Path | None = None):
                     if verbose:
                         print(f'{table}: {error}')
         if not errors_1 and not errors_2:
-            report_entries.extend((f'Units Check 4: (Related Tables):  Passed', '\n'))
+            print(errors_1, errors_2)
+            report_entries.extend(('Units Check 4: (Related Tables):  Passed', '\n'))
+
+        report_entries.append('\n')
+
+        # test 5:  Cost-Based Tables
+        # checks to assure that the output units are compatible with the related tech and that the currency is
+        # standardized when the units are simplified
+        msg = '======== Units Check 5 (Cost Tables):  Started ========'
+        logger.info(msg)
+        report_entries.extend((msg, '\n'))
+        errors = check_cost_tables(
+            conn,
+            cost_tables=cost_based_tables,
+            tech_lut=tech_io,
+            c2a_lut=c2a_lut,
+            commodity_lut=commodity_lut,
+        )
+        if errors:
+            for error in errors:
+                logger.warning('%s', error)
+                report_entries.extend((error, '\n'))
+
+        else:
+            report_entries.extend(('Units Check 5 (Cost Tables):  Passed', '\n'))
 
         # wrap it up
         _write_report(report_path, report_entries)

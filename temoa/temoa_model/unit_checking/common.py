@@ -71,15 +71,15 @@ tables_with_units = [
 ]
 """Tables that have units"""
 
-ratio_units_tables = {
+ratio_capture_tables = {
     'Efficiency',
-    'EmissionActivity',
-    'CostEmission',
-    'CostFixed',
-    'CostInvest',
-    'CostVariable',
+    # 'EmissionActivity',
+    # 'CostEmission',
+    # 'CostFixed',
+    # 'CostInvest',
+    # 'CostVariable',
 }
-"""Tables that express a ratio of units in form "units / (other units)" """
+"""Tables that require ratio capture in form "units / (other units)" """
 
 commodity_based_tables = [
     'Demand',
@@ -94,6 +94,7 @@ activity_based_tables = [
 """Tables that should have units equivalent to the commodity's native units"""
 
 capacity_based_tables = [
+    'ExistingCapacity',
     'MaxCapacity',
     # 'MaxCapacityGroup',
     'MaxNewCapacity',
@@ -105,6 +106,12 @@ capacity_based_tables = [
 ]
 """Tables that require conversion via CapacityToActivity to reach the native units"""
 
+per_capacity_based_tables = [
+    'CostFixed',
+    'CostInvest',
+]
+"""tables with capacity in the denominator"""
+
 period_based_tables = [
     'LifetimeProcess',
     'LifetimeTech',
@@ -112,12 +119,15 @@ period_based_tables = [
 ]
 """Tables that align to the time period, presumably 'years'"""
 
+# we need to delineate whether the units are commodity-referenced or tech-referenced and if they are "capacity based" so...
+# format:  (table_name, commodity field name (None if 'tech' based), capacity based )
 cost_based_tables = [
-    'CostEmission',
-    'CostFixed',
-    'CostInvest',
-    'CostVariable',
+    ('CostEmission', 'emis_comm', False),
+    ('CostFixed', None, True),
+    ('CostInvest', None, True),
+    ('CostVariable', None, False),
 ]
+"""Tables that have cost units"""
 
 
 # TODO:  Unclear tables:  MaxResource, GrowthRateSeed

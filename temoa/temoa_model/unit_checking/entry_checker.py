@@ -59,7 +59,7 @@ def validate_units_expression(expr: str) -> tuple[bool, Union[Unit, None]]:
     try:
         units = ureg.parse_units(expr)
         return True, units
-    except UndefinedUnitError as e:
+    except UndefinedUnitError:
         return False, None
 
 

@@ -36,11 +36,13 @@ from pint.registry import Unit
 
 from temoa.temoa_model.unit_checking.common import (
     tables_with_units,
-    ratio_units_tables,
+    ratio_capture_tables,
     RATIO_ELEMENT,
     SINGLE_ELEMENT,
     ACCEPTABLE_CHARACTERS,
     consolidate_lines,
+    capacity_based_tables,
+    per_capacity_based_tables,
 )
 from temoa.temoa_model.unit_checking.entry_checker import (
     validate_units_expression,
@@ -52,10 +54,17 @@ logger = logging.getLogger(__name__)
 
 
 def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Unit], list[str]]:
-    """Check all entries in a table for format and registry compliance"""
+    """
+    Check all entries in a table for format and registry compliance
+    This "first pass" gathers common entriesfor efficiency"""
     errors = []
     res = {}
-    format_type = RATIO_ELEMENT if table_name in ratio_units_tables else SINGLE_ELEMENT
+    format_type = RATIO_ELEMENT if table_name in ratio_capture_tables else SINGLE_ELEMENT
+
+    # check for incompatible screens...
+    if table_name in capacity_based_tables or table_name in capacity_based_tables:
+        if format_type == RATIO_ELEMENT:
+            logger.warning('Checking of RATIO_ELEMENTs for capacity-type units is NOT implemented')
 
     entries = gather_from_table(conn, table_name)
     for expr, line_nums in entries.items():
@@ -65,7 +74,7 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
             listed_lines = consolidate_lines(line_nums)
 
             errors.append(
-                f'Invalid character(s) at rows {listed_lines} [only letters, underscore and "*, /, ^" operators allowed]: {expr}'
+                f'  Invalid character(s) at rows {listed_lines} [only letters, underscore and "*, /, ^, ()" operators allowed]: {expr}'
             )
             continue
 
@@ -74,7 +83,7 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
         if not valid:
             listed_lines = consolidate_lines(line_nums)
 
-            errors.append(f'Format violation at rows {listed_lines}:  {expr}')
+            errors.append(f'  Format violation at rows {listed_lines}:  {expr}')
             continue
 
         # Check registry compliance
@@ -85,10 +94,28 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
                 if not success:
                     listed_lines = consolidate_lines(line_nums)
                     errors.append(
-                        f'Registry violation (UNK units) at rows {listed_lines}:  {element}'
+                        f'  Registry violation (UNK units) at rows {listed_lines}:  {element}'
                     )
                 else:
                     converted_units.append(units)
+
+        # if we have a relationship with "capacity" check that we have some time units
+        if table_name in capacity_based_tables and format_type == SINGLE_ELEMENT:
+            test_value = converted_units[0]
+            if test_value.dimensionality.get('[time]') != -1:
+                # no time in numerator
+                listed_lines = consolidate_lines(line_nums)
+                errors.append(
+                    f'  No time dimension in denominator of capacity entry at rows {listed_lines}:  {expr}'
+                )
+        if table_name in per_capacity_based_tables and format_type == SINGLE_ELEMENT:
+            test_value = converted_units[0]
+            if test_value.dimensionality.get('[time]') != 1:
+                listed_lines = consolidate_lines(line_nums)
+                errors.append(
+                    f'  No time dimension in numerator of capacity entry at rows {listed_lines}:  {expr}'
+                )
+
         # assemble a reference of item: units-relationship if we have a valid entry
         if len(converted_units) == format_type.groups:  # we have the right number
             if format_type == SINGLE_ELEMENT:
