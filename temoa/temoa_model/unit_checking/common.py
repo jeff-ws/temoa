@@ -120,12 +120,12 @@ period_based_tables = [
 """Tables that align to the time period, presumably 'years'"""
 
 # we need to delineate whether the units are commodity-referenced or tech-referenced and if they are "capacity based" so...
-# format:  (table_name, commodity field name (None if 'tech' based), capacity based )
+# format:  (table_name, commodity field name (None if 'tech' based), capacity-based, period-based )
 cost_based_tables = [
-    ('CostEmission', 'emis_comm', False),
-    ('CostFixed', None, True),
-    ('CostInvest', None, True),
-    ('CostVariable', None, False),
+    ('CostEmission', 'emis_comm', False, True),
+    ('CostFixed', None, True, True),
+    ('CostInvest', None, True, False),
+    ('CostVariable', None, False, True),
 ]
 """Tables that have cost units"""
 
@@ -152,10 +152,10 @@ RATIO_ELEMENT = UnitsFormat(
 ACCEPTABLE_CHARACTERS = r'^\s*([A-Za-z0-9\*\^\_\s\/\(\)]+?)\s*$'
 
 
-def consolidate_lines(line_nums: list[str | int]) -> list[str]:
+def consolidate_lines(line_nums: list[str | int]) -> str:
     listed_lines = (
-        line_nums
+        ", ".join(str(t) for t in line_nums)
         if len(line_nums) < 5
-        else f'{", ".join(str(t) for t in line_nums[:5])}", ... +{len(line_nums)-5} more"'
+        else f'{", ".join(str(t) for t in line_nums[:5])}, ... +{len(line_nums)-5} more'
     )
     return listed_lines

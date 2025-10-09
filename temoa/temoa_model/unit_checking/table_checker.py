@@ -62,7 +62,7 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
     format_type = RATIO_ELEMENT if table_name in ratio_capture_tables else SINGLE_ELEMENT
 
     # check for incompatible screens...
-    if table_name in capacity_based_tables or table_name in capacity_based_tables:
+    if table_name in capacity_based_tables:
         if format_type == RATIO_ELEMENT:
             logger.warning('Checking of RATIO_ELEMENTs for capacity-type units is NOT implemented')
 
@@ -74,7 +74,7 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
             listed_lines = consolidate_lines(line_nums)
 
             errors.append(
-                f'  Invalid character(s) at rows {listed_lines} [only letters, underscore and "*, /, ^, ()" operators allowed]: {expr}'
+                f'  Invalid character(s) at rows {listed_lines} [only letters, underscore and "*, /, ^, ()" operators allowed]: {expr if expr else "<no recognized entry>"}'
             )
             continue
 

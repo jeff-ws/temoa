@@ -32,6 +32,7 @@ import sqlite3
 from collections.abc import Iterable
 from pathlib import Path
 
+from mypy.checkexpr import defaultdict
 from mypy.message_registry import NamedTuple
 from pint.registry import Unit
 
@@ -61,9 +62,7 @@ def make_commodity_lut(conn: sqlite3.Connection) -> dict[str, Unit]:
         valid, group = validate_units_format(units, SINGLE_ELEMENT)
         if valid:
             valid, units = validate_units_expression(group[0])
-        if not valid:
-            continue
-        res[comm] = units
+            res[comm] = units
     return res
 
 
@@ -78,9 +77,7 @@ def make_c2a_lut(conn: sqlite3.Connection) -> dict[str, Unit]:
         valid, group = validate_units_format(units, SINGLE_ELEMENT)
         if valid:
             valid, units = validate_units_expression(group[0])
-        if not valid:
-            continue
-        res[comm] = units
+            res[comm] = units
     return res
 
 
@@ -237,10 +234,11 @@ def check_cost_tables(
     """
     common_cost_unit = None
     error_msgs = []
-    for table_name, commodity_reference, capacity_based in cost_tables:
+    for table_name, commodity_reference, capacity_based, period_based in cost_tables:
+        table_grouped_errors = defaultdict(list)
         if commodity_reference and capacity_based:
             raise ValueError(
-                'Cannot have both a commodity reference and be capacity based.  Check input for cost tables'
+                f'Table that is "capacity based" {table_name} flagged as having commodity field.  Check input for cost tables'
             )
         query = f'SELECT {commodity_reference if commodity_reference else 'tech'}, units FROM {table_name}'
         try:
@@ -254,9 +252,10 @@ def check_cost_tables(
             # convert
             valid, output_units = validate_units_expression(units)
             if not valid:
-                error_msgs.append(
-                    f'  {table_name}:  Unprocessed row (invalid units--see earlier tests): {idx}'
+                label = (
+                    f'  {table_name}:  Unprocessed row (invalid units--see earlier tests): {units}'
                 )
+                table_grouped_errors[label].append(idx)
                 continue
 
             # determine the units for the commodity
@@ -268,9 +267,8 @@ def check_cost_tables(
                 if tech_io:
                     commodity_units = tech_io.output_units
                 else:
-                    error_msgs.append(
-                        f'  {table_name}:  Unprocessed row (unknown tech {tech}): {idx}'
-                    )
+                    label = f'  {table_name}:  Unprocessed row (unknown tech: {tech}) '
+                    table_grouped_errors[label].append(idx)
                     continue
                 if capacity_based:
                     c2a_units = c2a_lut.get(tech, ureg.dimensionless / ureg.year)
@@ -290,7 +288,7 @@ def check_cost_tables(
                 # if it's "clean" use it
 
                 cost_unit = output_units * commodity_units
-                # check that what we have captured is in the currency dimension
+                # check that what we have captured is in the currency dimension == "clean"
                 if (1 * cost_unit).check('[currency]'):
                     common_cost_unit = cost_unit
                 else:  # something is wrong, hopefully it was just this entry?
@@ -302,10 +300,13 @@ def check_cost_tables(
                 # use the common cost unit to check
                 cost_unit = output_units * commodity_units
                 if cost_unit != common_cost_unit:
-                    error_msgs.append(
-                        f'  {table_name}:  Unprocessed row (mismatched cost units or tech output mismatch): {idx}'
+                    label = (
+                        f'  {table_name}:  Unprocessed row (mismatched cost units or tech output mismatch)'
                         f'\n    Table entry: {units}, Commodity units: {commodity_units}, Remainder: {cost_unit}, c2a units: {c2a_units if c2a_units else "N/A"}:'
                     )
+                    table_grouped_errors[label].append(idx)
+        for label, listed_lines in table_grouped_errors.items():
+            error_msgs.append(f'{label} {consolidate_lines(listed_lines)}')
     return error_msgs
 
 

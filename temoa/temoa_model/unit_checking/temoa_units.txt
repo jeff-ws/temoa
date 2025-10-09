@@ -8,6 +8,8 @@ vehicle = [object] = vehicle
 # see pint's notes about currency and conversion before getting ideas about currency conversions.  ;)
 # it would be OK to add other currencies here in addition to USD.
 
-dollar = [currency] = USD = dollars
-euro = [currency] = EUR = euros
+dollar = [currency] = USD = dollar
+euro = [currency] = EUR = euro
+
+# Temoa uses ethos as an original source, so we add it here as an "empty" base class unit
 ethos = [empty]
