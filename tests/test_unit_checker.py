@@ -44,6 +44,7 @@ cases = [
     ('Mt.steel ', SINGLE_ELEMENT, False),  # period not allowed
     ('PJ / day', SINGLE_ELEMENT, False),  # no slash char
     ('PJ    / (kT)', RATIO_ELEMENT, True),
+    ('(PJ) / (kT)', RATIO_ELEMENT, True),  # numerator optionally parenthesized
     ('PJ / kT', RATIO_ELEMENT, False),  # no parens on denom
     ('kWh/day/(cycle)', RATIO_ELEMENT, False),  # no slash char
 ]
@@ -56,27 +57,30 @@ cases = [
 )
 def test_format_validation(entry, units_format, expected):
     """Test the regex matching for unit format
-    Note:  The unit values here are NOT tested within the Units Registry"""
+    Note:  The unit values here are NOT tested within the Units Registry
+    This test is solely to test the regex to grab the units, esp the ratio units"""
     assert validate_units_format(expr=entry, unit_format=units_format)
 
 
 cases = [
     ('kg', (True, ureg.kg)),
+    ('kg/m^3', (True, ureg('kg/(meter*meter*meter)'))),
     ('m/s', (True, ureg('m/s'))),
     ('dog_food', (False, None)),
     ('ethos', (True, ureg.ethos)),
     ('passenger', (True, ureg.passenger)),
     ('seat', (True, ureg.seat)),
     ('dollar', (True, ureg.dollar)),
+    ('dollars', (True, ureg.dollar)),
     ('USD', (True, ureg.dollar)),
     ('EUR', (True, ureg.euro)),
+    ('kWh', (True, ureg.kWh)),
 ]
-
 
 @pytest.mark.parametrize(
     'expr, expected_result',
     cases,
-    ids=[f"{t[0]} -> {'valid' if t[0] in ('kg', 'm/s', 'mixed') else 'invalid'}" for t in cases],
+    ids=[f"{t[0]} -> {'valid' if t[1][0]else 'invalid'}" for t in cases],
 )
 def test_validate_units_expression(expr, expected_result):
     """

@@ -122,9 +122,9 @@ period_based_tables = [
 # we need to delineate whether the units are commodity-referenced or tech-referenced and if they are "capacity based" so...
 # format:  (table_name, commodity field name (None if 'tech' based), capacity-based, period-based )
 cost_based_tables = [
+    ('CostInvest', None, True, False),
     ('CostEmission', 'emis_comm', False, True),
     ('CostFixed', None, True, True),
-    ('CostInvest', None, True, False),
     ('CostVariable', None, False, True),
 ]
 """Tables that have cost units"""
@@ -140,9 +140,13 @@ class UnitsFormat:
 
 
 # any gathering of letters and allowed symbols which are "*" and "_" with end lead/trail spaces trimmed
+# We include numbers here for cases where there is an exponent in the units like "meter^2"
+# the units *may* be parenthesized arbitrarily.  See the unit tests for examples.
 SINGLE_ELEMENT = UnitsFormat(format=r'^\s*([A-Za-z0-9\*\^\_\s\/\(\)]+?)\s*$', groups=1)
 
 # any fractional expression using the same pattern above with the denominator IN PARENTHESES
+# this modification of above REQUIRES a parenthetical expression after the slash to isolate the denominator.
+# see the unit tests for examples.
 RATIO_ELEMENT = UnitsFormat(
     format=r'^\s*([A-Za-z0-9\*\/\^\_\s]+?)\s*\/\s*\(\s*([A-Za-z0-9\*\^\/\(\)\_\s]+?)\s*\)\s*$',
     groups=2,
@@ -153,6 +157,7 @@ ACCEPTABLE_CHARACTERS = r'^\s*([A-Za-z0-9\*\^\_\s\/\(\)]+?)\s*$'
 
 
 def consolidate_lines(line_nums: list[str | int]) -> str:
+    """A little sand wedge of a function to prevent lists of many, many line numbers and maxing at 5 or 5 + 'more'"""
     listed_lines = (
         ", ".join(str(t) for t in line_nums)
         if len(line_nums) < 5
