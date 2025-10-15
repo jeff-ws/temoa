@@ -248,7 +248,8 @@ def check_cost_tables(
         table_grouped_errors = defaultdict(list)
         if ct.commodity_reference and ct.capacity_based:
             raise ValueError(
-                f'Table that is "capacity based" {ct.table_name} flagged as having commodity field.  Check input for cost tables'
+                f'Table that is "capacity based" {ct.table_name} flagged as '
+                'having commodity field--expecting tech field.  Check data.'
             )
         query = f'SELECT {ct.commodity_reference if ct.commodity_reference else 'tech'}, units FROM {ct.table_name}'
         try:
@@ -262,23 +263,40 @@ def check_cost_tables(
             continue
         for idx, (tech, raw_units_expression) in enumerate(rows, start=1):
             # convert to pint expression
-            valid, table_units = validate_units_expression(raw_units_expression)
-            if not valid:
-                label = f'  {ct.table_name}:  Unprocessed row (invalid units--see earlier tests): {raw_units_expression}'
+            cost_units, measure_units = None, None
+            valid, (raw_cost, raw_units) = validate_units_format(
+                raw_units_expression, RATIO_ELEMENT
+            )
+            if valid:
+                cost_valid, cost_units = validate_units_expression(raw_cost)
+                units_valid, measure_units = validate_units_expression(raw_units)
+            else:
+                cost_valid, units_valid = False, False
+            if not (cost_valid and units_valid):
+                label = f'{ct.table_name}:  Unprocessed row (invalid units--see earlier tests): {raw_units_expression}'
                 table_grouped_errors[label].append(idx)
                 continue
 
-            # for those costs that are capacity-based, we will adjust the commodity's units (which are activity-based)
-            # by dividing them by the C2A factor, which should make them comparable.
-            #
-            # Example:
-            #    $/MW  (Capacity based cost from a table)
-            #    MWh   (The commodity's base units as an Activity-based (energy))
-            #
-            #    h     (the C2A factor to get from MW to MWh
-            #
-            #    so we take MWh / h =>  MW is the expected comparison point after removing the $ reference
+            # Test 1: Look for cost commonality
+            if common_cost_unit is None:
+                # try to establish it
+                # check that what we have captured is in the currency dimension == "clean"
+                # dev note:  multiplying by 1 allows us to use the check_units_expression() function
+                if (1 * cost_units).check('[currency]'):
+                    common_cost_unit = cost_units
+                else:
+                    # something is wrong, hopefully it was just this entry?
+                    # mark it, dump it, and try again...
+                    error_msgs.append(
+                        f'{ct.table_name}:  Unprocessed row (unreducible cost units): {cost_units} at row: {idx}'
+                    )
+                    continue
+            else:  # use the common units to test
+                if cost_units != common_cost_unit:
+                    label = f'{ct.table_name}:  Non-standard cost found (expected common cost units of {common_cost_unit}) got: {cost_units}'
+                    table_grouped_errors[label].append(idx)
 
+            # Test 2:  Check the units of measure to ensure alignment with the tech's output units
             # find the referenced commodity units from the tech or commodity depending on table structure...
             if ct.commodity_reference:
                 commodity_units = commodity_lut.get(ct.commodity_reference)
@@ -300,63 +318,23 @@ def check_cost_tables(
             c2a_units = None
             if ct.capacity_based:
                 c2a_units = c2a_lut.get(tech, ureg.dimensionless)  # default is dimensionless
-                # we need to transform the activity-based commodity units to capacity units to match the cost table
-                match_units = commodity_units / (c2a_units * ureg.year)
-            else:
-                match_units = commodity_units
+                # apply to convert
+                measure_units *= c2a_units * ureg.year
 
-            # now we "sit on this" so we can remove the common cost below for checking, after it is established
+            if ct.period_based:
+                measure_units /= ureg.year  # remove the "per year" from this denominator
 
-            if common_cost_unit is None:
-                # establish it
+            matched = measure_units == commodity_units
 
-                #
-                # Typical "cost math" is like:
-                #
-                #      MUSD
-                #      ----     *    kWh  =  MUSD
-                #      kWh
+            if not matched:
+                tech_reference = ct.commodity_reference if ct.commodity_reference else tech
+                label = (
+                    f'{ct.table_name}:  Non-matching measure unit found in cost denominator for tech/commodity {tech_reference}: {raw_units_expression}'
+                    f'\n    Commodity units: {commodity_units}, Discovered (after conversions): {measure_units}'
+                    f'\n    Conversions:  c2a units: {c2a_units*ureg.year if c2a_units else "N/A"}{", `per period` removed" if ct.period_based else ""}\n   '
+                )
+                table_grouped_errors[label].append(idx)
 
-                # determine if the units are a "clean cost" as shown above
-
-                cost_unit = (
-                    table_units * match_units
-                )  # should simplify to pure currency as shown above
-                if ct.period_based:
-                    # multiply by the standard period to remove it from the denominator
-                    cost_unit *= ureg.year
-                # check that what we have captured is in the currency dimension == "clean"
-                # dev note:  multiplying by 1 allows us to use the check_units_expression() function
-                if (1 * cost_unit).check('[currency]'):
-                    common_cost_unit = cost_unit
-                else:
-                    # something is wrong, hopefully it was just this entry?
-                    # mark it, dump it, and try again...
-                    error_msgs.append(
-                        f'{ct.table_name}:  Unprocessed row (unreducible cost units or mismatched tech output units): {idx}'
-                    )
-                    continue
-            else:
-                # use the match_units from the associated tech/commodity to remove the non-cost units
-                cost_unit = table_units * match_units
-                if ct.period_based:
-                    cost_unit *= ureg.year
-
-                # check 1:  ensure the cost units are equal to the common cost units
-                if cost_unit != common_cost_unit:
-                    label = (
-                        f'{ct.table_name}:  Non-standard cost found (does not simplify to expected common cost unit): {raw_units_expression}'
-                        f'\n    Commodity units: {commodity_units}, Residual (expecting {common_cost_unit}): {cost_unit}, c2a units: {c2a_units if c2a_units else "N/A"}.'
-                    )
-                    table_grouped_errors[label].append(idx)
-                else:
-                    # proceed to the follow-on check
-                    # check 2: ensure that the commodity units match the commodity,
-                    # now that we can remove the common cost and check that the plain units matches the denominator
-                    plain_units = common_cost_unit / table_units
-                    if match_units != plain_units:
-                        label = f'{ct.table_name}:  Commodity units of cost element incorrect after applying C2A factor: {raw_units_expression}.'
-                        table_grouped_errors[label].append(idx)
         for label, listed_lines in table_grouped_errors.items():
             error_msgs.append(f'{label} at rows: {consolidate_lines(listed_lines)}')
     return error_msgs
