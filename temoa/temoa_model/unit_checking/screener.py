@@ -99,10 +99,10 @@ def screen(dp_path: Path, report_path: Path | None = None):
             if table_errors:
                 errors = True
                 for error in table_errors:
-                    logger.warning('%s: %s', table, error)
+                    logger.info('%s: %s', table, error)
                     report_entries.extend((f'  {table}: {error}', '\n'))
                     if verbose:
-                        print(f'{table}: {error}')
+                        print(f'{table}:  {error}')
         if not errors:
             msg = 'Units Check 2 (Units Entries in Tables):  Passed'
             logger.info(msg)
@@ -124,7 +124,7 @@ def screen(dp_path: Path, report_path: Path | None = None):
         tech_io_lut, errors = check_efficiency_table(conn, comm_units=commodity_lut)
         if errors:
             for error in errors:
-                logger.warning('%s: %s', 'Efficiency', error)
+                logger.info('%s: %s', 'Efficiency', error)
                 report_entries.extend((f'Efficiency: {error}', '\n'))
                 if verbose:
                     print(f'Efficiency: {error}')
@@ -157,10 +157,10 @@ def screen(dp_path: Path, report_path: Path | None = None):
             if errors:
                 error_free = False
                 for error in errors:
-                    logger.warning('%s: %s', table, error)
-                    report_entries.extend((f'{table}: {error}', '\n'))
+                    logger.info('%s: %s', table, error)
+                    report_entries.extend((f'{table}:  {error}', '\n'))
                     if verbose:
-                        print(f'{table}: {error}')
+                        print(f'{table}:  {error}')
         for table in capacity_based_tables:
             errors = check_inter_table_relations(
                 conn=conn,
@@ -172,10 +172,10 @@ def screen(dp_path: Path, report_path: Path | None = None):
             if errors:
                 error_free = False
                 for error in errors:
-                    logger.warning('%s: %s', table, error)
-                    report_entries.extend((f'{table}: {error}', '\n'))
+                    logger.info('%s: %s', table, error)
+                    report_entries.extend((f'{table}:  {error}', '\n'))
                     if verbose:
-                        print(f'{table}: {error}')
+                        print(f'{table}:  {error}')
         if error_free:
             msg = 'Units Check 4: (Related Tables):  Passed'
             logger.info(msg)
@@ -204,8 +204,10 @@ def screen(dp_path: Path, report_path: Path | None = None):
         )
         if errors:
             for error in errors:
-                logger.warning('%s', error)
+                logger.info('%s', error)
                 report_entries.extend((error, '\n'))
+                if verbose:
+                    print(error)
         else:
             msg = 'Units Check 5: (Cost Tables):  Passed'
             logger.info(msg)

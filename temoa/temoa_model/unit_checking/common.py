@@ -28,6 +28,7 @@ common elements used within Unit Checking
 
 """
 from dataclasses import dataclass
+from typing import NamedTuple
 
 tables_with_units = [
     'CapacityToActivity',
@@ -74,10 +75,10 @@ tables_with_units = [
 ratio_capture_tables = {
     'Efficiency',
     # 'EmissionActivity',
-    # 'CostEmission',
-    # 'CostFixed',
-    # 'CostInvest',
-    # 'CostVariable',
+    'CostEmission',
+    'CostFixed',
+    'CostInvest',
+    'CostVariable',
 }
 """Tables that require ratio capture in form "units / (other units)" """
 
@@ -106,11 +107,6 @@ capacity_based_tables = [
 ]
 """Tables that require conversion via CapacityToActivity to reach the native units"""
 
-per_capacity_based_tables = [
-    'CostFixed',
-    'CostInvest',
-]
-"""tables with capacity in the denominator"""
 
 period_based_tables = [
     'LifetimeProcess',
@@ -121,13 +117,18 @@ period_based_tables = [
 
 # we need to delineate whether the units are commodity-referenced or tech-referenced and if they are "capacity based" so...
 # format:  (table_name, commodity field name (None if 'tech' based), capacity-based, period-based )
+CostTableData = NamedTuple(
+    'CostTableData', table_name=str, commodity_reference=str, capacity_based=bool, period_based=bool
+)
+"""A named tuple for the cost tables + important properties"""
+
 cost_based_tables = [
-    ('CostInvest', None, True, False),
-    ('CostEmission', 'emis_comm', False, True),
-    ('CostFixed', None, True, True),
-    ('CostVariable', None, False, True),
+    CostTableData('CostInvest', None, True, False),
+    CostTableData('CostEmission', 'emis_comm', False, False),
+    CostTableData('CostFixed', None, True, True),
+    CostTableData('CostVariable', None, False, False),
 ]
-"""Tables that have cost units"""
+"""Tables that have cost units and their properties"""
 
 
 # TODO:  Unclear tables:  MaxResource, GrowthRateSeed
@@ -159,7 +160,7 @@ ACCEPTABLE_CHARACTERS = r'^\s*([A-Za-z0-9\*\^\_\s\/\(\)]+?)\s*$'
 def consolidate_lines(line_nums: list[str | int]) -> str:
     """A little sand wedge of a function to prevent lists of many, many line numbers and maxing at 5 or 5 + 'more'"""
     listed_lines = (
-        ", ".join(str(t) for t in line_nums)
+        ', '.join(str(t) for t in line_nums)
         if len(line_nums) < 5
         else f'{", ".join(str(t) for t in line_nums[:5])}, ... +{len(line_nums)-5} more'
     )

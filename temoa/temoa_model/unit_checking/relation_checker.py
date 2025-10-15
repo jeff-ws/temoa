@@ -42,6 +42,7 @@ from temoa.temoa_model.unit_checking.common import (
     RATIO_ELEMENT,
     SINGLE_ELEMENT,
     consolidate_lines,
+    CostTableData,
 )
 from temoa.temoa_model.unit_checking.entry_checker import (
     validate_units_format,
@@ -113,16 +114,18 @@ def check_efficiency_table(
             continue
 
         # check that our tech matches the units of the connected commodities
-        invalid_input = input_units != comm_units[ic]
-        invalid_output = output_units != comm_units[oc]
-        if invalid_input or invalid_output:
+        invalid_input_flag = input_units != comm_units[ic]
+        invalid_output_flag = output_units != comm_units[oc]
+        if invalid_input_flag or invalid_output_flag:
             logger.warning(
-                '  Units conflict with linked commodity for Technology %s near row %d', tech, idx
+                'Efficiency units conflict with associated commodity for Technology %s near row %d',
+                tech,
+                idx,
             )
             msg = f"\n  Expected:  {f'{ic} [{input_units}]' :^25} ----> {tech :^20} ----> {f'{oc} [{output_units}]': ^25}"
-            if invalid_input:
+            if invalid_input_flag:
                 msg += f'\n    Invalid input units: {comm_units[ic]}'
-            if invalid_output:
+            if invalid_output_flag:
                 msg += f'\n    Invalid output units: {comm_units[oc]}'
             error_msgs.append(msg)
 
@@ -130,7 +133,9 @@ def check_efficiency_table(
         if tech in res:
             if res[tech].output_units != output_units:
                 logger.warning(
-                    '  Units conflict with same-name tech for Technology %s near row %d', tech, idx
+                    'Efficiency units conflict with same-name tech for Technology %s near row %d',
+                    tech,
+                    idx,
                 )
                 msg = f"\n  Found:  {f'{ic} [{input_units}]' :^25} ----> {tech :^20} ----> {f'{oc} [{output_units}]': ^25}"
                 msg += f'\n    Conflicting output units: {res[tech].output_units} vs {output_units}'
@@ -158,7 +163,11 @@ def check_inter_table_relations(
     """check the tech and units in the given table vs. baseline values for the tech"""
     error_msgs = []
     if capacity_based:
-        query = f'SELECT {table_name}.tech, {table_name}.units, ca.units FROM {table_name} JOIN CapacityToActivity ca ON {table_name}.tech = ca.tech'
+        query = (
+            f'SELECT {table_name}.tech, {table_name}.units, ca.units '
+            f'FROM {table_name} JOIN CapacityToActivity ca '
+            f'ON {table_name}.tech = ca.tech AND {table_name}.region = ca.region'
+        )
     else:
         query = f'SELECT tech, units, NULL FROM {table_name}'
 
@@ -166,13 +175,13 @@ def check_inter_table_relations(
         rows = conn.execute(query).fetchall()
     except sqlite3.OperationalError:
         logger.error('failed to process query: %s when processing table %s', query, table_name)
-        msg = f'  Failed to process table {table_name}.  See log for failed query.'
+        msg = f'Failed to process table {table_name}.  See log for failed query.'
         error_msgs.append(msg)
         return error_msgs
     for idx, (tech, table_units, c2a_units) in enumerate(rows, start=1):
         if tech not in tech_lut:
             error_msgs.append(
-                f'  Unprocessed row (missing reference for tech "{tech}" --see earlier tests): {idx}'
+                f'Unprocessed row (missing reference for tech "{tech}" --see earlier tests): {idx}'
             )
             continue
         # validate the units in the table...
@@ -195,9 +204,9 @@ def check_inter_table_relations(
             valid_c2a_units = None
 
         if not valid_table_units:
-            error_msgs.append(f'  Unprocessed row (invalid units--see earlier tests): {idx}')
+            error_msgs.append(f'Unprocessed row (invalid units--see earlier tests): {idx}')
         if not c2a_valid:
-            error_msgs.append(f'  Unprocessed row (invalid c2a units--see earlier tests): {idx}')
+            error_msgs.append(f'Unprocessed row (invalid c2a units--see earlier tests): {idx}')
         if not valid_table_units or not c2a_valid:
             continue
 
@@ -211,9 +220,10 @@ def check_inter_table_relations(
         # check that the res_units match the expectation from the tech
         if tech_lut[tech].output_units != res_units:
             error_msgs.append(
-                f'  Units mismatch near row {idx}:  Table Entry: {valid_table_units}, '
-                f'C2A Entry: {valid_c2a_units if valid_c2a_units else 'N/A'}, '
-                f'expected: {tech_lut[tech].output_units / (valid_c2a_units * ureg.year) if valid_c2a_units else {tech_lut[tech].output_units}}'
+                f'Units mismatch at row {idx}. Table Entry: {valid_table_units}, '
+                f'{f" C2A Entry: {valid_c2a_units}, " if valid_c2a_units else ""}'
+                f'expected: {tech_lut[tech].output_units / (valid_c2a_units * ureg.year) if valid_c2a_units else tech_lut[tech].output_units}'
+                f' for output of tech {tech}.'
             )
 
     return error_msgs
@@ -221,7 +231,7 @@ def check_inter_table_relations(
 
 def check_cost_tables(
     conn: sqlite3.Connection,
-    cost_tables: Iterable[str],
+    cost_tables: Iterable[CostTableData],
     tech_lut: dict[str, IOUnits],
     c2a_lut: dict[str, Unit],
     commodity_lut: dict[str, Unit],
@@ -232,81 +242,123 @@ def check_cost_tables(
     Note:  we'll *assume* the first passing entry in the first table establishes the common cost units and
            check for consistency
     """
-    common_cost_unit = None
+    common_cost_unit = None  # Expectation:  MUSD.  Something with a prefix and currency dimension
     error_msgs = []
-    for table_name, commodity_reference, capacity_based, period_based in cost_tables:
+    for ct in cost_tables:
         table_grouped_errors = defaultdict(list)
-        if commodity_reference and capacity_based:
+        if ct.commodity_reference and ct.capacity_based:
             raise ValueError(
-                f'Table that is "capacity based" {table_name} flagged as having commodity field.  Check input for cost tables'
+                f'Table that is "capacity based" {ct.table_name} flagged as having commodity field.  Check input for cost tables'
             )
-        query = f'SELECT {commodity_reference if commodity_reference else 'tech'}, units FROM {table_name}'
+        query = f'SELECT {ct.commodity_reference if ct.commodity_reference else 'tech'}, units FROM {ct.table_name}'
         try:
             rows = conn.execute(query).fetchall()
         except sqlite3.OperationalError:
-            logger.error('failed to process query: %s when processing table %s', query, table_name)
-            msg = f'  Failed to process table {table_name}.  See log for failed query.'
+            logger.error(
+                'failed to process query: %s when processing table %s', query, ct.table_name
+            )
+            msg = f'Failed to process table {ct.table_name}.  See log for failed query.'
             error_msgs.append(msg)
             continue
-        for idx, (tech, units) in enumerate(rows, start=1):
-            # convert
-            valid, output_units = validate_units_expression(units)
+        for idx, (tech, raw_units_expression) in enumerate(rows, start=1):
+            # convert to pint expression
+            valid, table_units = validate_units_expression(raw_units_expression)
             if not valid:
-                label = (
-                    f'  {table_name}:  Unprocessed row (invalid units--see earlier tests): {units}'
-                )
+                label = f'  {ct.table_name}:  Unprocessed row (invalid units--see earlier tests): {raw_units_expression}'
                 table_grouped_errors[label].append(idx)
                 continue
 
-            # determine the units for the commodity
-            c2a_units = None
-            if commodity_reference:
-                commodity_units = commodity_lut[commodity_reference]
+            # for those costs that are capacity-based, we will adjust the commodity's units (which are activity-based)
+            # by dividing them by the C2A factor, which should make them comparable.
+            #
+            # Example:
+            #    $/MW  (Capacity based cost from a table)
+            #    MWh   (The commodity's base units as an Activity-based (energy))
+            #
+            #    h     (the C2A factor to get from MW to MWh
+            #
+            #    so we take MWh / h =>  MW is the expected comparison point after removing the $ reference
+
+            # find the referenced commodity units from the tech or commodity depending on table structure...
+            if ct.commodity_reference:
+                commodity_units = commodity_lut.get(ct.commodity_reference)
+                if not commodity_units:
+                    label = f'{ct.table_name}:  Unprocessed row (unknown commodity: {ct.commodity_reference}) '
+                    table_grouped_errors[label].append(idx)
+                    continue
             else:
                 tech_io = tech_lut.get(tech)
                 if tech_io:
                     commodity_units = tech_io.output_units
                 else:
-                    label = f'  {table_name}:  Unprocessed row (unknown tech: {tech}) '
+                    label = f'{ct.table_name}:  Unprocessed row (unknown tech: {tech}) '
                     table_grouped_errors[label].append(idx)
                     continue
-                if capacity_based:
-                    c2a_units = c2a_lut.get(tech, ureg.dimensionless / ureg.year)
 
-                    # we need to transform the activity-based commodity units to capacity units to match the cost table
-                    commodity_units /= c2a_units * ureg.year
+            # pull the C2A factor if this table is capacity-based and determine the "match units" which should
+            # match the commodity units in the table, after removing the "per period" time factor, if it exists
+            c2a_units = None
+            if ct.capacity_based:
+                c2a_units = c2a_lut.get(tech, ureg.dimensionless)  # default is dimensionless
+                # we need to transform the activity-based commodity units to capacity units to match the cost table
+                match_units = commodity_units / (c2a_units * ureg.year)
+            else:
+                match_units = commodity_units
 
-            # separate and check
+            # now we "sit on this" so we can remove the common cost below for checking, after it is established
+
             if common_cost_unit is None:
                 # establish it
 
+                #
+                # Typical "cost math" is like:
                 #
                 #      MUSD
                 #      ----     *    kWh  =  MUSD
                 #      kWh
 
-                # if it's "clean" use it
+                # determine if the units are a "clean cost" as shown above
 
-                cost_unit = output_units * commodity_units
+                cost_unit = (
+                    table_units * match_units
+                )  # should simplify to pure currency as shown above
+                if ct.period_based:
+                    # multiply by the standard period to remove it from the denominator
+                    cost_unit *= ureg.year
                 # check that what we have captured is in the currency dimension == "clean"
+                # dev note:  multiplying by 1 allows us to use the check_units_expression() function
                 if (1 * cost_unit).check('[currency]'):
                     common_cost_unit = cost_unit
-                else:  # something is wrong, hopefully it was just this entry?
+                else:
+                    # something is wrong, hopefully it was just this entry?
+                    # mark it, dump it, and try again...
                     error_msgs.append(
-                        f'  {table_name}:  Unprocessed row (unreducible cost units or mismatched tech output units): {idx}'
+                        f'{ct.table_name}:  Unprocessed row (unreducible cost units or mismatched tech output units): {idx}'
                     )
                     continue
             else:
-                # use the common cost unit to check
-                cost_unit = output_units * commodity_units
+                # use the match_units from the associated tech/commodity to remove the non-cost units
+                cost_unit = table_units * match_units
+                if ct.period_based:
+                    cost_unit *= ureg.year
+
+                # check 1:  ensure the cost units are equal to the common cost units
                 if cost_unit != common_cost_unit:
                     label = (
-                        f'  {table_name}:  Unprocessed row (mismatched cost units or tech output mismatch)'
-                        f'\n    Table entry: {units}, Commodity units: {commodity_units}, Remainder: {cost_unit}, c2a units: {c2a_units if c2a_units else "N/A"}:'
+                        f'{ct.table_name}:  Non-standard cost found (does not simplify to expected common cost unit): {raw_units_expression}'
+                        f'\n    Commodity units: {commodity_units}, Residual (expecting {common_cost_unit}): {cost_unit}, c2a units: {c2a_units if c2a_units else "N/A"}.'
                     )
                     table_grouped_errors[label].append(idx)
+                else:
+                    # proceed to the follow-on check
+                    # check 2: ensure that the commodity units match the commodity,
+                    # now that we can remove the common cost and check that the plain units matches the denominator
+                    plain_units = common_cost_unit / table_units
+                    if match_units != plain_units:
+                        label = f'{ct.table_name}:  Commodity units of cost element incorrect after applying C2A factor: {raw_units_expression}.'
+                        table_grouped_errors[label].append(idx)
         for label, listed_lines in table_grouped_errors.items():
-            error_msgs.append(f'{label} {consolidate_lines(listed_lines)}')
+            error_msgs.append(f'{label} at rows: {consolidate_lines(listed_lines)}')
     return error_msgs
 
 

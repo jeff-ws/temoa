@@ -77,6 +77,7 @@ cases = [
     ('kWh', (True, ureg.kWh)),
 ]
 
+
 @pytest.mark.parametrize(
     'expr, expected_result',
     cases,
@@ -88,3 +89,15 @@ def test_validate_units_expression(expr, expected_result):
     """
     result = validate_units_expression(expr)
     assert result == expected_result
+
+
+cases = [('kW', -3), ('kWh', -2), ('PJ', -2), ('PJ/h', -3)]
+
+
+@pytest.mark.parametrize('expr, location', cases, ids=[t[0] for t in cases])
+def test_time_dimenstion_locator(expr, location: int):
+    test_value = validate_units_expression(expr)[1]
+    found = test_value.dimensionality.get('[time]')
+    assert (
+        found == location
+    ), f'time dimension not found at expected location for units: {test_value}'

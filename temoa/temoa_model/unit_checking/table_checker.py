@@ -30,19 +30,17 @@ functions to check tables within a version 3.1 database for units compliance
 import logging
 import re
 import sqlite3
-from pathlib import Path
 
 from pint.registry import Unit
 
+from temoa.temoa_model.unit_checking import ureg
 from temoa.temoa_model.unit_checking.common import (
-    tables_with_units,
     ratio_capture_tables,
     RATIO_ELEMENT,
     SINGLE_ELEMENT,
     ACCEPTABLE_CHARACTERS,
     consolidate_lines,
     capacity_based_tables,
-    per_capacity_based_tables,
 )
 from temoa.temoa_model.unit_checking.entry_checker import (
     validate_units_expression,
@@ -56,25 +54,21 @@ logger = logging.getLogger(__name__)
 def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Unit], list[str]]:
     """
     Check all entries in a table for format and registry compliance
-    This "first pass" gathers common entriesfor efficiency"""
+    This "first pass" gathers common entries for efficiency"""
     errors = []
     res = {}
     format_type = RATIO_ELEMENT if table_name in ratio_capture_tables else SINGLE_ELEMENT
 
-    # check for incompatible screens...
-    if table_name in capacity_based_tables:
-        if format_type == RATIO_ELEMENT:
-            logger.warning('Checking of RATIO_ELEMENTs for capacity-type units is NOT implemented')
-
+    # this function gathers all unique entries by row number for efficiency in larger tables
     entries = gather_from_table(conn, table_name)
     for expr, line_nums in entries.items():
         # check characters
         valid_chars = re.search(ACCEPTABLE_CHARACTERS, expr)
         if not valid_chars:
             listed_lines = consolidate_lines(line_nums)
-
             errors.append(
-                f'  Invalid character(s) at rows {listed_lines} [only letters, underscore and "*, /, ^, ()" operators allowed]: {expr if expr else "<no recognized entry>"}'
+                f'Invalid character(s): {expr if expr else "<no recognized entry>"} [only letters, underscore '
+                f'and "*, /, ^, ()" operators allowed] at rows: {listed_lines}  '
             )
             continue
 
@@ -82,8 +76,18 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
         valid, elements = validate_units_format(expr, format_type)
         if not valid:
             listed_lines = consolidate_lines(line_nums)
+            if format_type == RATIO_ELEMENT:
+                msg = (
+                    f'Format violation at rows.  {listed_lines}:  {expr}.  '
+                    f'Check illegal chars/operators and that denominator is isolated in parentheses.'
+                )
+            else:
+                msg = (
+                    f'Format violation at rows.  {listed_lines}:  {expr}.  '
+                    f'Check for illegal characters or operators.'
+                )
 
-            errors.append(f'  Format violation at rows {listed_lines}:  {expr}')
+            errors.append(msg)
             continue
 
         # Check registry compliance
@@ -94,26 +98,29 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
                 if not success:
                     listed_lines = consolidate_lines(line_nums)
                     errors.append(
-                        f'  Registry violation (UNK units) at rows {listed_lines}:  {element}'
+                        f'Registry violation (UNK units): {element} at rows: {listed_lines}'
                     )
                 else:
                     converted_units.append(units)
+        if len(converted_units) != format_type.groups:
+            # we came up short of something, skip this entry
+            continue
 
         # if we have a relationship with "capacity" check that we have some time units
+        # this test is disabled for RATIO_ELEMENT based tables due to ambiguities
         if table_name in capacity_based_tables and format_type == SINGLE_ELEMENT:
             test_value = converted_units[0]
-            if test_value.dimensionality.get('[time]') != -1:
-                # no time in numerator
+            # test if compatible with standard "power" units (magnitude doesn't matter)
+            capacity_like = ureg.watt in test_value.compatible_units()
+            if not capacity_like:
+                # test for time units in denominator as backup test
+                capacity_like = test_value.dimensionality.get('[time]') != -1
+
+            if not capacity_like:
                 listed_lines = consolidate_lines(line_nums)
                 errors.append(
-                    f'  No time dimension in denominator of capacity entry at rows {listed_lines}:  {expr}'
-                )
-        if table_name in per_capacity_based_tables and format_type == SINGLE_ELEMENT:
-            test_value = converted_units[0]
-            if test_value.dimensionality.get('[time]') != 1:
-                listed_lines = consolidate_lines(line_nums)
-                errors.append(
-                    f'  No time dimension in numerator of capacity entry at rows {listed_lines}:  {expr}'
+                    f'Time dimension of capacity entry: {expr} *might* be missing in denominator '
+                    f'or this may not be a standard "power" expression:  {listed_lines}'
                 )
 
         # assemble a reference of item: units-relationship if we have a valid entry
@@ -125,32 +132,5 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
                 ref = {expr: converted_units[0] / converted_units[1]}
                 res.update(ref)
             else:
-                logger.error('Unknown units format: %s', format_type)
+                raise ValueError('Unknown units format: %s', format_type)
     return res, errors
-
-
-def check_database(db_path: Path) -> list[str]:
-    """Check all tables in database for units compliance"""
-    errors = []
-    conn = sqlite3.connect(db_path)
-
-    for table in tables_with_units:
-        table_errors = check_table(conn, table)
-        errors.extend(table_errors)
-
-    conn.close()
-    return errors
-
-
-if __name__ == '__main__':
-    from definitions import PROJECT_ROOT
-
-    test_db = Path(PROJECT_ROOT) / 'data_files/mike_US/US_9R_8D_v3_stability_v3_1.sqlite'
-    results = check_database(test_db)
-
-    if results:
-        print('\nErrors found:')
-        for error in results:
-            print(error)
-    else:
-        print('\nNo errors found')
