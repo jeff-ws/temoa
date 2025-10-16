@@ -46,7 +46,8 @@ cases = [
     ('PJ    / (kT)', RATIO_ELEMENT, True),
     ('(PJ) / (kT)', RATIO_ELEMENT, True),  # numerator optionally parenthesized
     ('PJ / kT', RATIO_ELEMENT, False),  # no parens on denom
-    ('kWh/day/(cycle)', RATIO_ELEMENT, False),  # no slash char
+    ('kWh/day/(cycle)', RATIO_ELEMENT, False),  # ambiguous slash char
+    ('(kWh/day)/(cycle)', RATIO_ELEMENT, True),
 ]
 
 
