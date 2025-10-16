@@ -148,11 +148,7 @@ def screen(dp_path: Path, report_path: Path | None = None):
         error_free = True
         for table in activity_based_tables:
             errors = check_inter_table_relations(
-                conn=conn,
-                table_name=table,
-                tech_lut=tech_io_lut,
-                c2a_lut=c2a_lut,
-                capacity_based=False,
+                conn=conn, table_name=table, tech_lut=tech_io_lut, capacity_based=False
             )
             if errors:
                 error_free = False
@@ -163,11 +159,7 @@ def screen(dp_path: Path, report_path: Path | None = None):
                         print(f'{table}:  {error}')
         for table in capacity_based_tables:
             errors = check_inter_table_relations(
-                conn=conn,
-                table_name=table,
-                tech_lut=tech_io_lut,
-                c2a_lut=c2a_lut,
-                capacity_based=True,
+                conn=conn, table_name=table, tech_lut=tech_io_lut, capacity_based=True
             )
             if errors:
                 error_free = False
@@ -228,6 +220,5 @@ def _write_report(report_path: Path, report_entries: list[str]):
 
 
 if __name__ == '__main__':
-    # db_path = Path(PROJECT_ROOT) / 'data_files/mike_US/US_9R_8D_v3_stability_orig_v3_1.sqlite'
     db_path = Path(PROJECT_ROOT) / 'data_files/mike_US/US_9R_8D_v3_stability_v3_1.sqlite'
     screen(db_path, report_path=Path(PROJECT_ROOT) / 'output_files/units.txt')

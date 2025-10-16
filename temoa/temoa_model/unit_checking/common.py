@@ -86,10 +86,12 @@ commodity_based_tables = [
     'Demand',
     'MaxResource',  # haven't we done away with this table/constraint?
 ]
+
+# Group tables Not Yet Implemented...  would need to gather by group name and tech, etc.
 activity_based_tables = [
     'MaxActivity',
-    # 'MaxActivityGroup',
     'MinActivity',
+    # 'Max ActivityGroup',
     # 'MinActivityGroup',
 ]
 """Tables that should have units equivalent to the commodity's native units"""
@@ -97,12 +99,12 @@ activity_based_tables = [
 capacity_based_tables = [
     'ExistingCapacity',
     'MaxCapacity',
-    # 'MaxCapacityGroup',
     'MaxNewCapacity',
-    # 'MaxNewCapacityGroup',
     'MinCapacity',
-    # 'MinCapacityGroup',
     'MinNewCapacity',
+    # 'MinCapacityGroup',
+    # 'MaxNewCapacityGroup',
+    # 'MaxCapacityGroup',
     # 'MinNewCapacityGroup',
 ]
 """Tables that require conversion via CapacityToActivity to reach the native units"""
@@ -118,7 +120,11 @@ period_based_tables = [
 # we need to delineate whether the units are commodity-referenced or tech-referenced and if they are "capacity based" so...
 # format:  (table_name, commodity field name (None if 'tech' based), capacity-based, period-based )
 CostTableData = NamedTuple(
-    'CostTableData', table_name=str, commodity_reference=str, capacity_based=bool, period_based=bool
+    'CostTableData',
+    table_name=str,
+    commodity_reference=str | None,
+    capacity_based=bool,
+    period_based=bool,
 )
 """A named tuple for the cost tables + important properties"""
 

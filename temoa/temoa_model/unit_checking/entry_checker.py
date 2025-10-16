@@ -34,33 +34,16 @@ import logging
 import re
 import sqlite3
 from collections import defaultdict
-from pathlib import Path
 from typing import Union
 
 from pint import UndefinedUnitError, Unit
 
-from definitions import PROJECT_ROOT
 from temoa.temoa_model.unit_checking import ureg
 from temoa.temoa_model.unit_checking.common import (
     UnitsFormat,
-    RATIO_ELEMENT,
-    SINGLE_ELEMENT,
 )
 
 logger = logging.getLogger(__name__)
-
-
-def validate_units_expression(expr: str) -> tuple[bool, Union[Unit, None]]:
-    """
-    validate an entry against the units registry
-    :param expr: the expression to validate
-    :return: tuple of the validity and the converted expression
-    """
-    try:
-        units = ureg.parse_units(expr)
-        return True, units
-    except UndefinedUnitError:
-        return False, None
 
 
 def validate_units_format(
@@ -78,8 +61,21 @@ def validate_units_format(
     return False, None
 
 
+def validate_units_expression(expr: str) -> tuple[bool, Union[Unit, None]]:
+    """
+    validate an entry against the units registry
+    :param expr: the expression to validate
+    :return: tuple of the validity and the converted expression
+    """
+    try:
+        units = ureg.parse_units(expr)
+        return True, units
+    except UndefinedUnitError:
+        return False, None
+
+
 def gather_from_table(conn: sqlite3.Connection, table: str) -> dict[str, list[int]]:
-    """gather all "units" entries from a table as a list of line numbers"""
+    """gather all unique "units" entries from a table and collect the row indices"""
 
     res = defaultdict(list)
     with conn:
@@ -89,65 +85,3 @@ def gather_from_table(conn: sqlite3.Connection, table: str) -> dict[str, list[in
             res[result[0]].append(idx)
 
     return res
-
-
-if __name__ == '__main__':
-    """for development/experimentation"""
-    exprs = [
-        'watt',
-        'meter',
-        'm',
-        'petajoule',
-        'PJ',
-        'PJ/s',
-        'PeTAJouLE',
-        'PetaJoule',
-        'kilowatt*hour',
-        'killowathour',
-        'KWh',
-        'KWH',
-        'USD',
-        'dollar',
-        'passenger',
-    ]
-    for expr in exprs:
-        success, converted = validate_units_expression(expr)
-        compatible = converted.is_compatible_with(ureg('joule')) if converted else '--'
-        if success:
-            print(f'{expr} converts to: {converted}.  Compatible with joules: {compatible} ')
-        else:
-            print(f'{expr} failed to convert')
-
-    tables = ['Efficiency', 'ExistingCapacity']
-    formats = [RATIO_ELEMENT, SINGLE_ELEMENT]
-
-    conn = sqlite3.connect(
-        Path(PROJECT_ROOT) / 'data_files/mike_US/US_9R_8D_v3_stability_v3_1.sqlite'
-    )
-
-    def validate_entries(table_name, units_format: UnitsFormat):
-        """validate all entries in a table"""
-        conn = sqlite3.connect(
-            Path(PROJECT_ROOT) / 'data_files/mike_US/US_9R_8D_v3_stability_v3_1.sqlite'
-        )
-        res = gather_from_table(conn, table_name)
-        conn.close()
-        for expr in res:
-            valid, elements = validate_units_format(expr, units_format)
-            if not valid:
-                print(f'Format Violation: {expr} in {table_name}')
-            else:
-                for group in elements:
-                    if group:
-                        success, converted = validate_units_expression(group)
-                        if not success:
-                            print(f'Unit Validation Fail: {expr} in {table_name}')
-
-    for table in tables:
-        print(gather_from_table(conn, table))
-
-    conn.close()
-    print('\n\n')
-
-    for t in zip(tables, formats):
-        validate_entries(t[0], t[1])

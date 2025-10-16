@@ -30,13 +30,11 @@ A systematic check of expected relationships between tables to ensure units are 
 import logging
 import sqlite3
 from collections.abc import Iterable
-from pathlib import Path
 
 from mypy.checkexpr import defaultdict
 from mypy.message_registry import NamedTuple
 from pint.registry import Unit
 
-from definitions import PROJECT_ROOT
 from temoa.temoa_model.unit_checking import ureg
 from temoa.temoa_model.unit_checking.common import (
     RATIO_ELEMENT,
@@ -111,6 +109,7 @@ def check_efficiency_table(
             valid, input_units = validate_units_expression(located_units[1])
         if not valid:
             invalid_rows.append(idx)
+            # we give up early.  The specifics of why this failed should be evident in earlier tests
             continue
 
         # check that our tech matches the units of the connected commodities
@@ -154,15 +153,12 @@ def check_efficiency_table(
 
 
 def check_inter_table_relations(
-    conn: sqlite3.Connection,
-    table_name,
-    tech_lut: dict[str, IOUnits],
-    c2a_lut: dict[str, Unit],
-    capacity_based: bool,
+    conn: sqlite3.Connection, table_name, tech_lut: dict[str, IOUnits], capacity_based: bool
 ) -> list[str]:
-    """check the tech and units in the given table vs. baseline values for the tech"""
+    """check the tech and units in the given table vs. baseline (expected) values for the tech"""
     error_msgs = []
     if capacity_based:
+        # we make a query to join on the C2A units to pick those up
         query = (
             f'SELECT {table_name}.tech, {table_name}.units, ca.units '
             f'FROM {table_name} JOIN CapacityToActivity ca '
@@ -338,23 +334,3 @@ def check_cost_tables(
         for label, listed_lines in table_grouped_errors.items():
             error_msgs.append(f'{label} at rows: {consolidate_lines(listed_lines)}')
     return error_msgs
-
-
-def main(db_path: Path):
-    """Run unit relationship checks on database"""
-    logging.basicConfig(level=logging.INFO)
-
-    try:
-        conn = sqlite3.connect(db_path)
-        comm_units = make_commodity_lut(conn)
-        check_efficiency_table(conn, comm_units)
-        conn.close()
-    except sqlite3.Error as e:
-        logger.error(f'Database error: {e}')
-    except Exception as e:
-        logger.error(f'Error during check: {repr(e)}')
-        raise
-
-
-if __name__ == '__main__':
-    main(Path(PROJECT_ROOT) / 'data_files/mike_US/US_9R_8D_v3_stability_v3_1.sqlite')
