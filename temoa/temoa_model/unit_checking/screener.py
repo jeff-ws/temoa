@@ -48,7 +48,7 @@ from temoa.temoa_model.unit_checking.relation_checker import (
 from temoa.temoa_model.unit_checking.table_checker import check_table
 
 logger = logging.getLogger(__name__)
-verbose = True  # for dev/test work
+verbose = False  # for dev/test work
 
 
 def screen(*db_paths: Path, report_path: Path | None = None) -> bool:
