@@ -51,174 +51,197 @@ logger = logging.getLogger(__name__)
 verbose = True  # for dev/test work
 
 
-def screen(dp_path: Path, report_path: Path | None = None):
-    """The sequencer to run a series of checks on units in the database"""
+def screen(*db_paths: Path, report_path: Path | None = None) -> bool:
+    """
+    Run series of units screens on the database
+    :param db_paths: the abs path(S) to the database(s)
+    :param report_path: abs path to write the report to.  If None, no report is written
+    :return: indicator of whether all checks passed "cleanly" or not
+    """
+    all_clear = True
     report_entries = []
     table_units = {}
     """Table name : {tech | commodity: units}"""
-    with sqlite3.connect(dp_path) as conn:
-        # test 1: DB version
-        msg = '========  Units Check 1 (DB Version):  Started ========'
-        report_entries.extend((msg, '\n'))
-        logger.info(msg)
-        if verbose:
-            print()
-            print(msg)
-        data = conn.execute('SELECT element, value FROM MetaData').fetchall()
-        meta_data = dict(data)
-        major = meta_data.get('DB_MAJOR', 0)
-        minor = meta_data.get('DB_MINOR', 0)
-        if major == 3 and minor >= 1:
-            msg = 'Units Check 1 (DB Version):  Passed'
+    for db_path in db_paths:
+        if not db_path.is_file():
+            raise FileNotFoundError(f'Database file not found: {db_path}')
+        initialization_msg = f'========  Units Check on DB: {db_path}:  Started ========\n'
+        report_entries.append(initialization_msg)
+        logger.info('Starting Units Check on DB: %s', db_paths)
+        with sqlite3.connect(db_path) as conn:
+            # test 1: DB version
+            msg = '========  Units Check 1 (DB Version):  Started ========'
             report_entries.extend((msg, '\n'))
             logger.info(msg)
             if verbose:
+                print()
                 print(msg)
-        else:
-            msg = 'Units Check 1 (DB Version):  Failed.  DB must be v3.1 or greater for units checking'
-            report_entries.extend((msg, '\n'))
-            logger.warning(msg)
-            # we are non-viable, write the (very short) report and return
-            _write_report(report_path, report_entries)
-            if verbose:
-                print(msg)
-            return
-
-        # test 2: Units in tables
-        report_entries.append('\n')
-        msg = '======== Units Check 2 (Units Entries in Tables):  Started ========'
-        if verbose:
-            print()
-            print(msg)
-        logger.info(msg)
-        report_entries.extend((msg, '\n'))
-        errors = False
-        for table in tables_with_units:
-            relations, table_errors = check_table(conn, table)
-            table_units[table] = relations
-            if table_errors:
-                errors = True
-                for error in table_errors:
-                    logger.info('%s: %s', table, error)
-                    report_entries.extend((f'  {table}: {error}', '\n'))
-                    if verbose:
-                        print(f'{table}:  {error}')
-        if not errors:
-            msg = 'Units Check 2 (Units Entries in Tables):  Passed'
-            logger.info(msg)
-            report_entries.extend((msg, '\n'))
-            if verbose:
-                print(msg)
-        report_entries.append('\n')
-
-        # test 3: Efficiency Table
-        msg = '======== Units Check 3 (Tech I/O via Efficiency Table):  Started ========'
-        logger.info(msg)
-        report_entries.extend((msg, '\n'))
-        if verbose:
-            print()
-            print(msg)
-        # make Look Up Tables for use in follow-on checks
-        commodity_lut = make_commodity_lut(conn)
-        c2a_lut = make_c2a_lut(conn)
-        tech_io_lut, errors = check_efficiency_table(conn, comm_units=commodity_lut)
-        if errors:
-            for error in errors:
-                logger.info('%s: %s', 'Efficiency', error)
-                report_entries.extend((f'Efficiency: {error}', '\n'))
+            data = conn.execute('SELECT element, value FROM MetaData').fetchall()
+            meta_data = dict(data)
+            major = meta_data.get('DB_MAJOR', 0)
+            minor = meta_data.get('DB_MINOR', 0)
+            if major == 3 and minor >= 1:
+                msg = 'Units Check 1 (DB Version):  Passed'
+                report_entries.extend((msg, '\n'))
+                logger.info(msg)
                 if verbose:
-                    print(f'Efficiency: {error}')
-        else:
-            msg = 'Units Check 3: (Efficiency Table and Tech I/O:  Passed'
-            report_entries.extend((msg, '\n'))
-            logger.info(msg)
+                    print(msg)
+            else:
+                msg = 'Units Check 1 (DB Version):  Failed.  DB must be v3.1 or greater for units checking'
+                report_entries.extend((msg, '\n'))
+                logger.warning(msg)
+                # we are non-viable, write the (very short) report and return
+                _write_report(report_path, report_entries)
+                if verbose:
+                    print(msg)
+                return False
+
+            # test 2: Units in tables
+            report_entries.append('\n')
+            msg = '======== Units Check 2 (Units Entries in Tables):  Started ========'
             if verbose:
+                print()
                 print(msg)
+            logger.info(msg)
+            report_entries.extend((msg, '\n'))
+            errors = False
+            for table in tables_with_units:
+                relations, table_errors = check_table(conn, table)
+                table_units[table] = relations
+                if table_errors:
+                    errors = True
+                    for error in table_errors:
+                        logger.info('%s: %s', table, error)
+                        report_entries.extend((f'  {table}: {error}', '\n'))
+                        if verbose:
+                            print(f'{table}:  {error}')
+            if not errors:
+                msg = 'Units Check 2 (Units Entries in Tables):  Passed'
+                logger.info(msg)
+                report_entries.extend((msg, '\n'))
+                if verbose:
+                    print(msg)
+            else:
+                all_clear = False
+            report_entries.append('\n')
 
-        report_entries.append('\n')
+            # test 3: Efficiency Table
+            msg = '======== Units Check 3 (Tech I/O via Efficiency Table):  Started ========'
+            logger.info(msg)
+            report_entries.extend((msg, '\n'))
+            if verbose:
+                print()
+                print(msg)
+            # make Look Up Tables for use in follow-on checks
+            commodity_lut = make_commodity_lut(conn)
+            c2a_lut = make_c2a_lut(conn)
+            tech_io_lut, errors = check_efficiency_table(conn, comm_units=commodity_lut)
+            if errors:
+                all_clear = False
+                for error in errors:
+                    logger.info('%s: %s', 'Efficiency', error)
+                    report_entries.extend((f'Efficiency: {error}', '\n'))
+                    if verbose:
+                        print(f'Efficiency: {error}')
+            else:
+                msg = 'Units Check 3: (Efficiency Table and Tech I/O:  Passed'
+                report_entries.extend((msg, '\n'))
+                logger.info(msg)
+                if verbose:
+                    print(msg)
 
-        # test 4: Relationships in other tables
-        # this utilizes tech_io_lut gathered above to QA the units in other tables
-        msg = '======== Units Check 4 (Related Tables):  Started ========'
-        logger.info(msg)
-        report_entries.extend((msg, '\n'))
-        if verbose:
-            print()
-            print(msg)
-        error_free = True
-        for table in activity_based_tables:
-            errors = check_inter_table_relations(
-                conn=conn, table_name=table, tech_lut=tech_io_lut, capacity_based=False
+            report_entries.append('\n')
+
+            # test 4: Relationships in other tables
+            # this utilizes tech_io_lut gathered above to QA the units in other tables
+            msg = '======== Units Check 4 (Related Tables):  Started ========'
+            logger.info(msg)
+            report_entries.extend((msg, '\n'))
+            if verbose:
+                print()
+                print(msg)
+            error_free = True
+            for table in activity_based_tables:
+                errors = check_inter_table_relations(
+                    conn=conn, table_name=table, tech_lut=tech_io_lut, capacity_based=False
+                )
+                if errors:
+                    error_free = False
+                    for error in errors:
+                        logger.info('%s: %s', table, error)
+                        report_entries.extend((f'{table}:  {error}', '\n'))
+                        if verbose:
+                            print(f'{table}:  {error}')
+            for table in capacity_based_tables:
+                errors = check_inter_table_relations(
+                    conn=conn, table_name=table, tech_lut=tech_io_lut, capacity_based=True
+                )
+                if errors:
+                    error_free = False
+                    for error in errors:
+                        logger.info('%s: %s', table, error)
+                        report_entries.extend((f'{table}:  {error}', '\n'))
+                        if verbose:
+                            print(f'{table}:  {error}')
+            if error_free:
+                msg = 'Units Check 4: (Related Tables):  Passed'
+                logger.info(msg)
+                report_entries.extend((msg, '\n'))
+                if verbose:
+                    print(msg)
+            else:
+                all_clear = False
+
+            report_entries.append('\n')
+
+            # test 5: Cost-Based Tables
+            # checks to assure that the output units are compatible with the related tech and that the currency is
+            # standardized when the units are simplified
+            # We expect units like Mdollars/PJ or such and the denominator should align with the commodity via the tech
+            msg = '======== Units Check 5 (Cost Tables):  Started ========'
+            logger.info(msg)
+            report_entries.extend((msg, '\n'))
+            if verbose:
+                print()
+                print(msg)
+            errors = check_cost_tables(
+                conn,
+                cost_tables=cost_based_tables,
+                tech_lut=tech_io_lut,
+                c2a_lut=c2a_lut,
+                commodity_lut=commodity_lut,
             )
             if errors:
-                error_free = False
+                all_clear = False
                 for error in errors:
-                    logger.info('%s: %s', table, error)
-                    report_entries.extend((f'{table}:  {error}', '\n'))
+                    logger.info('%s', error)
+                    report_entries.extend((error, '\n'))
                     if verbose:
-                        print(f'{table}:  {error}')
-        for table in capacity_based_tables:
-            errors = check_inter_table_relations(
-                conn=conn, table_name=table, tech_lut=tech_io_lut, capacity_based=True
-            )
-            if errors:
-                error_free = False
-                for error in errors:
-                    logger.info('%s: %s', table, error)
-                    report_entries.extend((f'{table}:  {error}', '\n'))
-                    if verbose:
-                        print(f'{table}:  {error}')
-        if error_free:
-            msg = 'Units Check 4: (Related Tables):  Passed'
-            logger.info(msg)
-            report_entries.extend((msg, '\n'))
-            if verbose:
-                print(msg)
-
-        report_entries.append('\n')
-
-        # test 5: Cost-Based Tables
-        # checks to assure that the output units are compatible with the related tech and that the currency is
-        # standardized when the units are simplified
-        # We expect units like Mdollars/PJ or such and the denominator should align with the commodity via the tech
-        msg = '======== Units Check 5 (Cost Tables):  Started ========'
-        logger.info(msg)
-        report_entries.extend((msg, '\n'))
-        if verbose:
-            print()
-            print(msg)
-        errors = check_cost_tables(
-            conn,
-            cost_tables=cost_based_tables,
-            tech_lut=tech_io_lut,
-            c2a_lut=c2a_lut,
-            commodity_lut=commodity_lut,
-        )
-        if errors:
-            for error in errors:
-                logger.info('%s', error)
-                report_entries.extend((error, '\n'))
+                        print(error)
+            else:
+                msg = 'Units Check 5: (Cost Tables):  Passed'
+                logger.info(msg)
+                report_entries.extend((msg, '\n'))
                 if verbose:
-                    print(error)
-        else:
-            msg = 'Units Check 5: (Cost Tables):  Passed'
-            logger.info(msg)
-            report_entries.extend((msg, '\n'))
-            if verbose:
-                print(msg)
+                    print(msg)
 
         # wrap it up
         _write_report(report_path, report_entries)
+        logger.info('Finished Units Check')
+        return all_clear
 
 
 def _write_report(report_path: Path, report_entries: list[str]):
     """Write the report to file"""
     if not report_path:
         return
+    if report_path.is_dir():
+        # augment with a default filename
+        report_path /= 'units_check.txt'
     with open(report_path, 'w', encoding='utf-8') as report_file:
         report_file.writelines(report_entries)
 
 
 if __name__ == '__main__':
     db_path = Path(PROJECT_ROOT) / 'data_files/mike_US/US_9R_8D_v3_stability_v3_1.sqlite'
-    screen(db_path, report_path=Path(PROJECT_ROOT) / 'output_files/units.txt')
+    screen(db_path, report_path=Path(PROJECT_ROOT) / 'output_files/')

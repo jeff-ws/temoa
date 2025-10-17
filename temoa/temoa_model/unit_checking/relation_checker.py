@@ -260,6 +260,11 @@ def check_cost_tables(
         for idx, (tech, raw_units_expression) in enumerate(rows, start=1):
             # convert to pint expression
             cost_units, measure_units = None, None
+            # screen for empty/missing raw inputs
+            if not raw_units_expression:
+                label = f'{ct.table_name}:  Unprocessed row (missing units): {raw_units_expression}'
+                table_grouped_errors[label].append(idx)
+                continue
             valid, (raw_cost, raw_units) = validate_units_format(
                 raw_units_expression, RATIO_ELEMENT
             )

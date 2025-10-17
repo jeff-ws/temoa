@@ -62,6 +62,12 @@ def check_table(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, Un
     # this function gathers all unique entries by row number for efficiency in larger tables
     entries = gather_from_table(conn, table_name)
     for expr, line_nums in entries.items():
+        # mark the blanks
+        if not expr:
+            listed_lines = consolidate_lines(line_nums)
+            errors.append(f'Blank units entry found at rows: {listed_lines}')
+            continue
+
         # check characters
         valid_chars = re.search(ACCEPTABLE_CHARACTERS, expr)
         if not valid_chars:

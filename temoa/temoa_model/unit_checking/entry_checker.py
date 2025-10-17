@@ -82,6 +82,8 @@ def gather_from_table(conn: sqlite3.Connection, table: str) -> dict[str, list[in
         cur = conn.cursor()
         cur.execute(f'SELECT units FROM {table}')
         for idx, result in enumerate(cur.fetchall(), start=1):
-            res[result[0]].append(idx)
+            # note:  this will put in "blank" entries which is OK, we want to mark blank rows too
+            entry = result[0]
+            res[entry].append(idx)
 
     return res
