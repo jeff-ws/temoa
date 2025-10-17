@@ -27,12 +27,12 @@ Created on:  9/22/25
 A systematic check of expected relationships between tables to ensure units are consistent
 
 """
+import dataclasses
 import logging
 import sqlite3
+from collections import defaultdict
 from collections.abc import Iterable
 
-from mypy.checkexpr import defaultdict
-from mypy.message_registry import NamedTuple
 from pint.registry import Unit
 
 from temoa.temoa_model.unit_checking import ureg
@@ -79,8 +79,8 @@ def make_c2a_lut(conn: sqlite3.Connection) -> dict[str, Unit]:
             res[comm] = units
     return res
 
-
-class IOUnits(NamedTuple):
+@dataclasses.dataclass(frozen=True)
+class IOUnits():
     input_units: Unit
     output_units: Unit
 
