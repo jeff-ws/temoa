@@ -38,7 +38,7 @@ from pathlib import Path
 from queue import Empty
 
 import pyomo.environ as pyo
-from pyomo.contrib.solver.results import Results
+from pyomo.contrib.solver.common.results import Results
 from pyomo.dataportal import DataPortal
 from pyomo.opt import check_optimal_termination
 
@@ -54,6 +54,7 @@ from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
 from temoa.temoa_model.temoa_rules import TotalCost_rule
+from temoa.temoa_model.unit_checking.screener import screen
 
 logger = getLogger(__name__)
 
@@ -163,6 +164,10 @@ class MgaSequencer:
             good_prices = price_checker(instance)
             if not good_prices and not self.config.silent:
                 print('Warning:  Cost anomalies discovered.  Check log file for details.')
+        if self.config.units_check:
+            clear_units = screen(self.config.input_database, report_path=self.config.output_path)
+            if not clear_units and not self.config.silent:
+                print('Warning:  Units anomalies discovered.  Check log file for details.')
         # tag the instance by name, so we can sort out the multiple results...
         instance.name = '-'.join((self.config.scenario, '0'))
 

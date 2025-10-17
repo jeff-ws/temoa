@@ -54,6 +54,7 @@ from temoa.temoa_model.run_actions import (
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_mode import TemoaMode
 from temoa.temoa_model.temoa_model import TemoaModel
+from temoa.temoa_model.unit_checking.screener import screen
 from temoa.version_information import (
     DB_MAJOR_VERSION,
     MIN_DB_MINOR_VERSION,
@@ -170,6 +171,8 @@ class TemoaSequencer:
                     logger.warning('Plot commodity network disabled for BUILD_ONLY')
                 if self.config.price_check:
                     logger.warning('Price check disabled for BUILD_ONLY')
+                if self.config.units_check:
+                    logger.warning('Units check disabled for BUILD_ONLY')
                 con = sqlite3.connect(self.config.input_database)
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
@@ -196,6 +199,17 @@ class TemoaSequencer:
                 good_prices = price_checker(instance)
                 if not good_prices and not self.config.silent:
                     print('\nWarning:  Cost anomalies discovered.  Check log file for details.')
+                if self.config.units_check is False:
+                    logger.warning('Units check of model is automatic with CHECK')
+                clear_screen = screen(
+                    *{self.config.input_database, self.config.output_database},
+                    report_path=self.config.output_path,
+                )
+                if not clear_screen:
+                    print(
+                        '\nWarning:  Units are not clear.  Check log file for details and see the units report in the output path.'
+                    )
+
                 con.close()
 
             case TemoaMode.PERFECT_FORESIGHT:
@@ -212,6 +226,17 @@ class TemoaSequencer:
                     good_prices = price_checker(instance)
                     if not good_prices and not self.config.silent:
                         print('\nWarning:  Cost anomalies discovered.  Check log file for details.')
+
+                if self.config.units_check:
+                    clear_screen = screen(
+                        *{self.config.input_database, self.config.output_database},
+                        report_path=self.config.output_path,
+                    )
+                    if not clear_screen and not self.config.silent:
+                        print(
+                            '\nWarning:  Units are not clear.  Check log file for details and see the units report in the output path.'
+                        )
+
                 suffixes = (
                     [
                         'dual',

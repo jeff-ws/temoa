@@ -44,6 +44,7 @@ from temoa.temoa_model.model_checking.pricing_check import price_checker
 from temoa.temoa_model.table_writer import TableWriter
 from temoa.temoa_model.temoa_config import TemoaConfig
 from temoa.temoa_model.temoa_model import TemoaModel
+from temoa.temoa_model.unit_checking.screener import screen
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +160,15 @@ class MyopicSequencer:
         return con
 
     def start(self):
+        # run units check, if requested
+        if self.config.units_check:
+            # myopic requires input_db=output_db, so we can just use the input_db
+            clear_screen = screen(self.config.input_database, report_path=self.config.output_path)
+            if not clear_screen and not self.config.silent:
+                print(
+                    '\nWarning:  units screen found discrepancies.  Check log file/report for details.'
+                )
+
         # load up the instance queue
         self.characterize_run()
 

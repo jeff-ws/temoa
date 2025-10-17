@@ -55,6 +55,7 @@ class TemoaConfig:
         silent: bool = False,
         stream_output: bool = False,
         price_check: bool = True,
+        units_check: bool = True,
         source_trace: bool = False,
         plot_commodity_network: bool = False,
     ):
@@ -127,6 +128,7 @@ class TemoaConfig:
         self.silent = silent
         self.stream_output = stream_output
         self.price_check = price_check
+        self.units_check = units_check
         self.source_trace = source_trace
         if plot_commodity_network and not self.source_trace:
             logger.warning(
@@ -179,6 +181,7 @@ class TemoaConfig:
 
         msg += spacer
         msg += '{:>{}s}: {}\n'.format('Price check', width, self.price_check)
+        msg += '{:>{}s}: {}\n'.format('Units check', width, self.units_check)
         msg += '{:>{}s}: {}\n'.format('Source trace', width, self.source_trace)
         msg += '{:>{}s}: {}\n'.format('Commodity network plots', width, self.plot_commodity_network)
 
