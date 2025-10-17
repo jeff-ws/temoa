@@ -225,10 +225,10 @@ def screen(*db_paths: Path, report_path: Path | None = None) -> bool:
                 if verbose:
                     print(msg)
 
-        # wrap it up
-        _write_report(report_path, report_entries)
-        logger.info('Finished Units Check')
-        return all_clear
+    # wrap it up
+    _write_report(report_path, report_entries)
+    logger.info('Finished Units Check')
+    return all_clear
 
 
 def _write_report(report_path: Path, report_entries: list[str]):
