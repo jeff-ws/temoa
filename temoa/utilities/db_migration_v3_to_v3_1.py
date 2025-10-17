@@ -161,7 +161,9 @@ con_new.execute('PRAGMA foreign_keys = 0;')
 
 # belt & suspenders check that we have all tables in the schema covered
 
-table_query_result = con_new.execute('SELECT name FROM sqlite_master WHERE type="table"').fetchall()
+table_query_result = con_new.execute(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+).fetchall()
 v31_tables = {t[0] for t in table_query_result}
 
 covered = set(direct_transfer_tables + add_units_tables + list(transfer_with_mod.keys()))
