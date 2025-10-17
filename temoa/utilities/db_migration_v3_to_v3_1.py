@@ -229,7 +229,7 @@ for table_name, mod_dict in transfer_with_mod.items():
             row[1] for row in con_new.execute(f'PRAGMA table_info({table_name})').fetchall()
         ]
         if set(old_cols) != set(new_cols):
-            print(f'WARNING: Column mismatch in {table_name}')
+            print(f'ERROR: Column mismatch in {table_name}')
             print(f'Old columns: {old_cols}')
             print(f'New columns: {new_cols}')
             con_new.close()
