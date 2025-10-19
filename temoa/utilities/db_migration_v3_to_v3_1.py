@@ -146,10 +146,27 @@ schema_file = Path(options.schema)
 
 new_db_name = legacy_db.stem + '_v3_1.sqlite'
 new_db_path = Path(legacy_db.parent, new_db_name)
+# check that destination doesn't exist already
+if new_db_path.exists():
+    print(f'ERROR: destination database already exists: {new_db_path}. Exiting.')
+    sys.exit(-1)
+
+
+def exit_on_failure(msg):
+    print(
+        'Transition failed for reason below.  This issue is fatal and must be remediated.  Exiting.'
+    )
+    print(msg)
+    con_old.close()
+    con_new.close()
+    new_db_path.unlink()
+    sys.exit(-1)
+
 
 con_old = sqlite3.connect(legacy_db)
 con_new = sqlite3.connect(new_db_path)
 cur = con_new.cursor()
+
 
 # bring in the new schema and execute to build new db
 with open(schema_file, 'r') as src:
@@ -173,9 +190,7 @@ if deltas:
     extra = covered - v31_tables
     print(f'ERROR:  missing tables (from transfer list): {missing}')
     print(f"ERROR:  extra tables (that don't exist in schema): {extra}")
-    con_new.close()
-    con_old.close()
-    sys.exit(-1)
+    exit_on_failure('Missing transfer tables list does not match schema.')
 
 
 # execute the direct transfers
@@ -194,9 +209,7 @@ for table_name in direct_transfer_tables:
             print(f'WARNING: Column mismatch in {table_name}')
             print(f'Old columns: {old_cols}')
             print(f'New columns: {new_cols}')
-            con_new.close()
-            con_old.close()
-            sys.exit(-1)
+            exit_on_failure(f'Column mismatch in {table_name}')
 
         # Get data from old database with explicit column order
         cols_str = ', '.join(new_cols)
@@ -215,6 +228,7 @@ for table_name in direct_transfer_tables:
     cols_str = ', '.join(new_cols)
     query = f'INSERT OR REPLACE INTO {table_name} ({cols_str}) VALUES ({placeholders})'
     con_new.executemany(query, data)
+    con_new.commit()
     print(f'inserted {len(data)} rows into {table_name}')
 
 # execute transfer with modifications
@@ -232,9 +246,7 @@ for table_name, mod_dict in transfer_with_mod.items():
             print(f'ERROR: Column mismatch in {table_name}')
             print(f'Old columns: {old_cols}')
             print(f'New columns: {new_cols}')
-            con_new.close()
-            con_old.close()
-            sys.exit(-1)
+            exit_on_failure(f'Column mismatch in {table_name}')
         # Get data from old database with explicit column order
         cols_str = ', '.join(new_cols)
 
@@ -315,5 +327,15 @@ except sqlite3.OperationalError as e:
 
 # move the GlobalDiscountRate
 # move the myopic base year
+# sanity check...
+
+qry = 'SELECT * FROM TimePeriod'
+res = con_new.execute(qry).fetchall()
+if res:
+    print(f'TimePeriod table has {len(res)} rows')
+    for t in res[:5]:
+        print(t)
+else:
+    print('TimePeriod table is empty')
 con_new.close()
 con_old.close()

@@ -79,8 +79,9 @@ def make_c2a_lut(conn: sqlite3.Connection) -> dict[str, Unit]:
             res[comm] = units
     return res
 
+
 @dataclasses.dataclass(frozen=True)
-class IOUnits():
+class IOUnits:
     input_units: Unit
     output_units: Unit
 
@@ -176,8 +177,8 @@ def check_inter_table_relations(
     for idx, (tech, table_units, c2a_units) in enumerate(rows, start=1):
         if tech not in tech_lut:
             grouped_errors[
-                f'Unprocessed row (missing reference for tech "{tech}" --see earlier tests)'].append(idx
-            )
+                f'Unprocessed row (missing reference for tech "{tech}" --see earlier tests)'
+            ].append(idx)
             continue
         # validate the units in the table...
         table_valid, units_data = validate_units_format(table_units, SINGLE_ELEMENT)
@@ -214,7 +215,7 @@ def check_inter_table_relations(
 
         # check that the res_units match the expectation from the tech
         if tech_lut[tech].output_units != res_units:
-            msg=(
+            msg = (
                 f'Units mismatch from expected reference. Table Entry: {valid_table_units}, '
                 f'{f" C2A Entry: {valid_c2a_units}, " if valid_c2a_units else ""}'
                 f'expected: {tech_lut[tech].output_units / (valid_c2a_units * ureg.year) if valid_c2a_units else tech_lut[tech].output_units}'
@@ -270,12 +271,10 @@ def check_cost_tables(
                 label = f'{ct.table_name}:  Unprocessed row (missing units): {raw_units_expression}'
                 table_grouped_errors[label].append(idx)
                 continue
-            valid, (raw_cost, raw_units) = validate_units_format(
-                raw_units_expression, RATIO_ELEMENT
-            )
+            valid, (elements) = validate_units_format(raw_units_expression, RATIO_ELEMENT)
             if valid:
-                cost_valid, cost_units = validate_units_expression(raw_cost)
-                units_valid, measure_units = validate_units_expression(raw_units)
+                cost_valid, cost_units = validate_units_expression(elements[0])
+                units_valid, measure_units = validate_units_expression(elements[1])
             else:
                 cost_valid, units_valid = False, False
             if not (cost_valid and units_valid):
