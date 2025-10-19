@@ -325,17 +325,5 @@ except sqlite3.OperationalError as e:
     print('Foreign Key Check FAILED on new DB.  Something may be wrong with schema.')
     print(e)
 
-# move the GlobalDiscountRate
-# move the myopic base year
-# sanity check...
-
-qry = 'SELECT * FROM TimePeriod'
-res = con_new.execute(qry).fetchall()
-if res:
-    print(f'TimePeriod table has {len(res)} rows')
-    for t in res[:5]:
-        print(t)
-else:
-    print('TimePeriod table is empty')
 con_new.close()
 con_old.close()
