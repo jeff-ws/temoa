@@ -65,9 +65,9 @@ def screen(*db_paths: Path, report_path: Path | None = None) -> bool:
     for db_path in db_paths:
         if not db_path.is_file():
             raise FileNotFoundError(f'Database file not found: {db_path}')
-        initialization_msg = f'========  Units Check on DB: {db_path}:  Started ========\n'
+        initialization_msg = f'\n========  Units Check on DB: {db_path}:  Started ========\n\n'
         report_entries.append(initialization_msg)
-        logger.info('Starting Units Check on DB: %s', db_paths)
+        logger.info('Starting Units Check on DB: %s', db_path)
         with sqlite3.connect(db_path) as conn:
             # test 1: DB version
             msg = '========  Units Check 1 (DB Version):  Started ========'

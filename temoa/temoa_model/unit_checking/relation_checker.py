@@ -156,7 +156,7 @@ def check_inter_table_relations(
     conn: sqlite3.Connection, table_name, tech_lut: dict[str, IOUnits], capacity_based: bool
 ) -> list[str]:
     """check the tech and units in the given table vs. baseline (expected) values for the tech"""
-    error_msgs = []
+    grouped_errors = defaultdict(list)
     if capacity_based:
         # we make a query to join on the C2A units to pick those up
         query = (
@@ -172,12 +172,11 @@ def check_inter_table_relations(
     except sqlite3.OperationalError:
         logger.error('failed to process query: %s when processing table %s', query, table_name)
         msg = f'Failed to process table {table_name}.  See log for failed query.'
-        error_msgs.append(msg)
-        return error_msgs
+        return [msg]
     for idx, (tech, table_units, c2a_units) in enumerate(rows, start=1):
         if tech not in tech_lut:
-            error_msgs.append(
-                f'Unprocessed row (missing reference for tech "{tech}" --see earlier tests): {idx}'
+            grouped_errors[
+                f'Unprocessed row (missing reference for tech "{tech}" --see earlier tests)'].append(idx
             )
             continue
         # validate the units in the table...
@@ -200,9 +199,9 @@ def check_inter_table_relations(
             valid_c2a_units = None
 
         if not valid_table_units:
-            error_msgs.append(f'Unprocessed row (invalid units--see earlier tests): {idx}')
+            grouped_errors[f'Unprocessed row (invalid units--see earlier tests)'].append(idx)
         if not c2a_valid:
-            error_msgs.append(f'Unprocessed row (invalid c2a units--see earlier tests): {idx}')
+            grouped_errors[f'Unprocessed row (invalid c2a units--see earlier tests)'].append(idx)
         if not valid_table_units or not c2a_valid:
             continue
 
@@ -215,14 +214,20 @@ def check_inter_table_relations(
 
         # check that the res_units match the expectation from the tech
         if tech_lut[tech].output_units != res_units:
-            error_msgs.append(
-                f'Units mismatch at row {idx}. Table Entry: {valid_table_units}, '
+            msg=(
+                f'Units mismatch from expected reference. Table Entry: {valid_table_units}, '
                 f'{f" C2A Entry: {valid_c2a_units}, " if valid_c2a_units else ""}'
                 f'expected: {tech_lut[tech].output_units / (valid_c2a_units * ureg.year) if valid_c2a_units else tech_lut[tech].output_units}'
                 f' for output of tech {tech}.'
             )
+            grouped_errors[msg].append(idx)
 
-    return error_msgs
+    # gather into list format
+    res = []
+    for msg, line_nums in grouped_errors.items():
+        res.append(f'{msg} at rows: {consolidate_lines(line_nums)}')
+
+    return res
 
 
 def check_cost_tables(
