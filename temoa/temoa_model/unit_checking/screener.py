@@ -112,7 +112,7 @@ def screen(*db_paths: Path, report_path: Path | None = None) -> bool:
                     errors = True
                     for error in table_errors:
                         logger.info('%s: %s', table, error)
-                        report_entries.extend((f'  {table}: {error}', '\n'))
+                        report_entries.extend((f'{table}:  {error}', '\n'))
                         if verbose:
                             print(f'{table}:  {error}')
             if not errors:
@@ -140,11 +140,11 @@ def screen(*db_paths: Path, report_path: Path | None = None) -> bool:
                 all_clear = False
                 for error in errors:
                     logger.info('%s: %s', 'Efficiency', error)
-                    report_entries.extend((f'Efficiency: {error}', '\n'))
+                    report_entries.extend((f'Efficiency:  {error}', '\n'))
                     if verbose:
                         print(f'Efficiency: {error}')
             else:
-                msg = 'Units Check 3: (Efficiency Table and Tech I/O:  Passed'
+                msg = 'Units Check 3 (Efficiency Table and Tech I/O):  Passed'
                 report_entries.extend((msg, '\n'))
                 logger.info(msg)
                 if verbose:
