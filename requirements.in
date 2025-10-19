@@ -22,7 +22,7 @@ seaborn
 tabulate
 xlsxwriter
 plotly
-pyam-iamc
+pyam-iamc >= 3.1
 
 # Below required to update documentation
 sphinx
