@@ -41,6 +41,7 @@ from temoa.temoa_model.unit_checking.common import (
     SINGLE_ELEMENT,
     consolidate_lines,
     CostTableData,
+    RelationType,
 )
 from temoa.temoa_model.unit_checking.entry_checker import (
     validate_units_format,
@@ -154,35 +155,68 @@ def check_efficiency_table(
 
 
 def check_inter_table_relations(
-    conn: sqlite3.Connection, table_name, tech_lut: dict[str, IOUnits], capacity_based: bool
+    conn: sqlite3.Connection,
+    table_name,
+    tech_lut: dict[str, IOUnits],
+    comm_lut: dict[str, Unit],
+    relation_type: RelationType,
 ) -> list[str]:
     """check the tech and units in the given table vs. baseline (expected) values for the tech"""
     grouped_errors = defaultdict(list)
-    if capacity_based:
-        # we make a query to join on the C2A units to pick those up
-        query = (
-            f'SELECT {table_name}.tech, {table_name}.units, ca.units '
-            f'FROM {table_name} JOIN CapacityToActivity ca '
-            f'ON {table_name}.tech = ca.tech AND {table_name}.region = ca.region'
-        )
-    else:
-        query = f'SELECT tech, units, NULL FROM {table_name}'
-
+    match relation_type:
+        case RelationType.CAPACITY:
+            # we make a query to join on the C2A units to pick those up
+            query = (
+                f'SELECT {table_name}.tech, {table_name}.units, ca.units '
+                f'FROM {table_name} JOIN CapacityToActivity ca '
+                f'ON {table_name}.tech = ca.tech AND {table_name}.region = ca.region'
+            )
+        case RelationType.ACTIVITY:
+            query = f'SELECT tech, units, NULL FROM {table_name}'
+        case RelationType.COMMODITY:
+            query = f'SELECT commodity, units, NULL FROM {table_name}'
+        case _:
+            raise ValueError(f'Unexpected relation type: {relation_type}')
     try:
         rows = conn.execute(query).fetchall()
     except sqlite3.OperationalError:
         logger.error('failed to process query: %s when processing table %s', query, table_name)
         msg = f'Failed to process table {table_name}.  See log for failed query.'
         return [msg]
-    for idx, (tech, table_units, c2a_units) in enumerate(rows, start=1):
-        if tech not in tech_lut:
+
+    # process the rows
+    for idx, (tech_or_comm, table_units, c2a_units) in enumerate(rows, start=1):
+        expected_units = None
+        match relation_type:
+            case RelationType.CAPACITY:
+                io_units = tech_lut.get(tech_or_comm)
+                if not io_units:
+                    grouped_errors[
+                        f'Unprocessed row (missing reference for tech "{tech_or_comm}" --see earlier tests)'
+                    ].append(idx)
+                    continue
+                expected_units = io_units.output_units
+            case RelationType.ACTIVITY:
+                io_units = tech_lut[tech_or_comm]
+                if not io_units:
+                    grouped_errors[
+                        f'Unprocessed row (missing reference for tech "{tech_or_comm}" --see earlier tests)'
+                    ].append(idx)
+                    continue
+                expected_units = io_units.output_units
+            case RelationType.COMMODITY:
+                expected_units = comm_lut.get(tech_or_comm)
+            case _:
+                raise ValueError(f'Unexpected relation type: {relation_type}')
+        if not expected_units:
             grouped_errors[
-                f'Unprocessed row (missing reference for tech "{tech}" --see earlier tests)'
+                f'Unprocessed row (missing reference for tech "{tech_or_comm}" --see earlier tests)'
             ].append(idx)
             continue
+
         # validate the units in the table...
-        table_valid, units_data = validate_units_format(table_units, SINGLE_ELEMENT)
-        if table_valid:
+        entry_format_valid, units_data = validate_units_format(table_units, SINGLE_ELEMENT)
+        if entry_format_valid:
             _, valid_table_units = validate_units_expression(units_data[0])
         else:
             valid_table_units = None
@@ -195,14 +229,14 @@ def check_inter_table_relations(
                 c2a_valid, valid_c2a_units = validate_units_expression(units_data[0])
             else:
                 valid_c2a_units = None
-        else:  # we are in a valid state, but no units to use for c2a
+        else:  # we are in a valid state: no C2A units provided/needed
             c2a_valid = True
             valid_c2a_units = None
 
         if not valid_table_units:
-            grouped_errors[f'Unprocessed row (invalid units--see earlier tests)'].append(idx)
+            grouped_errors['Unprocessed row (invalid units--see earlier tests)'].append(idx)
         if not c2a_valid:
-            grouped_errors[f'Unprocessed row (invalid c2a units--see earlier tests)'].append(idx)
+            grouped_errors['Unprocessed row (invalid c2a units--see earlier tests)'].append(idx)
         if not valid_table_units or not c2a_valid:
             continue
 
@@ -214,12 +248,12 @@ def check_inter_table_relations(
             res_units = valid_table_units
 
         # check that the res_units match the expectation from the tech
-        if tech_lut[tech].output_units != res_units:
+        if expected_units != res_units:
             msg = (
                 f'Units mismatch from expected reference. Table Entry: {valid_table_units}, '
                 f'{f" C2A Entry: {valid_c2a_units}, " if valid_c2a_units else ""}'
-                f'expected: {tech_lut[tech].output_units / (valid_c2a_units * ureg.year) if valid_c2a_units else tech_lut[tech].output_units}'
-                f' for output of tech {tech}.'
+                f'expected: {expected_units}'
+                f' for output of tech {tech_or_comm}'
             )
             grouped_errors[msg].append(idx)
 
@@ -335,7 +369,7 @@ def check_cost_tables(
                 tech_reference = ct.commodity_reference if ct.commodity_reference else tech
                 label = (
                     f'{ct.table_name}:  Non-matching measure unit found in cost denominator for tech/commodity {tech_reference}: {raw_units_expression}'
-                    f'\n    Commodity units: {commodity_units}, Discovered (after conversions): {measure_units}'
+                    f'\n    Expecting commodity units: {commodity_units}. Discovered (after conversions applied): {measure_units}'
                     f'\n    Conversions:  c2a units: {c2a_units*ureg.year if c2a_units else "N/A"}{", `per period` removed" if ct.period_based else ""}\n   '
                 )
                 table_grouped_errors[label].append(idx)

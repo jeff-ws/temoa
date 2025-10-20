@@ -37,6 +37,8 @@ from temoa.temoa_model.unit_checking.common import (
     capacity_based_tables,
     activity_based_tables,
     cost_based_tables,
+    commodity_based_tables,
+    RelationType,
 )
 from temoa.temoa_model.unit_checking.relation_checker import (
     check_efficiency_table,
@@ -163,7 +165,11 @@ def screen(*db_paths: Path, report_path: Path | None = None) -> bool:
             error_free = True
             for table in activity_based_tables:
                 errors = check_inter_table_relations(
-                    conn=conn, table_name=table, tech_lut=tech_io_lut, capacity_based=False
+                    conn=conn,
+                    table_name=table,
+                    tech_lut=tech_io_lut,
+                    comm_lut=commodity_lut,
+                    relation_type=RelationType.ACTIVITY,
                 )
                 if errors:
                     error_free = False
@@ -174,7 +180,26 @@ def screen(*db_paths: Path, report_path: Path | None = None) -> bool:
                             print(f'{table}:  {error}')
             for table in capacity_based_tables:
                 errors = check_inter_table_relations(
-                    conn=conn, table_name=table, tech_lut=tech_io_lut, capacity_based=True
+                    conn=conn,
+                    table_name=table,
+                    tech_lut=tech_io_lut,
+                    comm_lut=commodity_lut,
+                    relation_type=RelationType.CAPACITY,
+                )
+                if errors:
+                    error_free = False
+                    for error in errors:
+                        logger.info('%s: %s', table, error)
+                        report_entries.extend((f'{table}:  {error}', '\n'))
+                        if verbose:
+                            print(f'{table}:  {error}')
+            for table in commodity_based_tables:
+                errors = check_inter_table_relations(
+                    conn=conn,
+                    table_name=table,
+                    tech_lut=tech_io_lut,
+                    comm_lut=commodity_lut,
+                    relation_type=RelationType.COMMODITY,
                 )
                 if errors:
                     error_free = False
@@ -244,4 +269,4 @@ def _write_report(report_path: Path, report_entries: list[str]):
 
 if __name__ == '__main__':
     db_path = Path(PROJECT_ROOT) / 'data_files/mike_US/US_9R_8D_v3_stability_v3_1.sqlite'
-    screen(db_path, report_path=Path(PROJECT_ROOT) / 'output_files/')
+    screen(db_path, report_path=Path(PROJECT_ROOT) / 'temp/')

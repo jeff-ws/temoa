@@ -28,6 +28,7 @@ common elements used within Unit Checking
 
 """
 from dataclasses import dataclass
+from enum import Enum
 from typing import NamedTuple
 
 tables_with_units = [
@@ -84,7 +85,7 @@ ratio_capture_tables = {
 
 commodity_based_tables = [
     'Demand',
-    'MaxResource',  # haven't we done away with this table/constraint?
+    # 'MaxResource',  # haven't we done away with this table/constraint?
 ]
 
 # Group tables Not Yet Implemented...  would need to gather by group name and tech, etc.
@@ -96,6 +97,8 @@ activity_based_tables = [
 ]
 """Tables that should have units equivalent to the commodity's native units"""
 
+# dev note:  The "grouped" functions below are not yet implemented / future work.  They are (to date)
+#            seldom used.  Implementing would require grouping by group name, ensuring all techs in group are same...
 capacity_based_tables = [
     'ExistingCapacity',
     'MaxCapacity',
@@ -137,7 +140,10 @@ cost_based_tables = [
 """Tables that have cost units and their properties"""
 
 
-# TODO:  Unclear tables:  MaxResource, GrowthRateSeed
+class RelationType(Enum):
+    ACTIVITY = 1
+    CAPACITY = 2
+    COMMODITY = 3
 
 
 @dataclass(frozen=True)
