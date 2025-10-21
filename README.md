@@ -95,7 +95,7 @@ and has all parameters in it.  It can be copied/renamed, etc.
 | Temoa Mode             | The execution mode.  See note below on currently supported modes                                           |
 | Input/Output DB        | The source (and optionally diffent) output database.  Note for myopic, MGA input must be same as output    |
 | Price Checking         | Run the "price checker" on the built model to look for costing deficiencies and log them                   |
-| Unit Checking          | Run the "unit checker" on the source (and destination) databases and document anomalies with units         |
+| Units Checking         | Run the "units checker" on the source (and destination) databases and document anomalies with units        |
 | Source Tracing         | Check the integrity of the commodity flow network in every region-period combination.  Required for Myopic |
 | Plot Commodity Network | Produce HTML (viewable in any browser) displays of the networks built (see note at bottom)                 |
 | Solver                 | The exact name of the solver executable to call                                                            |

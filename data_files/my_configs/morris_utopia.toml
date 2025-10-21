@@ -37,7 +37,7 @@ price_check = true
 
 # check the units in the source/destination databases for units consistency.  Errors
 # are reported in log file and units_check.txt in output folder
-unit_check = true
+units_check = true
 
 # Check the network connectivity for processes in the model.  Strongly
 # recommended to ensure proper performance.  Results are reported in log file
