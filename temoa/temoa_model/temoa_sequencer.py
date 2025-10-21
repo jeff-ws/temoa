@@ -207,7 +207,8 @@ class TemoaSequencer:
                 )
                 if not clear_screen:
                     print(
-                        '\nWarning:  Units are not clear.  Check log file for details and see the units report in the output path.'
+                        '\nWarning:  Units check discovered issues.  '
+                        'Check log file for details and see the units report in the output path.'
                     )
 
                 con.close()
@@ -234,7 +235,8 @@ class TemoaSequencer:
                     )
                     if not clear_screen and not self.config.silent:
                         print(
-                            '\nWarning:  Units are not clear.  Check log file for details and see the units report in the output path.'
+                            '\nWarning:  Units check discovered issues.  '
+                            'Check log file for details and see the units report in the output path.'
                         )
 
                 suffixes = (

@@ -64,9 +64,9 @@ is (for Utopia as an example):
 ```
 (venv) $ sqlite3 utopia.sqlite < utopia.sql
 ```
-- Converting legacy db's to Version 3 can be done with the included database migration tool.  Users who use this
+- Converting legacy db's to Version 3.0 can be done with the included database migration tool.  Users who use this
 tool are advised to carefully review the console outputs during conversion to ensure accuracy and check the 
-converted database carefully.  The migration tool will build an empty new Version 3 database and move data from
+converted database carefully.  The migration tool will build an empty new Version 3.0 database and move data from
 the old database, preserving the legacy database in place.  The command can be run from the top level of the 
 project and needs pointers to the target database and the Version 3 schema file.  A typical execution from top level
 should look like:
@@ -78,6 +78,10 @@ should look like:
 directory as described above using the `sqlite3` command.  The "minimal" version excludes some of the group
 parameters and is recommended as a starting point for entry-level models.  It can be upgraded to the full set of
 tables by executing the full schema SQL command on the resulting database later, which will add the missing tables.
+- Users wishing to use the optional "Unit Checking" functionality described in the documentation need to build from or
+transition to a version 3.1 database.  A second utility is provided to assist with this process and is run
+similarly to the migration utility described above.  The version 3.1 utility only accepts a source database
+that is already version 3.0 format.
 
 ## Config Files
 
@@ -91,6 +95,7 @@ and has all parameters in it.  It can be copied/renamed, etc.
 | Temoa Mode             | The execution mode.  See note below on currently supported modes                                           |
 | Input/Output DB        | The source (and optionally diffent) output database.  Note for myopic, MGA input must be same as output    |
 | Price Checking         | Run the "price checker" on the built model to look for costing deficiencies and log them                   |
+| Unit Checking          | Run the "unit checker" on the source (and destination) databases and document anomalies with units         |
 | Source Tracing         | Check the integrity of the commodity flow network in every region-period combination.  Required for Myopic |
 | Plot Commodity Network | Produce HTML (viewable in any browser) displays of the networks built (see note at bottom)                 |
 | Solver                 | The exact name of the solver executable to call                                                            |
