@@ -361,7 +361,7 @@ def check_cost_tables(
                 measure_units *= c2a_units * ureg.year
 
             if ct.period_based:
-                measure_units /= ureg.year  # remove the "per year" from this denominator
+                measure_units /= ureg.year  # remove the "per year" from this element
 
             matched = measure_units == commodity_units
 
@@ -370,7 +370,7 @@ def check_cost_tables(
                 label = (
                     f'{ct.table_name}:  Non-matching measure unit found in cost denominator for tech/commodity {tech_reference}: {raw_units_expression}'
                     f'\n    Expecting commodity units: {commodity_units}. Discovered (after conversions applied): {measure_units}'
-                    f'\n    Conversions:  c2a units: {c2a_units*ureg.year if c2a_units else "N/A"}{", `per period` removed" if ct.period_based else ""}\n   '
+                    f'\n    Conversions:  c2a units: {c2a_units if c2a_units else "N/A"}{", `per period` removed" if ct.period_based else ""}\n   '
                 )
                 table_grouped_errors[label].append(idx)
 

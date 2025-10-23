@@ -260,13 +260,19 @@ def _write_report(report_path: Path, report_entries: list[str]):
     """Write the report to file"""
     if not report_path:
         return
+    if not report_path.exists():
+        report_path.mkdir(parents=True)
     if report_path.is_dir():
-        # augment with a default filename
-        report_path /= 'units_check.txt'
+        # augment with a default filename including timestamp
+        from datetime import datetime
+
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+        report_path /= f'units_check_{timestamp}.txt'
     with open(report_path, 'w', encoding='utf-8') as report_file:
         report_file.writelines(report_entries)
 
 
+"""Preserve a way to run this quickly/independently as long as that is useful..."""
 if __name__ == '__main__':
-    db_path = Path(PROJECT_ROOT) / 'data_files/mike_US/US_9R_8D_v3_stability_v3_1.sqlite'
-    screen(db_path, report_path=Path(PROJECT_ROOT) / 'temp/')
+    db_path = Path(PROJECT_ROOT) / '<path to db from project ROOT>'
+    screen(db_path, report_path=Path(PROJECT_ROOT) / 'temp')

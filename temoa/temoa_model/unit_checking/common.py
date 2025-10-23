@@ -134,7 +134,7 @@ CostTableData = NamedTuple(
 cost_based_tables = [
     CostTableData('CostInvest', None, True, False),
     CostTableData('CostEmission', 'emis_comm', False, False),
-    CostTableData('CostFixed', None, True, True),
+    CostTableData('CostFixed', None, True, False),
     CostTableData('CostVariable', None, False, False),
 ]
 """Tables that have cost units and their properties"""
