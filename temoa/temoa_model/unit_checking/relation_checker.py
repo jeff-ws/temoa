@@ -171,6 +171,7 @@ def check_inter_table_relations(
                 f'FROM {table_name} JOIN CapacityToActivity ca '
                 f'ON {table_name}.tech = ca.tech AND {table_name}.region = ca.region'
             )
+        # otherwise, fill the C2A with NULL
         case RelationType.ACTIVITY:
             query = f'SELECT tech, units, NULL FROM {table_name}'
         case RelationType.COMMODITY:
@@ -249,20 +250,39 @@ def check_inter_table_relations(
 
         # check that the res_units match the expectation from the tech
         if expected_units != res_units:
-            msg = (
-                f'Units mismatch from expected reference. Table Entry: {valid_table_units}, '
-                f'{f" C2A Entry: {valid_c2a_units}, " if valid_c2a_units else ""}'
-                f'expected: {expected_units}'
-                f' for output of tech {tech_or_comm}'
+            label = f'Units do not match expectation for tech/comm: {tech_or_comm}'
+            conversions = []
+            if valid_c2a_units:
+                conversions.append(f'C2A Factor: {valid_c2a_units}')
+                conversions.append(f'Nominal Period: {ureg.year}')
+            detail = _ding_label(
+                table_entry=table_units,
+                focus=f'Converted Measure: {valid_table_units}',
+                conversions=conversions,
+                result=res_units,
+                expectation=expected_units,
             )
+            msg = label + detail + '\n'
             grouped_errors[msg].append(idx)
 
     # gather into list format
     res = []
     for msg, line_nums in grouped_errors.items():
-        res.append(f'{msg} at rows: {consolidate_lines(line_nums)}')
+        res.append(f'{msg}  at rows: {consolidate_lines(line_nums)}')
 
     return res
+
+
+def _ding_label(table_entry, focus, conversions: Iterable[str], result, expectation) -> str:
+    """Make a standardized 'ding' label to use in error reporting"""
+    res = ['']
+    res.append(f'|        Table Entry: {table_entry}')
+    res.append(f'|    Focused Portion: {focus}')
+    for conversion in conversions:
+        res.append(f'|         Conversion: {conversion}')
+    res.append(f'|             Result: {result}')
+    res.append(f'|        Expectation: {expectation}')
+    return '\n  '.join(res)
 
 
 def check_cost_tables(
@@ -355,10 +375,14 @@ def check_cost_tables(
             # pull the C2A factor if this table is capacity-based and determine the "match units" which should
             # match the commodity units in the table, after removing the "per period" time factor, if it exists
             c2a_units = None
+            oring_measure_units = measure_units
             if ct.capacity_based:
-                c2a_units = c2a_lut.get(tech, ureg.dimensionless)  # default is dimensionless
+                c2a_units = c2a_lut.get(tech, '<none>')  # default is dimensionless
                 # apply to convert
-                measure_units *= c2a_units * ureg.year
+                if c2a_units != '<none>':
+                    measure_units *= c2a_units
+                # apply the nominal period
+                measure_units *= ureg.year
 
             if ct.period_based:
                 measure_units /= ureg.year  # remove the "per year" from this element
@@ -367,13 +391,24 @@ def check_cost_tables(
 
             if not matched:
                 tech_reference = ct.commodity_reference if ct.commodity_reference else tech
-                label = (
-                    f'{ct.table_name}:  Non-matching measure unit found in cost denominator for tech/commodity {tech_reference}: {raw_units_expression}'
-                    f'\n    Expecting commodity units: {commodity_units}. Discovered (after conversions applied): {measure_units}'
-                    f'\n    Conversions:  c2a units: {c2a_units if c2a_units else "N/A"}{", `per period` removed" if ct.period_based else ""}\n   '
+                label = f'{ct.table_name}:  Non-matching measure unit found in cost denominator for tech/comm: {tech_reference}:'
+                conversions = []
+                if ct.capacity_based:
+                    conversions.append(f'C2A Factor: {c2a_units}')
+                    conversions.append(f'Nominal Period: {ureg.year}')
+                if ct.period_based:
+                    conversions.append(f'Per-period Factor: {ureg.year}')
+                detail = _ding_label(
+                    table_entry=raw_units_expression,
+                    focus=f'Converted Measure in Denominator: {oring_measure_units}',
+                    conversions=conversions,
+                    result=measure_units,
+                    expectation=commodity_units,
                 )
+                label += f'{detail}\n'
+
                 table_grouped_errors[label].append(idx)
 
         for label, listed_lines in table_grouped_errors.items():
-            error_msgs.append(f'{label} at rows: {consolidate_lines(listed_lines)}')
+            error_msgs.append(f'{label}  at rows: {consolidate_lines(listed_lines)}\n')
     return error_msgs

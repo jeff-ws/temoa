@@ -433,6 +433,13 @@ by a ratio of units as output / input.
     .. math::
        OutputUnits / ( InputUnits )
 
+    Units in the Cost tables should have a similar form:
+
+    .. math::
+        CostUnits / (MeasureUnits)
+
+    where :math:`MeasureUnits` is a Capacity or Activity unit of measure
+
     A Regular Expression is used to parse these units and expects the **denominator to be parenthesized.**  Other tables
     should just have a plain entry such as `PJ` or `petajoules`, or fractional units as necessary, including
     parentheticals.  Unique entries into the registry from Temoa
