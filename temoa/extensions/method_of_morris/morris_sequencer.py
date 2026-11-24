@@ -2,6 +2,7 @@
 An event sequencer to control the flow of a Method of Morris calculation.  This code uses
 multiprocessing via the joblib library
 """
+
 from __future__ import annotations
 
 import csv
@@ -21,6 +22,7 @@ from SALib.sample.morris import sample  # type: ignore[import-untyped]
 from SALib.util import compute_groups_matrix, read_param_file  # type: ignore[import-untyped]
 
 from temoa._internal.table_writer import TableWriter
+from temoa.core.solver_spec import redact_solver_options, resolve_solver_options
 from temoa.data_io.hybrid_loader import HybridLoader
 from temoa.extensions.method_of_morris.morris_evaluate import evaluate
 
@@ -28,7 +30,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from temoa.core.config import TemoaConfig
-
 
 
 logger = logging.getLogger(__name__)
@@ -70,11 +71,12 @@ class MorrisSequencer:
                 with open(path, 'rb') as f:
                     all_options = tomllib.load(f)
             s_options = all_options.get(self.config.solver_name, {})
-            logger.info('Using solver options: %s', s_options)
 
         except FileNotFoundError:
             logger.warning('Unable to find solver options toml file.  Using default options.')
             s_options = {}
+        self.solver_options = resolve_solver_options(self.config.solver, s_options)
+        logger.info('Using solver options: %s', redact_solver_options(self.solver_options))
 
         # output handling
         self.verbose = False  # for troubleshooting
@@ -87,7 +89,7 @@ class MorrisSequencer:
         # the amount to perturb the marked params
         pert = morris_inputs.get('perturbation')
         if pert:
-            self.mm_perturbation = float(cast(str | float, pert))
+            self.mm_perturbation = float(cast('str | float', pert))
             logger.info('Morris perturbation: %0.2f', self.mm_perturbation)
         else:
             self.mm_perturbation = 0.10
@@ -189,7 +191,14 @@ class MorrisSequencer:
             sys.stdout.flush()
         morris_results = Parallel(n_jobs=self.num_cores)(
             delayed(evaluate)(
-                param_names, mm_samples[i, :], data, i, self.config, log_queue, log_level
+                param_names,
+                mm_samples[i, :],
+                data,
+                i,
+                self.config,
+                log_queue,
+                log_level,
+                solver_options=self.solver_options,
             )
             for i in range(0, len(mm_samples))
         )
@@ -201,8 +210,9 @@ class MorrisSequencer:
         # 7.  Return the cost objective Mu_Star for testing purposes...
         return cost_mu_star
 
-    def process_results(self, problem: dict[str, Any], mm_samples: Any,
-                            morris_results: list[Any]) -> Any:
+    def process_results(
+        self, problem: dict[str, Any], mm_samples: Any, morris_results: list[Any]
+    ) -> Any:
         """
         Process the results of the runs on the mm_samples
         :param problem: the problem structure

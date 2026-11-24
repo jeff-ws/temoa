@@ -3,6 +3,7 @@
 A sequencer for Monte Carlo Runs
 
 """
+
 from __future__ import annotations
 
 import logging
@@ -17,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from temoa._internal.table_writer import TableWriter
+from temoa.core.solver_spec import redact_solver_options, resolve_solver_options
 from temoa.data_io.hybrid_loader import HybridLoader
 from temoa.extensions.monte_carlo.mc_run import MCRun, MCRunFactory
 from temoa.extensions.monte_carlo.mc_worker import MCWorker
@@ -31,12 +33,9 @@ if TYPE_CHECKING:
     from temoa.core.config import TemoaConfig
 
 
-
 logger = getLogger(__name__)
 
-solver_options_path = (
-    resources.files('temoa.extensions.monte_carlo') / 'MC_solver_options.toml'
-)
+solver_options_path = resources.files('temoa.extensions.monte_carlo') / 'MC_solver_options.toml'
 
 
 class MCSequencer:
@@ -85,7 +84,6 @@ class MCSequencer:
                     with open(path, 'rb') as f:
                         all_options = tomllib.load(f)
             s_options = all_options.get(self.config.solver_name, {})
-            logger.info('Using solver options: %s', s_options)
 
         except FileNotFoundError:
             if options_file_path:
@@ -97,7 +95,8 @@ class MCSequencer:
 
         # worker options pulled from file
         self.num_workers = all_options.get('num_workers', 1)
-        self.worker_solver_options = s_options
+        self.worker_solver_options = resolve_solver_options(self.config.solver, s_options)
+        logger.info('Using solver options: %s', redact_solver_options(self.worker_solver_options))
 
         # internal records
         self.solve_count = 0
@@ -117,7 +116,6 @@ class MCSequencer:
         # 4. copy & modify the base data to make per-dataset runs
         # 5. farm out the runs to workers
 
-
         # 0. Set up database for scenario
         self.writer.clear_scenario()
         self.writer.make_mc_tweaks_table()  # add the output table for tweaks, if not exists
@@ -125,6 +123,7 @@ class MCSequencer:
 
         # 1. Load data
         import contextlib
+
         with contextlib.closing(sqlite3.connect(self.config.input_database)) as con:
             hybrid_loader = HybridLoader(db_connection=con, config=self.config)
             data_store = hybrid_loader.create_data_dict(myopic_index=None)
@@ -138,6 +137,7 @@ class MCSequencer:
 
         # 4. Set up the workers
         import multiprocessing
+
         ctx = multiprocessing.get_context('spawn')
 
         num_workers = self.num_workers
@@ -151,10 +151,10 @@ class MCSequencer:
         log_queue: Queue[logging.LogRecord] = ctx.Queue()
         # make workers
         workers: list[BaseProcess] = []
-        kwargs = {
-            'solver_name': self.config.solver_name,
-            'solver_options': self.worker_solver_options,
-        }
+        # kwargs = {
+        #     'solver_name': self.config.solver_name,
+        #     'solver_options': self.worker_solver_options,
+        # }
         # construct path for the solver logs
         s_path = self.config.output_path / 'solver_logs'
         if not s_path.exists():

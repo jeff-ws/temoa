@@ -1,6 +1,7 @@
 """
 Performs top-level control over an MGA model run
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,16 +27,13 @@ if TYPE_CHECKING:
     from temoa.extensions.modeling_to_generate_alternatives.vector_manager import VectorManager
 
 
-
-
-
-
 import pyomo.environ as pyo
 from pyomo.opt import check_optimal_termination
 
 from temoa._internal.run_actions import build_instance
 from temoa._internal.table_writer import TableWriter
 from temoa.components.costs import total_cost_rule
+from temoa.core.solver_spec import redact_solver_options, resolve_solver_options
 from temoa.data_io.hybrid_loader import HybridLoader
 from temoa.extensions.modeling_to_generate_alternatives.manager_factory import get_manager
 from temoa.extensions.modeling_to_generate_alternatives.mga_constants import MgaAxis, MgaWeighting
@@ -96,16 +94,23 @@ class MgaSequencer:
                 with open(path, 'rb') as f:
                     all_options = tomllib.load(f)
             s_options = all_options.get(self.config.solver_name, {})
-            logger.info('Using solver options: %s', s_options)
 
         except FileNotFoundError:
             logger.warning('Unable to find solver options toml file.  Using default options.')
             s_options = {}
             all_options = {}
 
-        # get handle on solver instance
+        # get handle on solver instance.  The base solve only receives the user's
+        # [solver.options] (no Temoa defaults, no worker options) to get a more precise base cost
         self.opt = pyo.SolverFactory(self.config.solver_name)
-        self.worker_solver_options = s_options
+        for option, option_value in resolve_solver_options(
+            self.config.solver, include_defaults=False
+        ).items():
+            self.opt.options[option] = option_value
+        self.worker_solver_options = resolve_solver_options(self.config.solver, s_options)
+        logger.info(
+            'Using worker solver options: %s', redact_solver_options(self.worker_solver_options)
+        )
 
         # some defaults, etc.
         self.internal_stop = False
@@ -124,13 +129,13 @@ class MgaSequencer:
         except KeyError:
             logger.warning('No/bad MGA Weighting specified.  Using default: Hull Expansion')
             self.mga_weighting = MgaWeighting.HULL_EXPANSION
-        self.num_workers = int(cast(str | int, all_options.get('num_workers', 1)))
+        self.num_workers = int(cast('str | int', all_options.get('num_workers', 1)))
         logger.info('MGA workers are set to %s', self.num_workers)
-        self.iteration_limit = int(cast(str | int, mga_inputs.get('iteration_limit', 20)))
+        self.iteration_limit = int(cast('str | int', mga_inputs.get('iteration_limit', 20)))
         logger.info('Set MGA iteration limit to: %d', self.iteration_limit)
-        self.time_limit_hrs = float(cast(str | float, mga_inputs.get('time_limit_hrs', 12)))
+        self.time_limit_hrs = float(cast('str | float', mga_inputs.get('time_limit_hrs', 12)))
         logger.info('Set MGA time limit hours to: %0.1f', self.time_limit_hrs)
-        self.cost_epsilon = float(cast(str | float, mga_inputs.get('cost_epsilon', 0.05)))
+        self.cost_epsilon = float(cast('str | float', mga_inputs.get('cost_epsilon', 0.05)))
         logger.info('Set MGA cost (relaxation) epsilon to: %0.3f', self.cost_epsilon)
 
         # internal records
@@ -164,7 +169,10 @@ class MgaSequencer:
         hybrid_loader = HybridLoader(db_connection=self.con, config=self.config)
         data_portal: DataPortal = hybrid_loader.load_data_portal(myopic_index=None)
         instance: TemoaModel = build_instance(
-            loaded_portal=data_portal, model_name=self.config.scenario, silent=self.config.silent
+            loaded_portal=data_portal,
+            model_name=self.config.scenario,
+            silent=self.config.silent,
+            extensions=self.config.extensions,
         )
         if self.config.price_check:
             good_prices = price_checker(instance)
@@ -355,8 +363,10 @@ class MgaSequencer:
             elapsed.total_seconds(),
             status.name,
         )
-        return status == pyo.TerminationCondition.optimal or \
-            str(status) == 'convergenceCriteriaSatisfied'
+        return (
+            status == pyo.TerminationCondition.optimal
+            or str(status) == 'convergenceCriteriaSatisfied'
+        )
 
     def process_solve_results(self, instance: TemoaModel) -> None:
         """write the results as required"""

@@ -18,6 +18,12 @@ scenario = "zulu"
 #     [perfect_foresight, MGA, myopic, method_of_morris, build_only, check, monte_carlo]
 scenario_mode = "perfect_foresight"
 
+# Optional extensions list
+# Use this to enable modular model features that are not part of the base core model.
+# Example: extensions = ["unit_commitment", "growth_rates"]
+# Leave empty for default core-only behavior.
+extensions = []
+
 # Input database (Mandatory)
 input_database = "utopia.sqlite"
 
@@ -69,8 +75,15 @@ neos = false
 
 # solver (Mandatory)
 # Depending on what client machine has installed.
-#  [appsi_highs, cbc, gurobi, cplex, ...]
-solver_name = "appsi_highs"
+#  [appsi_highs, cbc, gurobi, cplex, ...]  (any solver available through pyomo's SolverFactory)
+# Either a solver name, which uses Temoa's default options for that solver:
+solver = "appsi_highs"
+# or a name plus options passed through to the solver, which are merged over Temoa's defaults
+# (use an inline table here, as a [solver] table header would capture the keys that follow it):
+# solver = { name = "gurobi", options = { Method = 2, Crossover = 0, BarConvTol = 1.0e-3, FeasibilityTol = 1.0e-4, BarOrder = -1 } }
+# Keep license credentials (e.g. gurobi WLS keys) in the solver's license file (gurobi.lic), not
+# in these options.
+# Note: 'solver_name' is deprecated but still accepted in place of 'solver'
 
 # ------------------------------------
 #             OUTPUTS
@@ -81,7 +94,7 @@ solver_name = "appsi_highs"
 save_excel = true
 
 # save the duals in the output Database (may slow execution slightly?)
-save_duals = true
+save_duals = false
 
 # save storage levels by time slice (may be a large amount of data)
 save_storage_levels = true

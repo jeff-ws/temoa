@@ -9,7 +9,7 @@ import logging
 import sqlite3
 import sys
 from collections.abc import Iterable
-from typing import Any, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from pyomo.core import Constraint, Expression, Objective, value
 from pyomo.opt import check_optimal_termination
@@ -19,6 +19,7 @@ from temoa._internal.table_writer import TableWriter
 from temoa.components.costs import total_cost_rule
 from temoa.core.config import TemoaConfig
 from temoa.core.model import TemoaModel
+from temoa.core.solver_spec import resolve_solver_options
 from temoa.data_io.hybrid_loader import HybridLoader
 from temoa.extensions.single_vector_mga.output_summary import summarize
 from temoa.model_checking.pricing_check import price_checker
@@ -79,6 +80,7 @@ class SvMgaSequencer:
             silent=self.config.silent,
             keep_lp_file=self.config.save_lp_file,
             lp_path=lp_path,
+            extensions=self.config.extensions,
         )
         if self.config.price_check:
             good_prices = price_checker(instance)
@@ -99,6 +101,7 @@ class SvMgaSequencer:
             solver_name=self.config.solver_name,
             silent=self.config.silent,
             solver_suffixes=suffixes,
+            solver_options=resolve_solver_options(self.config.solver),
         )
         status = res.solver.termination_condition
         logger.debug('Termination condition: %s', status.name)
@@ -162,6 +165,7 @@ class SvMgaSequencer:
             solver_name=self.config.solver_name,
             silent=self.config.silent,
             solver_suffixes=suffixes,
+            solver_options=resolve_solver_options(self.config.solver),
         )
         status = res.solver.termination_condition
         logger.debug('Termination condition: %s', status.name)

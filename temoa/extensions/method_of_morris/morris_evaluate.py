@@ -2,6 +2,7 @@
 This module contains the core "evaluation" function for Method Of Morris.  It needs to be isolated
 (outside of class) to enable parallelization.
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,7 +20,6 @@ if TYPE_CHECKING:
     from temoa.core.config import TemoaConfig
 
 
-
 def configure_worker_logger(log_queue: Any, log_level: int) -> logging.Logger:
     """configure the logger"""
     worker_logger = logging.getLogger('MM evaluate')
@@ -35,8 +35,16 @@ def configure_worker_logger(log_queue: Any, log_level: int) -> logging.Logger:
     return worker_logger
 
 
-def evaluate(param_info: dict[int, list[Any]], mm_sample: Any, data: dict[str, Any],
-            i: int, config: TemoaConfig, log_queue: Any, log_level: int) -> list[float]:
+def evaluate(
+    param_info: dict[int, list[Any]],
+    mm_sample: Any,
+    data: dict[str, Any],
+    i: int,
+    config: TemoaConfig,
+    log_queue: Any,
+    log_level: int,
+    solver_options: dict[str, Any] | None = None,
+) -> list[float]:
     """
     Run model for params provided and return objective value and emission value
     Note:  This function needs to be a static instance to enable the parallel
@@ -47,6 +55,7 @@ def evaluate(param_info: dict[int, list[Any]], mm_sample: Any, data: dict[str, A
     :param data: Data used to build the Data Portal
     :param i: indexing number
     :param config: The config file to pull run data from
+    :param solver_options: resolved solver options.  If None, the Temoa defaults are used
     :return: list of objective value and CO2 emission value
     """
     # get the logger configured...
@@ -67,9 +76,16 @@ def evaluate(param_info: dict[int, list[Any]], mm_sample: Any, data: dict[str, A
     logger.debug('\n  '.join(log_entry))
 
     dp = DataPortal(data_dict={None: data})
-    instance = run_actions.build_instance(loaded_portal=dp, silent=True)
+    instance = run_actions.build_instance(
+        loaded_portal=dp,
+        silent=True,
+        extensions=config.extensions,
+    )
     mdl, res = run_actions.solve_instance(
-        instance=instance, solver_name=config.solver_name, silent=True
+        instance=instance,
+        solver_name=config.solver_name,
+        silent=True,
+        solver_options=solver_options,
     )
     status = run_actions.check_solve_status(res)
     if not status:
@@ -77,6 +93,7 @@ def evaluate(param_info: dict[int, list[Any]], mm_sample: Any, data: dict[str, A
     with TableWriter(config) as table_writer:
         table_writer.write_mm_results(model=mdl, iteration=i)
     import contextlib
+
     with contextlib.closing(sqlite3.connect(config.input_database)) as con:
         cur = con.cursor()
         scenario_name = config.scenario + f'-{i}'

@@ -27,6 +27,7 @@ from temoa._internal.run_actions import (
 from temoa.core.config import TemoaConfig
 from temoa.core.model import TemoaModel
 from temoa.core.modes import TemoaMode
+from temoa.core.solver_spec import resolve_solver_options
 from temoa.data_io.hybrid_loader import HybridLoader
 from temoa.extensions.method_of_morris.morris_sequencer import MorrisSequencer
 from temoa.extensions.modeling_to_generate_alternatives.mga_sequencer import MgaSequencer
@@ -140,7 +141,11 @@ class TemoaSequencer:
                 tune_sqlite_connection(con, self.config)
                 hybrid_loader = HybridLoader(db_connection=con, config=self.config)
                 data_portal = hybrid_loader.load_data_portal(myopic_index=None)
-                instance = build_instance(data_portal, silent=self.config.silent)
+                instance = build_instance(
+                    data_portal,
+                    silent=self.config.silent,
+                    extensions=self.config.extensions,
+                )
 
             logger.info('Model build process complete.')
             return instance
@@ -220,6 +225,7 @@ class TemoaSequencer:
                 silent=self.config.silent,
                 keep_lp_file=self.config.save_lp_file,
                 lp_path=self.config.output_path,
+                extensions=self.config.extensions,
             )
             if not self.config.price_check:
                 logger.warning('Price check is automatically enabled for CHECK mode.')
@@ -238,6 +244,7 @@ class TemoaSequencer:
                 silent=self.config.silent,
                 keep_lp_file=self.config.save_lp_file,
                 lp_path=self.config.output_path,
+                extensions=self.config.extensions,
             )
             if self.config.price_check:
                 price_checker(instance)
@@ -248,6 +255,7 @@ class TemoaSequencer:
                 self.config.solver_name,
                 silent=self.config.silent,
                 solver_suffixes=suffixes,
+                solver_options=resolve_solver_options(self.config.solver),
             )
             good_solve, msg = check_solve_status(self.pf_results)
             if not good_solve:
